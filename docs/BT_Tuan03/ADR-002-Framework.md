@@ -1,15 +1,23 @@
-# ADR-002: Backend Framework
+# ARCHITECTURE DECISION RECORD
+## ADR-002: Framework Selection
 
-## Status
-Accepted
+### 1. BỐI CẢNH (Context)
+Hệ thống cần giao diện web hiện đại và backend tách biệt theo kiến trúc Client–Server.
 
-## Context
-Cần API linh hoạt, dễ mở rộng, phù hợp Scrum.
+### 2. CÁC PHƯƠNG ÁN XEM XÉT (Options Considered)
+- React.js + Node.js
+- Angular + Spring Boot
+- ASP.NET MVC
 
-## Decision
-Chọn Node.js + Express cho backend, React cho frontend.
+### 3. QUYẾT ĐỊNH (Decision)
+Nhóm chọn React.js cho frontend và Node.js (Express) cho backend do tính linh hoạt, phổ biến và phù hợp với kiến trúc phân tầng.
 
-## Consequences
-- Phát triển nhanh
-- Phù hợp xu hướng web hiện đại
-- Dễ tích hợp REST API
+### 4. HẬU QUẢ (Consequences)
+- Dễ chia module, dễ bảo trì
+- Phù hợp phát triển theo Scrum
+- Cần quản lý tốt bất đồng bộ
+
+### 5. LIÊN QUAN (Related)
+- Use Case Diagram
+- Class Diagram
+- ADR-001
