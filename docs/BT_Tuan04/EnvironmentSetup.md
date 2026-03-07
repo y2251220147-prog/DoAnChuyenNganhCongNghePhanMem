@@ -16,7 +16,7 @@ Tech stack:
 
 Version: 18+
 
-Download:
+Download:  
 https://nodejs.org
 
 Kiểm tra:
@@ -60,3 +60,72 @@ Extensions:
 ---
 
 # 2. Project Structure
+
+project-root  
+│  
+├── client  
+│   ├── src  
+│   ├── components  
+│   ├── pages  
+│  
+├── server  
+│   ├── controllers  
+│   ├── routes  
+│   ├── models  
+│   ├── config  
+│  
+└── docs  
+
+---
+
+# 3. Environment Variables
+
+File `.env.example`
+
+PORT=5000
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=password
+DB_NAME=event_management
+JWT_SECRET=secret_key
+
+Lưu ý:
+
+- Không commit file `.env`
+- Chỉ commit `.env.example`
+
+---
+
+# 4. Run Project
+
+Backend
+
+cd server
+npm install
+npm start
+
+---
+
+# 5. Database Connection
+
+Node.js sử dụng thư viện mysql2.
+
+Example:
+
+```javascript
+const mysql = require("mysql2")
+
+const db = mysql.createConnection({
+  host: "localhost",
+  user: "root",
+  password: "password",
+  database: "event_management"
+})
+
+db.connect((err) => {
+  if (err) {
+    console.error("Database connection failed:", err)
+    return
+  }
+  console.log("Connected to MySQL database")
+})
