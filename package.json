@@ -1,0 +1,17 @@
+{
+  "name": "event-management-server",
+  "version": "1.0.0",
+  "description": "Backend for event management system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.3",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1"
+  }
+}
