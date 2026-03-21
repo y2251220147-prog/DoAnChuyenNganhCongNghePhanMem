@@ -1,12 +1,15 @@
 import { useContext, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { login } from "../services/authService";
+import "../styles/layout.css";
 
 export default function Login() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const { loginUser } = useContext(AuthContext);
 
@@ -15,6 +18,8 @@ export default function Login() {
     const handleSubmit = async (e) => {
 
         e.preventDefault();
+        setError("");
+        setLoading(true);
 
         try {
 
@@ -22,40 +27,68 @@ export default function Login() {
 
             loginUser(res.data.token);
 
-            alert("Login success");
-
             navigate("/dashboard");
 
         } catch (err) {
 
-            alert(err.response?.data?.message || "Login failed");
+            setError(err.response?.data?.message || "Đăng nhập thất bại");
 
+        } finally {
+            setLoading(false);
         }
 
     };
 
     return (
 
-        <div>
+        <div className="auth-page">
 
-            <h2>Login</h2>
+            <div className="auth-card">
 
-            <form onSubmit={handleSubmit}>
+                <h2>🎯 Event Manager</h2>
+                <p className="auth-subtitle">Đăng nhập vào hệ thống</p>
 
-                <input
-                    placeholder="Email"
-                    onChange={(e) => setEmail(e.target.value)}
-                />
+                {error && (
+                    <div className="alert alert-error">{error}</div>
+                )}
 
-                <input
-                    type="password"
-                    placeholder="Password"
-                    onChange={(e) => setPassword(e.target.value)}
-                />
+                <form onSubmit={handleSubmit}>
 
-                <button>Login</button>
+                    <div className="form-group">
+                        <label>Email</label>
+                        <input
+                            className="form-control"
+                            placeholder="Nhập email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                    </div>
 
-            </form>
+                    <div className="form-group">
+                        <label>Mật khẩu</label>
+                        <input
+                            className="form-control"
+                            type="password"
+                            placeholder="Nhập mật khẩu"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    <button className="btn btn-primary" disabled={loading}>
+                        {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+                    </button>
+
+                </form>
+
+                <div className="auth-link">
+                    Chưa có tài khoản? <Link to="/register">Đăng ký</Link>
+                </div>
+
+            </div>
 
         </div>
 

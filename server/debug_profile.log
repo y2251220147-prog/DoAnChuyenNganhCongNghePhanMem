@@ -1,0 +1,4 @@
+[2026-03-20T20:29:34.349Z] Updating Profile for ID: 10
+[2026-03-20T20:29:34.351Z] Incoming Data: {"name":"Nguyễn","email":"user@gmail.com","phone":"0795677494","address":"Đà Ning","gender":"male"}
+[2026-03-20T20:29:34.354Z] Final Merged Data for DB: {"name":"Nguyễn","email":"user@gmail.com","phone":"0795677494","address":"Đà Ning","gender":"male"}
+[2026-03-20T20:29:34.358Z] Update Result: {"fieldCount":0,"affectedRows":1,"insertId":0,"info":"Rows matched: 1  Changed: 1  Warnings: 0","serverStatus":2,"warningStatus":0,"changedRows":1}

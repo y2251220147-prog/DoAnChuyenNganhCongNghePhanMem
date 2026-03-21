@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
+const db = require("../config/database");
 
 exports.register = async (req, res) => {
 
@@ -17,26 +18,28 @@ exports.register = async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-
+        
         const id = await User.createUser({
             name,
             email,
-            password: hashedPassword
+            password: hashedPassword,
+            phone: req.body.phone,
+            address: req.body.address,
+            gender: req.body.gender,
+            is_verified: 1
         });
 
-        res.json({
-            message: "Register success",
+        res.status(201).json({
+            message: "Đăng ký thành công!",
             userId: id
         });
 
     } catch (err) {
-
+        console.error("Register Error:", err);
         res.status(500).json({
             message: err.message
         });
-
     }
-
 };
 
 exports.login = async (req, res) => {
@@ -147,3 +150,7 @@ exports.resetPassword = async (req, res) => {
     }
 
 };
+
+/* 
+Verification logic removed as per user request.
+*/

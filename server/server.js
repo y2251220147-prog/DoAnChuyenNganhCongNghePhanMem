@@ -1,39 +1,51 @@
 const express = require("express");
 const cors = require("cors");
 
+// Routes
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const staffRoutes = require("./routes/staffRoutes");
 const guestRoutes = require("./routes/guestRoutes");
 const timelineRoutes = require("./routes/timelineRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
-const authRoutes = require("./routes/authRoutes");
+const partnerRoutes = require("./routes/partnerRoutes");
+const communicationRoutes = require("./routes/communicationRoutes");
+const evaluationRoutes = require("./routes/evaluationRoutes");
+const taskRoutes = require("./routes/taskRoutes");
 
+// Controllers
 const checkinController = require("./controllers/checkinController");
 
-/* PHẢI TẠO APP TRƯỚC */
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-/* SAU ĐÓ MỚI DÙNG ROUTE */
+// API Mounting
+app.use("/api/auth", authRoutes);
+app.use("/api", userRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/guests", guestRoutes);
 app.use("/api/timeline", timelineRoutes);
-app.use("/api/budgets", budgetRoutes);
-app.use("/api/auth", authRoutes);
+app.use("/api/budget", budgetRoutes);
+app.use("/api/partners", partnerRoutes);
+app.use("/api/communication", communicationRoutes);
+app.use("/api/evaluation", evaluationRoutes);
+app.use("/api/tasks", taskRoutes);
 
+// Special endpoints
 app.post("/api/checkin", checkinController.checkin);
 
 app.get("/", (req, res) => {
     res.send("Server running");
 });
 
-/* Chỉ chạy server khi không phải test */
 if (process.env.NODE_ENV !== "test") {
-    app.listen(5000, () => {
-        console.log("Server running on port 5000");
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
     });
 }
 

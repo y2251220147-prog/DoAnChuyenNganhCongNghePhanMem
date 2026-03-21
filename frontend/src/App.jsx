@@ -1,53 +1,145 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { useContext } from "react";
+import { AuthContext } from "./context/AuthContext";
 
-import AdminUsers from "./pages/AdminUsers";
-import BudgetList from "./pages/Budget/BudgetList";
-import CheckinScanner from "./pages/Checkin/CheckinScanner";
-import Dashboard from "./pages/Dashboard/Dashboard";
-import Events from "./pages/Events/EventList";
-import AddGuest from "./pages/Guests/AddGuest";
-import GuestList from "./pages/Guests/GuestList";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
+import Dashboard from "./pages/Dashboard/Dashboard";
+import AdminUsers from "./pages/AdminUsers";
+import OrganizerUsers from "./pages/OrganizerUsers";
+import UserProfile from "./pages/UserProfile";
+import Events from "./pages/Events/EventList";
+import EventDetail from "./pages/Events/EventDetail";
+import CreateEvent from "./pages/Events/CreateEvent";
+import EditEvent from "./pages/Events/EditEvent";
+import GuestList from "./pages/Guests/GuestList";
+import AddGuest from "./pages/Guests/AddGuest";
 import StaffList from "./pages/Staff/StaffList";
 import TimelineList from "./pages/Timeline/TimelineList";
+import BudgetList from "./pages/Budget/BudgetList";
+import CheckinScanner from "./pages/Checkin/CheckinScanner";
+
+// Protected Route component
+function ProtectedRoute({ children, allowedRoles }) {
+    const { user, token } = useContext(AuthContext);
+
+    if (!token) {
+        return <Navigate to="/" replace />;
+    }
+
+    if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+}
+
 function App() {
 
-  return (
+    return (
 
-    <BrowserRouter>
+        <BrowserRouter>
 
-      <Routes>
+            <Routes>
 
-        <Route path="/" element={<Login />} />
+                {/* Public routes */}
+                <Route path="/" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/verify/:token" element={<VerifyEmail />} />
 
-        <Route path="/register" element={<Register />} />
+                {/* Protected routes - all authenticated users */}
+                <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                        <Dashboard />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/profile" element={
+                    <ProtectedRoute>
+                        <UserProfile />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/events" element={
+                    <ProtectedRoute>
+                        <Events />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/events" element={<Events />} />
+                <Route path="/events/create" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <CreateEvent />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/events/edit/:id" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <EditEvent />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/guests" element={<GuestList />} />
+                <Route path="/events/:id" element={
+                    <ProtectedRoute>
+                        <EventDetail />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/guests/add" element={<AddGuest />} />
+                <Route path="/guests" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <GuestList />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/staff" element={<StaffList />} />
+                <Route path="/guests/add" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <AddGuest />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/timeline" element={<TimelineList />} />
+                <Route path="/staff" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <StaffList />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/budget" element={<BudgetList />} />
+                <Route path="/timeline" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <TimelineList />
+                    </ProtectedRoute>
+                } />
 
-        <Route path="/checkin" element={<CheckinScanner />} />
-      </Routes>
+                <Route path="/budget" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <BudgetList />
+                    </ProtectedRoute>
+                } />
 
-    </BrowserRouter>
+                <Route path="/checkin" element={
+                    <ProtectedRoute allowedRoles={["admin", "organizer"]}>
+                        <CheckinScanner />
+                    </ProtectedRoute>
+                } />
 
-  );
+                {/* Admin only */}
+                <Route path="/admin/users" element={
+                    <ProtectedRoute allowedRoles={["admin"]}>
+                        <AdminUsers />
+                    </ProtectedRoute>
+                } />
+
+                {/* Organizer only */}
+                <Route path="/organizer/users" element={
+                    <ProtectedRoute allowedRoles={["organizer"]}>
+                        <OrganizerUsers />
+                    </ProtectedRoute>
+                } />
+
+            </Routes>
+
+        </BrowserRouter>
+
+    );
 
 }
 

@@ -1,30 +1,35 @@
 const express = require("express");
 const router = express.Router();
-const { getUsers, changeRole } = require("../controllers/userController");
+const userController = require("../controllers/userController");
+const authController = require("../controllers/authController");
 const auth = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 
-const userController = require("../controllers/userController");
-const authController = require("../controllers/authController");
+// PROFILE ROUTES (any authenticated user)
+router.get("/profile", auth, userController.getProfile);
+router.put("/profile", auth, userController.updateProfile);
 
-// REGISTER
-router.post("/register", authController.register);
-
-// LOGIN
-router.post("/login", authController.login);
-// VERIFY TOKEN
-router.get("/verify", auth, authController.verifyToken);
-// RESET PASSWORD
-router.put("/reset-password", auth, authController.resetPassword);
-
-router.get("/users", getUsers);
-router.put("/users/:id/role", changeRole);
-// ADMIN APIs
+// USER LIST (admin and organizer can view)
 router.get(
     "/users",
     auth,
-    authorize(["admin"]),
+    authorize(["admin", "organizer"]),
     userController.getUsers
+);
+
+// ADMIN-ONLY ROUTES
+router.post(
+    "/users",
+    auth,
+    authorize(["admin"]),
+    userController.createUser
+);
+
+router.put(
+    "/users/:id",
+    auth,
+    authorize(["admin"]),
+    userController.updateUser
 );
 
 router.put(
@@ -33,16 +38,12 @@ router.put(
     authorize(["admin"]),
     userController.changeRole
 );
-// VERIFY TOKEN
-router.get(
-    "/verify",
+
+router.delete(
+    "/users/:id",
     auth,
-    authController.verifyToken
+    authorize(["admin"]),
+    userController.deleteUser
 );
-// RESET PASSWORD
-router.put(
-    "/reset-password",
-    auth,
-    authController.resetPassword
-);
+
 module.exports = router;
