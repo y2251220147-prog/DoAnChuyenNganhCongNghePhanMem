@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
@@ -7,6 +8,7 @@ const guestRoutes = require("./routes/guestRoutes");
 const timelineRoutes = require("./routes/timelineRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const checkinController = require("./controllers/checkinController");
 
@@ -23,6 +25,7 @@ app.use("/api/guests", guestRoutes);
 app.use("/api/timeline", timelineRoutes);
 app.use("/api/budgets", budgetRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 
 app.post("/api/checkin", checkinController.checkin);
 

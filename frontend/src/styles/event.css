@@ -1,19 +1,36 @@
+/* event.css – now uses design system variables from index.css */
+
 .event-container {
-    padding: 20px;
+    /* Replaced by Layout + global.css .data-table-wrapper */
 }
 
 .event-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
 }
 
+/* Legacy selectors kept for backward compat, mapped to design system */
 .create-btn {
-    background: #007bff;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     border: none;
-    padding: 10px 15px;
+    border-radius: var(--border-radius-sm);
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.create-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
 }
 
 .event-table {
@@ -23,39 +40,85 @@
 
 .event-table th,
 .event-table td {
-    border: 1px solid #ddd;
-    padding: 10px;
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13.5px;
 }
 
 .event-table th {
-    background: #f4f4f4;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    background: #f8fafc;
+}
+
+.event-table tbody tr:hover {
+    background: #fafbff;
 }
 
 .delete-btn {
-    background: red;
+    background: var(--color-danger);
     color: white;
     border: none;
-    padding: 6px 10px;
+    padding: 5px 12px;
+    border-radius: var(--border-radius-sm);
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
+    transition: var(--transition);
+}
+
+.delete-btn:hover {
+    background: var(--color-danger-dark);
+    transform: translateY(-1px);
 }
 
 .event-form {
-    width: 400px;
+    width: 100%;
+    max-width: 500px;
     margin: auto;
-    padding: 20px;
+    padding: 24px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
 }
 
 .event-form input,
 .event-form textarea {
     width: 100%;
-    margin-bottom: 10px;
-    padding: 8px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    transition: var(--transition);
+    outline: none;
+}
+
+.event-form input:focus,
+.event-form textarea:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
 .event-form button {
-    background: #28a745;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     color: white;
     border: none;
-    padding: 10px;
+    padding: 12px;
     width: 100%;
+    border-radius: var(--border-radius-sm);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.event-form button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
 }
