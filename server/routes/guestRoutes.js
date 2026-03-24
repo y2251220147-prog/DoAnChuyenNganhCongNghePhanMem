@@ -1,12 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const guestController = require("../controllers/guestController");
-const authMiddleware = require("../middlewares/authMiddleware");
-const authorize = require("../middlewares/authorize");
 
-router.get("/", authMiddleware, guestController.getAllGuests);
-router.get("/event/:eventId", authMiddleware, guestController.getGuestsByEvent);
-router.post("/", authMiddleware, authorize(["admin", "organizer"]), guestController.createGuest);
-router.delete("/:id", authMiddleware, authorize(["admin", "organizer"]), guestController.deleteGuest);
+router.get("/", guestController.getAllGuests);
+router.post("/", guestController.createGuest);
 
 module.exports = router;

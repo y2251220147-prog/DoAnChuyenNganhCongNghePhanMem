@@ -1,36 +1,19 @@
-/* event.css – now uses design system variables from index.css */
-
 .event-container {
-    /* Replaced by Layout + global.css .data-table-wrapper */
+    padding: 20px;
 }
 
 .event-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     margin-bottom: 20px;
 }
 
-/* Legacy selectors kept for backward compat, mapped to design system */
 .create-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 9px 18px;
-    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    background: #007bff;
     color: white;
     border: none;
-    border-radius: var(--border-radius-sm);
-    font-size: 13px;
-    font-weight: 600;
+    padding: 10px 15px;
     cursor: pointer;
-    transition: var(--transition);
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
-}
-
-.create-btn:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
 }
 
 .event-table {
@@ -40,85 +23,39 @@
 
 .event-table th,
 .event-table td {
-    padding: 12px 16px;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 13.5px;
+    border: 1px solid #ddd;
+    padding: 10px;
 }
 
 .event-table th {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    background: #f8fafc;
-}
-
-.event-table tbody tr:hover {
-    background: #fafbff;
+    background: #f4f4f4;
 }
 
 .delete-btn {
-    background: var(--color-danger);
+    background: red;
     color: white;
     border: none;
-    padding: 5px 12px;
-    border-radius: var(--border-radius-sm);
-    font-size: 12px;
-    font-weight: 600;
+    padding: 6px 10px;
     cursor: pointer;
-    transition: var(--transition);
-}
-
-.delete-btn:hover {
-    background: var(--color-danger-dark);
-    transform: translateY(-1px);
 }
 
 .event-form {
-    width: 100%;
-    max-width: 500px;
+    width: 400px;
     margin: auto;
-    padding: 24px;
-    background: white;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-md);
+    padding: 20px;
 }
 
 .event-form input,
 .event-form textarea {
     width: 100%;
-    margin-bottom: 12px;
-    padding: 10px 14px;
-    border: 1.5px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    font-size: 14px;
-    font-family: 'Inter', sans-serif;
-    transition: var(--transition);
-    outline: none;
-}
-
-.event-form input:focus,
-.event-form textarea:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    margin-bottom: 10px;
+    padding: 8px;
 }
 
 .event-form button {
-    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    background: #28a745;
     color: white;
     border: none;
-    padding: 12px;
+    padding: 10px;
     width: 100%;
-    border-radius: var(--border-radius-sm);
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.event-form button:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
 }

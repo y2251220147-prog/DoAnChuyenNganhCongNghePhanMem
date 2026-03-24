@@ -5,13 +5,13 @@ export const register = (data) => {
 };
 
 export const login = (data) => {
-    return api.post("/auth/login", data);
+    return api.post("auth/login", data);
 };
 
 export const verifyToken = () => {
-    return api.get("/auth/verify");
+    return api.get("/verify");
 };
 
 export const resetPassword = (data) => {
-    return api.put("/auth/reset-password", data);
+    return api.put("/reset-password", data);
 };

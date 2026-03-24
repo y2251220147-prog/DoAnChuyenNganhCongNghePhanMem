@@ -1,59 +1,59 @@
-// import { useState } from "react";
-// import { useNavigate } from "react-router-dom";
-// import { createEvent } from "../../services/eventService";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createEvent } from "../../services/eventService";
 
-// export default function CreateEvent() {
+export default function CreateEvent() {
 
-//     const navigate = useNavigate();
+    const navigate = useNavigate();
 
-//     const [name, setName] = useState("");
-//     const [date, setDate] = useState("");
-//     const [location, setLocation] = useState("");
-//     const [description, setDescription] = useState("");
+    const [name, setName] = useState("");
+    const [date, setDate] = useState("");
+    const [location, setLocation] = useState("");
+    const [description, setDescription] = useState("");
 
-//     const submit = async (e) => {
+    const submit = async (e) => {
 
-//         e.preventDefault();
+        e.preventDefault();
 
-//         await createEvent({
-//             name,
-//             date,
-//             location,
-//             description
-//         });
+        await createEvent({
+            name,
+            date,
+            location,
+            description
+        });
 
-//         navigate("/events");
+        navigate("/events");
 
-//     };
+    };
 
-//     return (
-//         <form onSubmit={submit}>
+    return (
+        <form onSubmit={submit}>
 
-//             <h2>Create Event</h2>
+            <h2>Create Event</h2>
 
-//             <input
-//                 placeholder="Event name"
-//                 onChange={(e) => setName(e.target.value)}
-//             />
+            <input
+                placeholder="Event name"
+                onChange={(e) => setName(e.target.value)}
+            />
 
-//             <input
-//                 type="date"
-//                 onChange={(e) => setDate(e.target.value)}
-//             />
+            <input
+                type="date"
+                onChange={(e) => setDate(e.target.value)}
+            />
 
-//             <input
-//                 placeholder="Location"
-//                 onChange={(e) => setLocation(e.target.value)}
-//             />
+            <input
+                placeholder="Location"
+                onChange={(e) => setLocation(e.target.value)}
+            />
 
-//             <textarea
-//                 placeholder="Description"
-//                 onChange={(e) => setDescription(e.target.value)}
-//             />
+            <textarea
+                placeholder="Description"
+                onChange={(e) => setDescription(e.target.value)}
+            />
 
-//             <button>Create</button>
+            <button>Create</button>
 
-//         </form>
-//     );
+        </form>
+    );
 
-// }
+}
