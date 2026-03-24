@@ -1,46 +1,37 @@
-const Staff = require("../models/staffModel");
+const staffService = require("../services/staffService");
 
 exports.getAllStaff = async (req, res) => {
-
     try {
-
-        const staff = await Staff.getAll();
-
+        const staff = await staffService.getAllStaff();
         res.json(staff);
-
     } catch (err) {
-
-        res.status(500).json({
-            message: err.message
-        });
-
+        res.status(err.status || 500).json({ message: err.message });
     }
+};
 
+exports.getStaffByEvent = async (req, res) => {
+    try {
+        const staff = await staffService.getStaffByEvent(req.params.eventId);
+        res.json(staff);
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
 };
 
 exports.assignStaff = async (req, res) => {
-
-    const { event_id, user_id, role } = req.body;
-
     try {
-
-        const id = await Staff.assign({
-            event_id,
-            user_id,
-            role
-        });
-
-        res.json({
-            message: "Staff assigned",
-            id
-        });
-
+        const result = await staffService.assignStaff(req.body);
+        res.status(201).json({ message: "Staff assigned", ...result });
     } catch (err) {
-
-        res.status(500).json({
-            message: err.message
-        });
-
+        res.status(err.status || 500).json({ message: err.message });
     }
+};
 
+exports.removeStaff = async (req, res) => {
+    try {
+        await staffService.removeStaff(req.params.id);
+        res.json({ message: "Staff removed" });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
 };
