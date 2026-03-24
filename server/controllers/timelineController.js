@@ -1,48 +1,46 @@
-const db = require("../config/database");
+const timelineService = require("../services/timelineService");
 
-exports.getAllTimeline = (req, res) => {
-
-    const sql = "SELECT * FROM event_timeline";
-
-    db.query(sql, (err, results) => {
-
-        if (err) {
-            console.error("Timeline GET error:", err);
-            return res.status(500).json({ error: err.message });
-        }
-
-        res.status(200).json(results);
-
-    });
-
+exports.getAllTimeline = async (req, res) => {
+    try {
+        const items = await timelineService.getAllTimeline();
+        res.json(items);
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
 };
 
-exports.createTimeline = (req, res) => {
+exports.getTimelineByEvent = async (req, res) => {
+    try {
+        const items = await timelineService.getTimelineByEvent(req.params.eventId);
+        res.json(items);
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
 
-    const { event_id, title, start_time, end_time, description } = req.body;
+exports.createTimeline = async (req, res) => {
+    try {
+        const result = await timelineService.createTimeline(req.body);
+        res.status(201).json({ message: "Timeline created", ...result });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
 
-    const sql = `
-        INSERT INTO event_timeline
-        (event_id, title, start_time, end_time, description)
-        VALUES (?, ?, ?, ?, ?)
-    `;
+exports.updateTimeline = async (req, res) => {
+    try {
+        await timelineService.updateTimeline(req.params.id, req.body);
+        res.json({ message: "Timeline updated" });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
 
-    db.query(
-        sql,
-        [event_id, title, start_time, end_time, description],
-        (err, result) => {
-
-            if (err) {
-                console.error("Timeline INSERT error:", err);
-                return res.status(500).json({ error: err.message });
-            }
-
-            res.status(200).json({
-                message: "Timeline created",
-                id: result.insertId
-            });
-
-        }
-    );
-
+exports.deleteTimeline = async (req, res) => {
+    try {
+        await timelineService.deleteTimeline(req.params.id);
+        res.json({ message: "Timeline deleted" });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
 };

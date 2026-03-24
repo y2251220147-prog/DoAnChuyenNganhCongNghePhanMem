@@ -1,0 +1,18 @@
+import api from "./api";
+export const getVenues = () => api.get("/venues");
+export const getVenueById = (id) => api.get(`/venues/${id}`);
+export const createVenue = (d) => api.post("/venues", d);
+export const updateVenue = (id, d) => api.put(`/venues/${id}`, d);
+export const deleteVenue = (id) => api.delete(`/venues/${id}`);
+export const getEventVenueBookings = (eid) => api.get(`/venues/bookings/event/${eid}`);
+export const bookVenue = (d) => api.post("/venues/bookings", d);
+export const updateVenueBooking = (id, d) => api.patch(`/venues/bookings/${id}`, d);
+export const deleteVenueBooking = (id) => api.delete(`/venues/bookings/${id}`);
+export const getAllResources = () => api.get("/venues/resources/all");
+export const getEventResources = (eid) => api.get(`/venues/resources/event/${eid}`);
+export const createResource = (d) => api.post("/venues/resources", d);
+export const updateResource = (id, d) => api.put(`/venues/resources/${id}`, d);
+export const deleteResource = (id) => api.delete(`/venues/resources/${id}`);
+export const bookResource = (d) => api.post("/venues/resources/bookings", d);
+export const updateResourceBooking = (id, d) => api.patch(`/venues/resources/bookings/${id}`, d);
+export const deleteResourceBooking = (id) => api.delete(`/venues/resources/bookings/${id}`);
