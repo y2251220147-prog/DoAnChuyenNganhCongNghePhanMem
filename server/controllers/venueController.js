@@ -1,0 +1,21 @@
+const svc = require("../services/venueService");
+const ok = (res, d, s = 200) => res.status(s).json(d);
+const err = (res, e) => res.status(e.status || 500).json({ message: e.message });
+
+exports.getAll = async (req, res) => { try { ok(res, await svc.getAll()); } catch (e) { err(res, e); } };
+exports.getById = async (req, res) => { try { ok(res, await svc.getById(req.params.id)); } catch (e) { err(res, e); } };
+exports.create = async (req, res) => { try { ok(res, await svc.create(req.body, req.user.id), 201); } catch (e) { err(res, e); } };
+exports.update = async (req, res) => { try { await svc.update(req.params.id, req.body); ok(res, { message: "OK" }); } catch (e) { err(res, e); } };
+exports.delete = async (req, res) => { try { await svc.delete(req.params.id); ok(res, { message: "Đã xóa" }); } catch (e) { err(res, e); } };
+exports.getEventBookings = async (req, res) => { try { ok(res, await svc.getEventBookings(req.params.eventId)); } catch (e) { err(res, e); } };
+exports.bookVenue = async (req, res) => { try { ok(res, await svc.bookVenue(req.body), 201); } catch (e) { err(res, e); } };
+exports.updateBooking = async (req, res) => { try { await svc.updateBookingStatus(req.params.id, req.body.status); ok(res, { message: "OK" }); } catch (e) { err(res, e); } };
+exports.deleteBooking = async (req, res) => { try { await svc.deleteBooking(req.params.id); ok(res, { message: "Đã xóa" }); } catch (e) { err(res, e); } };
+exports.getAllResources = async (req, res) => { try { ok(res, await svc.getAllResources()); } catch (e) { err(res, e); } };
+exports.getEventResources = async (req, res) => { try { ok(res, await svc.getResourcesByEvent(req.params.eventId)); } catch (e) { err(res, e); } };
+exports.createResource = async (req, res) => { try { ok(res, await svc.createResource(req.body), 201); } catch (e) { err(res, e); } };
+exports.updateResource = async (req, res) => { try { await svc.updateResource(req.params.id, req.body); ok(res, { message: "OK" }); } catch (e) { err(res, e); } };
+exports.deleteResource = async (req, res) => { try { await svc.deleteResource(req.params.id); ok(res, { message: "Đã xóa" }); } catch (e) { err(res, e); } };
+exports.bookResource = async (req, res) => { try { ok(res, await svc.bookResource(req.body), 201); } catch (e) { err(res, e); } };
+exports.updateResBooking = async (req, res) => { try { await svc.updateResourceBookingStatus(req.params.id, req.body.status); ok(res, { message: "OK" }); } catch (e) { err(res, e); } };
+exports.deleteResBooking = async (req, res) => { try { await svc.deleteResourceBooking(req.params.id); ok(res, { message: "Đã xóa" }); } catch (e) { err(res, e); } };
