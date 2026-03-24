@@ -1,36 +1,32 @@
-const db = require("../config/database");
+const checkinService = require("../services/checkinService");
 
 exports.checkin = async (req, res) => {
-    const { qr_code } = req.body;
-
-    if (!qr_code || !qr_code.trim()) {
-        return res.status(400).json({ message: "QR code is required" });
-    }
-
     try {
-        const [guests] = await db.query(
-            "SELECT * FROM guests WHERE qr_code = ?",
-            [qr_code.trim()]
-        );
-
-        if (guests.length === 0) {
-            return res.status(404).json({ message: "Guest not found with this QR code" });
-        }
-
-        const guest = guests[0];
-
-        if (guest.checked_in) {
-            return res.status(409).json({ message: `Guest "${guest.name}" has already checked in` });
-        }
-
-        await db.query(
-            "UPDATE guests SET checked_in = 1 WHERE qr_code = ?",
-            [qr_code.trim()]
-        );
-
-        res.json({ message: `Check-in successful! Welcome, ${guest.name}` });
-
+        const { qr_code, event_id } = req.body;
+        const result = await checkinService.checkin(qr_code, event_id);
+        res.json({
+            message: `✅ Check-in successful! Welcome, ${result.guest.name} to "${result.guest.event_name}"`,
+            ...result
+        });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
+
+exports.getStats = async (req, res) => {
+    try {
+        const stats = await checkinService.getCheckinStats(req.params.eventId);
+        res.json(stats);
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
+
+exports.getCheckinList = async (req, res) => {
+    try {
+        const list = await checkinService.getCheckinList(req.params.eventId);
+        res.json(list);
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
     }
 };

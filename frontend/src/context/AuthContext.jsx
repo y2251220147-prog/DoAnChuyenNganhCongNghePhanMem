@@ -28,6 +28,9 @@ export const AuthProvider = ({ children }) => {
         setUser(decodeToken(token));
     };
 
+    // GHI CHÚ BẢO MẬT: Token vẫn hợp lệ trên server cho đến khi hết hạn (2 giờ).
+    // Logout chỉ xóa token khỏi localStorage — không vô hiệu hóa token trên server.
+    // Để thu hồi token ngay lập tức cần implement server-side blacklist hoặc dùng refresh token.
     const logoutUser = () => {
         localStorage.removeItem("token");
         setToken(null);

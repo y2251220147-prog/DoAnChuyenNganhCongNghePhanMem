@@ -9,8 +9,10 @@ import "../../styles/global.css";
 
 const ROLE_BADGE = {
     manager: "badge badge-admin",
-    support: "badge badge-organizer",
-    volunteer: "badge badge-user",
+    marketing: "badge badge-warning",
+    technical: "badge badge-organizer",
+    support: "badge badge-user",
+    volunteer: "badge badge-default",
 };
 
 export default function StaffList() {
@@ -187,6 +189,8 @@ export default function StaffList() {
                             onChange={e => setFormData({ ...formData, role: e.target.value })}
                         >
                             <option value="manager">Manager</option>
+                            <option value="marketing">Marketing</option>
+                            <option value="technical">Technical</option>
                             <option value="support">Support</option>
                             <option value="volunteer">Volunteer</option>
                         </select>
