@@ -9,6 +9,7 @@ import {
     changeStatus,
     createDeadline, deleteDeadline, getDeadlines, toggleDeadline
 } from "../../services/eventService";
+import { selfRegister, removeAttendee } from "../../services/attendeeService";
 import "../../styles/global.css";
 import TaskBoard from "../Tasks/TaskBoard";
 
@@ -56,6 +57,9 @@ export default function EventDetail() {
     const [tasks, setTasks] = useState([]);
     const [error, setError] = useState("");
     const [tab, setTab] = useState("overview");
+    const [isRegistered, setIsRegistered] = useState(false);
+    const [registrationId, setRegistrationId] = useState(null);
+    const [joining, setJoining] = useState(false);
 
     // Modal thêm deadline
     const [dlModal, setDlModal] = useState(false);
@@ -78,7 +82,7 @@ export default function EventDetail() {
     const loadAll = async () => {
         setLoading(true); setError("");
         try {
-            const [evR, guR, stR, tlR, buR, dlR] = await Promise.allSettled([
+            const [evR, guR, stR, tlR, buR, dlR, taskR, regR] = await Promise.allSettled([
                 api.get(`/events/${id}`),
                 api.get(`/guests/event/${id}`),
                 api.get(`/staff/event/${id}`),
@@ -86,6 +90,7 @@ export default function EventDetail() {
                 api.get(`/budgets/event/${id}`),
                 api.get(`/events/${id}/deadlines`),
                 api.get(`/tasks/event/${id}`),
+                api.get(`/attendees/check/${id}`)
             ]);
             if (evR.status === "rejected") { setError("Không tìm thấy sự kiện."); setLoading(false); return; }
             setEvent(evR.value.data);
@@ -96,8 +101,14 @@ export default function EventDetail() {
                 ? { items: buR.value.data.items || [], total: buR.value.data.total || 0 }
                 : { items: [], total: 0 });
             setDeadlines(dlR.status === "fulfilled" ? (dlR.value.data || []) : []);
-            const taskR = arguments[6]; // handled below
-            setTasks([]);
+            setTasks(taskR.status === "fulfilled" ? (taskR.value.data || []) : []);
+            if (regR.status === "fulfilled" && regR.value.data.registered) {
+                setIsRegistered(true);
+                setRegistrationId(regR.value.data.attendee.id);
+            } else {
+                setIsRegistered(false);
+                setRegistrationId(null);
+            }
         } catch { setError("Lỗi khi tải dữ liệu."); }
         finally { setLoading(false); }
     };
@@ -110,6 +121,29 @@ export default function EventDetail() {
     const dlProgress = deadlines.length > 0 ? Math.round((doneCount / deadlines.length) * 100) : 0;
     const checkedIn = guests.filter(g => g.checked_in).length;
     const checkinPct = guests.length > 0 ? Math.round((checkedIn / guests.length) * 100) : 0;
+
+    // ── Registration ──────────────────────────────────────────
+    const handleJoinEvent = async () => {
+        if (!window.confirm("Bạn muốn tham gia sự kiện này?")) return;
+        setJoining(true);
+        try {
+            await selfRegister(id);
+            alert("Đăng ký tham gia sự kiện thành công!");
+            loadAll();
+        } catch (err) { alert(err.response?.data?.message || "Lỗi khi đăng ký"); }
+        finally { setJoining(false); }
+    };
+
+    const handleCancelRegistration = async () => {
+        if (!window.confirm("Bạn có chắc muốn hủy đăng ký tham gia sự kiện này?")) return;
+        setJoining(true);
+        try {
+            if (registrationId) await removeAttendee(registrationId);
+            alert("Đã hủy đăng ký thành công!");
+            loadAll();
+        } catch (err) { alert(err.response?.data?.message || "Lỗi khi hủy"); }
+        finally { setJoining(false); }
+    };
 
     // ── Workflow ──────────────────────────────────────────────
     const handleChangeStatus = async (newStatus) => {
@@ -234,6 +268,26 @@ export default function EventDetail() {
                         {event.owner_name && <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}>🧑‍💼 Phụ trách: {event.owner_name}</span>}
                     </div>
                     {event.description && <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, marginTop: 8, maxWidth: 480 }}>{event.description}</p>}
+                    
+                    {/* Nút đăng ký cho User */}
+                    {!canManage && (
+                        <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+                            {isRegistered ? (
+                                <>
+                                    <span style={{ color: "#10b981", fontWeight: 700, fontSize: 14, background: "rgba(255,255,255,0.9)", padding: "4px 10px", borderRadius: 20 }}>
+                                        ✅ Đã đăng ký tham gia
+                                    </span>
+                                    <button className="btn btn-sm" style={{ border: "1px solid rgba(255,255,255,0.5)", color: "white", background: "transparent" }} onClick={handleCancelRegistration} disabled={joining}>
+                                        {joining ? "Đang xử lý..." : "Hủy đăng ký"}
+                                    </button>
+                                </>
+                            ) : (
+                                <button className="btn btn-sm" style={{ background: "white", color: "var(--color-primary)", border: "none", fontWeight: 700, padding: "6px 16px" }} onClick={handleJoinEvent} disabled={joining || !['approved', 'running'].includes(event.status)}>
+                                    {joining ? "Đang xử lý..." : "Tham gia sự kiện"}
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {[

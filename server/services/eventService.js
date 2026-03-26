@@ -1,5 +1,8 @@
 const Event = require("../models/eventModel");
 const Deadline = require("../models/deadlineModel");
+const NotificationService = require("./notificationService");
+const Staff = require("../models/staffModel");
+const Attendee = require("../models/attendeeModel");
 
 // Workflow hợp lệ: chỉ cho phép chuyển trạng thái theo chiều này
 const WORKFLOW = {
@@ -79,6 +82,23 @@ const updateEvent = async (id, data) => {
         total_budget: data.total_budget ?? event.total_budget,
         status: event.status, // status chỉ thay đổi qua changeStatus
     });
+
+    try {
+        const staff = await Staff.getByEvent(id);
+        const attendees = await Attendee.getByEvent(id);
+        const userIds = new Set();
+        staff.forEach(s => s.user_id && userIds.add(s.user_id));
+        attendees.forEach(a => a.user_id && userIds.add(a.user_id));
+        
+        if (userIds.size > 0) {
+            await NotificationService.broadcast(Array.from(userIds), {
+                type: "info",
+                title: "Sự kiện được cập nhật",
+                message: `Thông tin sự kiện "${event.name}" vừa được thay đổi.`,
+                link: `/events/${id}`
+            });
+        }
+    } catch (err) { console.error("Broadcast notification error:", err); }
 };
 
 // Chuyển trạng thái theo workflow — chỉ admin mới approve
@@ -102,6 +122,26 @@ const changeStatus = async (id, newStatus, userId, userRole) => {
     } else {
         await Event.changeStatus(id, newStatus);
     }
+
+    try {
+        const staff = await Staff.getByEvent(id);
+        const attendees = await Attendee.getByEvent(id);
+        const userIds = new Set();
+        staff.forEach(s => s.user_id && userIds.add(s.user_id));
+        attendees.forEach(a => a.user_id && userIds.add(a.user_id));
+        
+        const labels = { planning: "Lên kế hoạch", approved: "Đã duyệt", running: "Đang diễn ra", completed: "Hoàn thành", cancelled: "Đã hủy" };
+        const statusName = labels[newStatus] || newStatus;
+
+        if (userIds.size > 0) {
+            await NotificationService.broadcast(Array.from(userIds), {
+                type: newStatus === "cancelled" ? "warning" : "info",
+                title: "Trạng thái sự kiện thay đổi",
+                message: `Sự kiện "${event.name}" đã chuyển sang trạng thái: ${statusName}.`,
+                link: `/events/${id}`
+            });
+        }
+    } catch (err) { console.error("Broadcast notification error:", err); }
 };
 
 const deleteEvent = async (id) => {
