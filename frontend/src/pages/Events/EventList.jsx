@@ -8,6 +8,7 @@ import {
     getEvents, updateEvent
 } from "../../services/eventService";
 import "../../styles/global.css";
+import UserEventList from "./UserEventList";
 
 // ── Workflow config ───────────────────────────────────────────
 const WORKFLOW = {
@@ -56,6 +57,10 @@ export default function EventList() {
 
     const isAdmin = user?.role === "admin";
     const canManage = user?.role === "admin" || user?.role === "organizer";
+
+    if (user?.role === "user") {
+        return <UserEventList />;
+    }
 
     const load = async () => {
         setLoading(true);

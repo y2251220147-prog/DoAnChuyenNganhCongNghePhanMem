@@ -50,4 +50,16 @@ const deleteUser = async (id) => {
     await User.deleteUser(id);
 };
 
-module.exports = { getAllUsers, getUserById, changeRole, deleteUser };
+/**
+ * Cập nhật thông tin profile
+ */
+const updateProfile = async (id, profileData) => {
+    const user = await User.findById(id);
+    if (!user) {
+        throw { status: 404, message: "User not found" };
+    }
+    await User.updateProfile(id, profileData);
+    return await getUserById(id);
+};
+
+module.exports = { getAllUsers, getUserById, changeRole, deleteUser, updateProfile };

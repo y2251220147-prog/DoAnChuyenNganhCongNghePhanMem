@@ -38,3 +38,17 @@ exports.deleteUser = async (req, res) => {
         res.json({ message: "User deleted" });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
+
+exports.getProfile = async (req, res) => {
+    try {
+        const user = await userService.getUserById(req.user.id);
+        res.json(user);
+    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
+exports.updateProfile = async (req, res) => {
+    try {
+        const updatedUser = await userService.updateProfile(req.user.id, req.body);
+        res.json({ message: "Profile updated successfully", user: updatedUser });
+    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};

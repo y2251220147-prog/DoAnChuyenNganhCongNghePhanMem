@@ -55,7 +55,9 @@ export default function EventDetail() {
     const [loading, setLoading] = useState(true);
     const [tasks, setTasks] = useState([]);
     const [error, setError] = useState("");
-    const [tab, setTab] = useState("overview");
+
+    const isStandardUser = user?.role === "user";
+    const [tab, setTab] = useState(isStandardUser ? "timeline" : "overview");
 
     // Modal thêm deadline
     const [dlModal, setDlModal] = useState(false);
@@ -153,14 +155,21 @@ export default function EventDetail() {
         </Layout>
     );
 
-    const TABS = [
-        { key: "overview", label: "📋 Tổng quan" },
-        { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})` },
-        { key: "guests", label: `🎟️ Khách (${guests.length})` },
-        { key: "staff", label: `👥 Staff (${staff.length})` },
+    let authTabs = [
+        { key: "overview", label: "📋 Tổng quan", internal: true },
+        { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})`, internal: true },
+        { key: "guests", label: `🎟️ Khách (${guests.length})`, internal: true },
+        { key: "staff", label: `👥 Staff (${staff.length})`, internal: true },
         { key: "timeline", label: `🗓️ Timeline (${timeline.length})` },
-        { key: "budget", label: "💰 Ngân sách" },
+        { key: "budget", label: "💰 Ngân sách", internal: true },
+        { key: "tasks", label: "✅ Tiến độ", internal: true }
     ];
+
+    if (isStandardUser) {
+        authTabs = authTabs.filter(t => !t.internal);
+    }
+
+    const TABS = authTabs;
 
     return (
         <Layout>
@@ -237,11 +246,11 @@ export default function EventDetail() {
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {[
-                        { icon: "🔥", label: "Deadlines", value: `${doneCount}/${deadlines.length}` },
+                        { icon: "🔥", label: "Deadlines", value: `${doneCount}/${deadlines.length}`, internal: true },
                         { icon: "🎟️", label: "Khách", value: guests.length },
-                        { icon: "👥", label: "Staff", value: staff.length },
-                        { icon: "💰", label: "Ngân sách", value: fmtVND(event.total_budget || 0) },
-                    ].map(c => (
+                        { icon: "👥", label: "Staff", value: staff.length, internal: true },
+                        { icon: "💰", label: "Ngân sách", value: fmtVND(event.total_budget || 0), internal: true },
+                    ].filter(c => isStandardUser ? !c.internal : true).map(c => (
                         <div key={c.label} style={{
                             background: "rgba(255,255,255,0.15)", borderRadius: 10,
                             padding: "10px 14px", textAlign: "center", minWidth: 70
@@ -255,15 +264,17 @@ export default function EventDetail() {
             </div>
 
             {/* ── Tabs ── */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-                {TABS.map(t => (
-                    <button key={t.key}
-                        className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-outline"}`}
-                        onClick={() => setTab(t.key)}>
-                        {t.label}
-                    </button>
-                ))}
-            </div>
+            {authTabs.length > 1 && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+                    {authTabs.map(t => (
+                        <button key={t.key}
+                            className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-outline"}`}
+                            onClick={() => setTab(t.key)}>
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* ════ TAB: OVERVIEW ════ */}
             {tab === "overview" && (
@@ -273,18 +284,18 @@ export default function EventDetail() {
                         {[
                             { label: "Tên sự kiện", value: event.name },
                             { label: "Loại", value: event.event_type || "—" },
-                            { label: "Người phụ trách", value: event.owner_name || "—" },
+                            { label: "Người phụ trách", value: event.owner_name || "—", internal: true },
                             { label: "Bắt đầu", value: fmtDT(event.start_date) },
                             { label: "Kết thúc", value: fmtDT(event.end_date) },
                             { label: "Hình thức", value: event.venue_type === "online" ? "🌐 Online" : "🏢 Offline" },
                             { label: "Địa điểm", value: event.location || "—" },
-                            { label: "Sức chứa", value: event.capacity ? `${event.capacity} người` : "—" },
-                            { label: "Ngân sách dự kiến", value: fmtVND(event.total_budget || 0) },
-                            { label: "Trạng thái", value: <StatusBadge status={event.status} /> },
-                            { label: "Người duyệt", value: event.approver_name || "—" },
-                            { label: "Ngày duyệt", value: fmtDate(event.approved_at) },
-                            { label: "Ngày tạo", value: fmtDate(event.created_at) },
-                        ].map(row => (
+                            { label: "Sức chứa", value: event.capacity ? `${event.capacity} người` : "—", internal: true },
+                            { label: "Ngân sách dự kiến", value: fmtVND(event.total_budget || 0), internal: true },
+                            { label: "Trạng thái", value: <StatusBadge status={event.status} />, internal: true },
+                            { label: "Người duyệt", value: event.approver_name || "—", internal: true },
+                            { label: "Ngày duyệt", value: fmtDate(event.approved_at), internal: true },
+                            { label: "Ngày tạo", value: fmtDate(event.created_at), internal: true },
+                        ].filter(row => isStandardUser ? !row.internal : true).map(row => (
                             <div key={row.label} style={{
                                 display: "flex", justifyContent: "space-between",
                                 alignItems: "flex-start", padding: "9px 0",
@@ -295,62 +306,64 @@ export default function EventDetail() {
                             </div>
                         ))}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        {/* Tiến độ deadline */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🔥 Tiến độ Deadline nội bộ</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{doneCount}/{deadlines.length} hoàn thành</span>
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{dlProgress}%</span>
-                            </div>
-                            <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", width: `${dlProgress}%`,
-                                    background: "linear-gradient(90deg, #f59e0b, #ef4444)",
-                                    borderRadius: 5, transition: "width 0.6s ease"
-                                }} />
-                            </div>
-                            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-                                {deadlines.map(dl => {
-                                    const overdue = !dl.done && new Date(dl.due_date) < new Date();
-                                    return (
-                                        <div key={dl.id} style={{
-                                            display: "flex", alignItems: "center", gap: 8,
-                                            padding: "6px 10px", borderRadius: 8,
-                                            background: dl.done ? "rgba(16,185,129,0.07)" : overdue ? "rgba(239,68,68,0.07)" : "var(--bg-main)"
-                                        }}>
-                                            <span style={{ fontSize: 14 }}>{dl.done ? "✅" : overdue ? "🔴" : "⏳"}</span>
-                                            <span style={{
-                                                flex: 1, fontSize: 13, fontWeight: dl.done ? 400 : 600,
-                                                textDecoration: dl.done ? "line-through" : "none",
-                                                color: dl.done ? "var(--text-muted)" : "var(--text-primary)"
+                    {!isStandardUser && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                            {/* Tiến độ deadline */}
+                            <div className="card">
+                                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🔥 Tiến độ Deadline nội bộ</h3>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{doneCount}/{deadlines.length} hoàn thành</span>
+                                    <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{dlProgress}%</span>
+                                </div>
+                                <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
+                                    <div style={{
+                                        height: "100%", width: `${dlProgress}%`,
+                                        background: "linear-gradient(90deg, #f59e0b, #ef4444)",
+                                        borderRadius: 5, transition: "width 0.6s ease"
+                                    }} />
+                                </div>
+                                <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {deadlines.map(dl => {
+                                        const overdue = !dl.done && new Date(dl.due_date) < new Date();
+                                        return (
+                                            <div key={dl.id} style={{
+                                                display: "flex", alignItems: "center", gap: 8,
+                                                padding: "6px 10px", borderRadius: 8,
+                                                background: dl.done ? "rgba(16,185,129,0.07)" : overdue ? "rgba(239,68,68,0.07)" : "var(--bg-main)"
                                             }}>
-                                                {dl.title}
-                                            </span>
-                                            <span style={{ fontSize: 11, color: overdue ? "#dc2626" : "var(--text-muted)" }}>
-                                                {fmtDate(dl.due_date)}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
+                                                <span style={{ fontSize: 14 }}>{dl.done ? "✅" : overdue ? "🔴" : "⏳"}</span>
+                                                <span style={{
+                                                    flex: 1, fontSize: 13, fontWeight: dl.done ? 400 : 600,
+                                                    textDecoration: dl.done ? "line-through" : "none",
+                                                    color: dl.done ? "var(--text-muted)" : "var(--text-primary)"
+                                                }}>
+                                                    {dl.title}
+                                                </span>
+                                                <span style={{ fontSize: 11, color: overdue ? "#dc2626" : "var(--text-muted)" }}>
+                                                    {fmtDate(dl.due_date)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            {/* Check-in */}
+                            <div className="card">
+                                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>✅ Tỷ lệ Check-in</h3>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} khách</span>
+                                    <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{checkinPct}%</span>
+                                </div>
+                                <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
+                                    <div style={{
+                                        height: "100%", width: `${checkinPct}%`,
+                                        background: "linear-gradient(90deg, var(--color-primary), #818cf8)",
+                                        borderRadius: 5, transition: "width 0.6s ease"
+                                    }} />
+                                </div>
                             </div>
                         </div>
-                        {/* Check-in */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>✅ Tỷ lệ Check-in</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} khách</span>
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{checkinPct}%</span>
-                            </div>
-                            <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", width: `${checkinPct}%`,
-                                    background: "linear-gradient(90deg, var(--color-primary), #818cf8)",
-                                    borderRadius: 5, transition: "width 0.6s ease"
-                                }} />
-                            </div>
-                        </div>
-                    </div>
+                    )}
                 </div>
             )}
 

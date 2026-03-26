@@ -137,6 +137,8 @@ const deleteDeadline = async (deadlineId) => {
 
 module.exports = {
     getAllEvents, getEventById,
+    getAvailableForUser: async (u) => await Event.getAvailableForUser(u),
+    getRegisteredForUser: async (u) => await Event.getRegisteredForUser(u),
     createEvent, updateEvent, changeStatus, deleteEvent,
     getDeadlines, createDeadline, toggleDeadline, deleteDeadline,
 };

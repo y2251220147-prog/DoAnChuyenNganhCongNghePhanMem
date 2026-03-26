@@ -18,6 +18,7 @@ import StaffList from "./pages/Staff/StaffList";
 import TimelineList from "./pages/Timeline/TimelineList";
 import VenueList from "./pages/Venues/VenueList";
 import NotificationCenter from "./pages/Notifications/NotificationCenter";
+import Profile from "./pages/Profile/Profile";
 
 function ProtectedRoute({ children }) {
   const { token } = useContext(AuthContext);
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/register" element={<GuestOnlyRoute><Register /></GuestOnlyRoute>} />
 
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute><EventList /></ProtectedRoute>} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
         <Route path="/guests" element={<ProtectedRoute><GuestList /></ProtectedRoute>} />

@@ -29,6 +29,13 @@ const User = {
     },
     async deleteUser(id) {
         await db.query("DELETE FROM users WHERE id = ?", [id]);
+    },
+    async updateProfile(id, profileData) {
+        const { name, phone, department, position, avatar } = profileData;
+        await db.query(
+            "UPDATE users SET name = ?, phone = ?, department = ?, position = ?, avatar = ? WHERE id = ?",
+            [name, phone || null, department || null, position || null, avatar || null, id]
+        );
     }
 };
 

@@ -10,6 +10,16 @@ exports.getEventById = async (req, res) => {
     catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 
+exports.getAvailableForUser = async (req, res) => {
+    try { res.json(await eventService.getAvailableForUser(req.user.id)); }
+    catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
+exports.getRegisteredForUser = async (req, res) => {
+    try { res.json(await eventService.getRegisteredForUser(req.user.id)); }
+    catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
 exports.createEvent = async (req, res) => {
     try {
         const result = await eventService.createEvent(req.body, req.user.id);

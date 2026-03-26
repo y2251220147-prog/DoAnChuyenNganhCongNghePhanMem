@@ -26,6 +26,7 @@ const NAV = {
         {
             label: "Admin", items: [
                 { to: "/admin/users", icon: "🔧", text: "Users", badge: "Admin" },
+                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Reset Password" },
             ]
@@ -52,6 +53,7 @@ const NAV = {
         },
         {
             label: "Account", items: [
+                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Reset Password" },
             ]
@@ -66,6 +68,7 @@ const NAV = {
         },
         {
             label: "Account", items: [
+                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/feedback", icon: "💬", text: "Give Feedback" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Reset Password" },
@@ -105,7 +108,7 @@ export default function Sidebar() {
                 ))}
             </nav>
             <div className="sidebar-footer">
-                <div className="sidebar-user">
+                <div className="sidebar-user" onClick={() => navigate("/profile")} style={{ cursor: "pointer" }}>
                     <div className="sidebar-avatar">{initials}</div>
                     <div className="sidebar-user-info">
                         <div className="user-name">{user?.name || "User"}</div>

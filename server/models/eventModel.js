@@ -24,6 +24,32 @@ const Event = {
         return rows[0] || null;
     },
 
+    async getAvailableForUser(userId) {
+        const [rows] = await db.query(`
+            SELECT e.*, u.name AS owner_name
+            FROM events e
+            LEFT JOIN users u ON e.owner_id = u.id
+            WHERE e.status IN ('approved', 'running')
+              AND e.id NOT IN (
+                  SELECT event_id FROM attendees WHERE user_id = ?
+              )
+            ORDER BY e.start_date ASC
+        `, [userId]);
+        return rows;
+    },
+
+    async getRegisteredForUser(userId) {
+        const [rows] = await db.query(`
+            SELECT e.*, u.name AS owner_name, a.checked_in
+            FROM events e
+            JOIN attendees a ON e.id = a.event_id
+            LEFT JOIN users u ON e.owner_id = u.id
+            WHERE a.user_id = ?
+            ORDER BY e.start_date ASC
+        `, [userId]);
+        return rows;
+    },
+
     async create(data) {
         const {
             name, description, event_type, owner_id,
