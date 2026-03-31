@@ -48,6 +48,7 @@ export default function EventDetail() {
 
     const [event, setEvent] = useState(null);
     const [guests, setGuests] = useState([]);
+    const [attendees, setAttendees] = useState([]);
     const [staff, setStaff] = useState([]);
     const [timeline, setTimeline] = useState([]);
     const [budget, setBudget] = useState({ items: [], total: 0 });
@@ -78,14 +79,14 @@ export default function EventDetail() {
     const loadAll = async () => {
         setLoading(true); setError("");
         try {
-            const [evR, guR, stR, tlR, buR, dlR] = await Promise.allSettled([
+            const [evR, guR, stR, tlR, buR, dlR, atR] = await Promise.allSettled([
                 api.get(`/events/${id}`),
                 api.get(`/guests/event/${id}`),
                 api.get(`/staff/event/${id}`),
                 api.get(`/timeline/event/${id}`),
                 api.get(`/budgets/event/${id}`),
                 api.get(`/events/${id}/deadlines`),
-                api.get(`/tasks/event/${id}`),
+                api.get(`/attendees/event/${id}`),
             ]);
             if (evR.status === "rejected") { setError("Không tìm thấy sự kiện."); setLoading(false); return; }
             setEvent(evR.value.data);
@@ -96,8 +97,7 @@ export default function EventDetail() {
                 ? { items: buR.value.data.items || [], total: buR.value.data.total || 0 }
                 : { items: [], total: 0 });
             setDeadlines(dlR.status === "fulfilled" ? (dlR.value.data || []) : []);
-            const taskR = arguments[6]; // handled below
-            setTasks([]);
+            setAttendees(atR.status === "fulfilled" ? (atR.value.data || []) : []);
         } catch { setError("Lỗi khi tải dữ liệu."); }
         finally { setLoading(false); }
     };
@@ -108,8 +108,9 @@ export default function EventDetail() {
 
     const doneCount = deadlines.filter(d => d.done).length;
     const dlProgress = deadlines.length > 0 ? Math.round((doneCount / deadlines.length) * 100) : 0;
-    const checkedIn = guests.filter(g => g.checked_in).length;
-    const checkinPct = guests.length > 0 ? Math.round((checkedIn / guests.length) * 100) : 0;
+    const totalParticipants = guests.length + attendees.length;
+    const checkedIn = guests.filter(g => g.checked_in).length + attendees.filter(a => a.checked_in).length;
+    const checkinPct = totalParticipants > 0 ? Math.round((checkedIn / totalParticipants) * 100) : 0;
 
     // ── Workflow ──────────────────────────────────────────────
     const handleChangeStatus = async (newStatus) => {
@@ -156,7 +157,7 @@ export default function EventDetail() {
     const TABS = [
         { key: "overview", label: "📋 Tổng quan" },
         { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})` },
-        { key: "guests", label: `🎟️ Khách (${guests.length})` },
+        { key: "participants", label: `🎟️ Người tham gia (${totalParticipants})` },
         { key: "staff", label: `👥 Staff (${staff.length})` },
         { key: "timeline", label: `🗓️ Timeline (${timeline.length})` },
         { key: "budget", label: "💰 Ngân sách" },
@@ -238,7 +239,7 @@ export default function EventDetail() {
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {[
                         { icon: "🔥", label: "Deadlines", value: `${doneCount}/${deadlines.length}` },
-                        { icon: "🎟️", label: "Khách", value: guests.length },
+                        { icon: "🎟️", label: "Tham gia", value: totalParticipants },
                         { icon: "👥", label: "Staff", value: staff.length },
                         { icon: "💰", label: "Ngân sách", value: fmtVND(event.total_budget || 0) },
                     ].map(c => (
@@ -339,7 +340,7 @@ export default function EventDetail() {
                         <div className="card">
                             <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>✅ Tỷ lệ Check-in</h3>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} khách</span>
+                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{totalParticipants} người</span>
                                 <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{checkinPct}%</span>
                             </div>
                             <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
@@ -416,33 +417,60 @@ export default function EventDetail() {
                 </div>
             )}
 
-            {/* ════ TAB: GUESTS ════ */}
-            {tab === "guests" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>🎟️ Danh sách khách mời</h3>
-                        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} đã check-in</span>
+            {/* ════ TAB: PARTICIPANTS (GUESTS & ATTENDEES) ════ */}
+            {tab === "participants" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    <div className="card">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🎟️ Khách mời bên ngoài</h3>
+                        </div>
+                        {guests.length === 0
+                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời</p></div>
+                            : <table className="data-table">
+                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th></tr></thead>
+                                <tbody>
+                                    {guests.map((g, i) => (
+                                        <tr key={g.id}>
+                                            <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                                            <td style={{ fontWeight: 600 }}>{g.checked_in ? "✅" : "⏳"} {g.name}</td>
+                                            <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
+                                            <td>{g.phone || "—"}</td>
+                                            <td>{g.checked_in
+                                                ? <span className="badge badge-success">Đã check-in</span>
+                                                : <span className="badge badge-default">Chờ</span>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        }
                     </div>
-                    {guests.length === 0
-                        ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th></tr></thead>
-                            <tbody>
-                                {guests.map((g, i) => (
-                                    <tr key={g.id}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 600 }}>{g.checked_in ? "✅" : "⏳"} {g.name}</td>
-                                        <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
-                                        <td>{g.phone || "—"}</td>
-                                        <td>{g.checked_in
-                                            ? <span className="badge badge-success">Đã check-in</span>
-                                            : <span className="badge badge-default">Chờ</span>}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    }
+
+                    <div className="card">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🏢 Nhân viên tham gia (Nội bộ)</h3>
+                        </div>
+                        {attendees.length === 0
+                            ? <div className="empty-state"><span>🏢</span><p>Chưa có nhân viên tham gia</p></div>
+                            : <table className="data-table">
+                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban</th><th>Trạng thái</th></tr></thead>
+                                <tbody>
+                                    {attendees.map((a, i) => (
+                                        <tr key={a.id}>
+                                            <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                                            <td style={{ fontWeight: 600 }}>{a.checked_in ? "✅" : "⏳"} {a.name}</td>
+                                            <td style={{ color: "var(--text-secondary)" }}>{a.email}</td>
+                                            <td>{a.department || "—"}</td>
+                                            <td>{a.checked_in
+                                                ? <span className="badge badge-success">Đã check-in</span>
+                                                : <span className="badge badge-default">Chờ</span>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        }
+                    </div>
                 </div>
             )}
 
