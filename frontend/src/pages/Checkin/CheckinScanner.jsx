@@ -2,7 +2,51 @@ import { useEffect, useRef, useState } from "react";
 import Layout from "../../components/Layout/Layout";
 import api from "../../services/api";
 import { getEvents } from "../../services/eventService";
+import { Html5QrcodeScanner } from "html5-qrcode";
 import "../../styles/global.css";
+
+// ── Widget Quét QR Camera ────────────────────────────────────────────────────
+function ScannerWidget({ onScan, onClose }) {
+    const scannerRef = useRef(null);
+
+    useEffect(() => {
+        if (!scannerRef.current) {
+            scannerRef.current = new Html5QrcodeScanner(
+                "qr-reader",
+                { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true },
+                false
+            );
+            scannerRef.current.render(
+                (decodedText) => {
+                    // Tự động đóng sau khi quét thành công
+                    if (scannerRef.current) {
+                        scannerRef.current.clear().catch(() => {});
+                        scannerRef.current = null;
+                    }
+                    onScan(decodedText);
+                },
+                (err) => { /* ignore */ }
+            );
+        }
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.clear().catch(() => {});
+                scannerRef.current = null;
+            }
+        };
+    }, [onScan]);
+
+    return (
+        <div style={{ background: "#f8fafc", padding: 16, borderRadius: 12, border: "1px solid var(--border-color)", marginBottom: 20 }}>
+            <div id="qr-reader" style={{ width: "100%", maxWidth: 400, margin: "0 auto", borderRadius: 8, overflow: "hidden" }}></div>
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+                <button type="button" className="btn btn-outline btn-sm" onClick={onClose}>
+                    ✕ Đóng Camera
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export default function CheckinScanner() {
     const [events, setEvents] = useState([]);
@@ -15,6 +59,7 @@ export default function CheckinScanner() {
     const [guestList, setGuestList] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
     const [tab, setTab] = useState("scanner");
+    const [cameraOpen, setCameraOpen] = useState(false);
     const inputRef = useRef(null);
 
     /* Load events */
@@ -85,6 +130,15 @@ export default function CheckinScanner() {
             setLoading(false);
             setTimeout(() => inputRef.current?.focus(), 100);
         }
+    };
+
+    const handleCameraScan = (decodedText) => {
+        setQr(decodedText);
+        setCameraOpen(false);
+        // Tự động bấm nút submit sau 100ms để trigger hàm checkin
+        setTimeout(() => {
+            document.getElementById("btn-checkin-submit")?.click();
+        }, 100);
     };
 
     const pct = stats ? Math.round((stats.checkedIn / (stats.total || 1)) * 100) : 0;
@@ -178,6 +232,25 @@ export default function CheckinScanner() {
                         <form onSubmit={checkin}>
                             <div className="form-group">
                                 <label style={{ fontWeight: 600 }}>Mã QR (nhân viên hoặc khách mời)</label>
+                                
+                                {cameraOpen ? (
+                                    <ScannerWidget 
+                                        onScan={handleCameraScan} 
+                                        onClose={() => setCameraOpen(false)} 
+                                    />
+                                ) : (
+                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                                        <button type="button" className="btn btn-outline" 
+                                            disabled={!selectedEvent}
+                                            onClick={() => setCameraOpen(true)}>
+                                            📷 Bật Camera quét
+                                        </button>
+                                        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "auto 0" }}>
+                                            Hoặc sử dụng máy quét mã vạch USB.
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div style={{ display: "flex", gap: 10 }}>
                                     <input
                                         ref={inputRef}
@@ -186,19 +259,15 @@ export default function CheckinScanner() {
                                         value={qr}
                                         onChange={e => setQr(e.target.value)}
                                         autoFocus
-                                        disabled={loading || !selectedEvent}
+                                        disabled={loading || !selectedEvent || cameraOpen}
                                         style={{ fontFamily: "monospace" }}
                                     />
-                                    <button type="submit" className="btn btn-primary"
-                                        disabled={loading || !qr.trim() || !selectedEvent}
+                                    <button type="submit" id="btn-checkin-submit" className="btn btn-primary"
+                                        disabled={loading || !qr.trim() || !selectedEvent || cameraOpen}
                                         style={{ flexShrink: 0, minWidth: 90 }}>
                                         {loading ? "⏳" : "✅ Check in"}
                                     </button>
                                 </div>
-                                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-                                    💡 Kết nối đầu đọc QR USB — máy sẽ tự nhập mã vào ô trên.
-                                    QR của guest chỉ có thể dùng cho đúng sự kiện đã đăng ký.
-                                </p>
                             </div>
                         </form>
                     </div>
