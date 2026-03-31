@@ -30,7 +30,10 @@ exports.getGuestById = async (req, res) => {
 exports.createGuest = async (req, res) => {
     try {
         const result = await guestService.createGuest(req.body);
-        res.status(201).json({ message: "Guest created", ...result });
+        res.status(201).json({
+            message: "Thêm khách mời thành công" + (result.emailSent ? " và đã gửi email mời" : ""),
+            ...result
+        });
     } catch (err) {
         res.status(err.status || 500).json({ message: err.message });
     }
@@ -40,6 +43,17 @@ exports.deleteGuest = async (req, res) => {
     try {
         await guestService.deleteGuest(req.params.id);
         res.json({ message: "Guest deleted" });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
+
+// Public lookup by email — không cần auth
+exports.lookupByEmail = async (req, res) => {
+    try {
+        const { email } = req.query;
+        const results = await guestService.lookupByEmail(email);
+        res.json(results);
     } catch (err) {
         res.status(err.status || 500).json({ message: err.message });
     }

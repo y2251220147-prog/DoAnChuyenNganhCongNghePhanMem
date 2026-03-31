@@ -10,6 +10,16 @@ const Attendee = {
         `);
         return r;
     },
+    getByUser: async (userId) => {
+        const [r] = await db.query(`
+            SELECT a.*, e.name AS event_name, e.start_date, e.end_date, e.location, e.status AS event_status
+            FROM attendees a
+            JOIN events e ON a.event_id = e.id
+            WHERE a.user_id = ?
+            ORDER BY e.start_date ASC
+        `, [userId]);
+        return r;
+    },
     getByEvent: async (eventId) => {
         const [r] = await db.query(`
             SELECT a.*, u.role AS user_role, u.department

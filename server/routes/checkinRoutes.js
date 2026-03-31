@@ -4,8 +4,8 @@ const checkinController = require("../controllers/checkinController");
 const authMiddleware = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 
-// POST /api/checkin — Scan QR check-in (staff, organizer, admin)
-router.post("/", authMiddleware, authorize(["admin", "organizer", "user"]), checkinController.checkin);
+// POST /api/checkin — Scan QR check-in (chỉ staff quản lý: organizer, admin)
+router.post("/", authMiddleware, authorize(["admin", "organizer"]), checkinController.checkin);
 
 // GET /api/checkin/stats/:eventId — Lấy thống kê check-in
 router.get("/stats/:eventId", authMiddleware, checkinController.getStats);

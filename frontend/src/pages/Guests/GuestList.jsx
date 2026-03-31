@@ -54,18 +54,30 @@ export default function GuestList() {
         catch { alert("Delete failed"); }
     };
 
-    // FIX 11: Không còn gọi generateQR() phía client.
-    // Chỉ gửi form data lên server — server tự sinh qr_code có HMAC signature.
+    // Sau khi tạo khách → hiện QR ngay. Server sẽ tự gửi email mời.
     const handleCreate = async (e) => {
         e.preventDefault(); setError("");
-        if (!form.event_id) return setError("Please select an event.");
+        if (!form.event_id) return setError("Vui lòng chọn sự kiện.");
         setSubmit(true);
         try {
-            await createGuest({ ...form });
+            const res = await createGuest({ ...form });
+            const newQrCode = res.data?.qr_code;
+            const emailSent = res.data?.emailSent; // server trả về true/false
             setModal(false);
+            await load();
+            if (newQrCode) {
+                setQrGuest({
+                    name: form.name,
+                    email: form.email,
+                    event_id: form.event_id,
+                    qr_code: newQrCode,
+                    checked_in: false,
+                    isNew: true,
+                    emailSent: res.data?.emailSent === true, // chỉ true khi server xác nhận rõ ràng
+                });
+            }
             setForm(p => ({ ...p, name: "", email: "", phone: "" }));
-            load();
-        } catch (err) { setError(err.response?.data?.message || "Create failed"); }
+        } catch (err) { setError(err.response?.data?.message || "Thêm thất bại"); }
         finally { setSubmit(false); }
     };
 
@@ -82,14 +94,14 @@ export default function GuestList() {
         <Layout>
             <div className="page-header">
                 <div>
-                    <h2>Guests</h2>
+                    <h2>Khách mời</h2>
                     <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        {guests.length} total · {guests.filter(g => g.checked_in).length} checked in
+                        {guests.length} khách · {guests.filter(g => g.checked_in).length} đã check-in
                     </p>
                 </div>
                 {canManage && (
                     <button className="btn btn-primary" onClick={() => { setForm({ event_id: "", name: "", email: "", phone: "" }); setError(""); setModal(true); }}>
-                        + Add Guest
+                        + Thêm khách mời
                     </button>
                 )}
             </div>
@@ -98,25 +110,25 @@ export default function GuestList() {
             <div className="grid-3" style={{ marginBottom: 20 }}>
                 <div className="card-stat">
                     <div className="card-stat-icon cyan">🎟️</div>
-                    <div className="card-stat-info"><h3>{guests.length}</h3><p>Total Guests</p></div>
+                    <div className="card-stat-info"><h3>{guests.length}</h3><p>Tổng khách mời</p></div>
                 </div>
                 <div className="card-stat">
                     <div className="card-stat-icon emerald">✅</div>
-                    <div className="card-stat-info"><h3>{guests.filter(g => g.checked_in).length}</h3><p>Checked In</p></div>
+                    <div className="card-stat-info"><h3>{guests.filter(g => g.checked_in).length}</h3><p>Đã check-in</p></div>
                 </div>
                 <div className="card-stat">
                     <div className="card-stat-icon rose">⏳</div>
-                    <div className="card-stat-info"><h3>{guests.filter(g => !g.checked_in).length}</h3><p>Pending</p></div>
+                    <div className="card-stat-info"><h3>{guests.filter(g => !g.checked_in).length}</h3><p>Chưa check-in</p></div>
                 </div>
             </div>
 
             {/* Filters */}
             <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-                <input className="form-control" placeholder="🔍 Search name or email..."
+                <input className="form-control" placeholder="🔍 Tìm theo tên, email..."
                     value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 260 }} />
                 <select className="form-control" style={{ maxWidth: 220 }}
                     value={filterEvent} onChange={e => setFilter(e.target.value)}>
-                    <option value="all">All Events</option>
+                    <option value="all">Tất cả sự kiện</option>
                     {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
             </div>
@@ -126,15 +138,15 @@ export default function GuestList() {
                     <div className="empty-state"><span>⏳</span><p>Loading guests...</p></div>
                 ) : filtered.length === 0 ? (
                     <div className="empty-state"><span>🎟️</span>
-                        <p>No guests found{canManage ? ". Add guests above!" : "."}</p>
+                        <p>Không tìm thấy khách mời{canManage ? ". Thêm khách mời bên trên!" : "."}</p>
                     </div>
                 ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>#</th><th>Name</th><th>Email</th><th>Phone</th>
-                                <th>Event</th><th>Status</th><th>QR Code</th>
-                                {canManage && <th>Actions</th>}
+                                <th>#</th><th>Họ tên</th><th>Email</th><th>Số điện thoại</th>
+                                <th>Sự kiện</th><th>Trạng thái</th><th>Mã QR</th>
+                                {canManage && <th>Thao tác</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -151,21 +163,21 @@ export default function GuestList() {
                                     </td>
                                     <td>
                                         {g.checked_in
-                                            ? <span className="badge badge-success">✓ Checked In</span>
-                                            : <span className="badge badge-default">Pending</span>
+                                            ? <span className="badge badge-success">✓ Đã check-in</span>
+                                            : <span className="badge badge-default">Chờ check-in</span>
                                         }
                                     </td>
                                     <td>
                                         {g.qr_code
                                             ? <button className="btn btn-outline btn-sm"
-                                                onClick={() => setQrGuest(g)}>📱 View QR</button>
-                                            : <span style={{ color: "var(--text-muted)", fontSize: 12 }}>No QR</span>
+                                                onClick={() => setQrGuest(g)}>📱 Xem QR</button>
+                                            : <span style={{ color: "var(--text-muted)", fontSize: 12 }}>Chưa có QR</span>
                                         }
                                     </td>
                                     {canManage && (
                                         <td>
                                             <button className="btn btn-danger btn-sm"
-                                                onClick={() => handleDelete(g.id)}>🗑</button>
+                                                onClick={() => handleDelete(g.id)} title="Xóa khách">🗑</button>
                                         </td>
                                     )}
                                 </tr>
@@ -176,21 +188,21 @@ export default function GuestList() {
             </div>
 
             {/* Add Guest Modal */}
-            <Modal title="Add New Guest" isOpen={isModalOpen}
+            <Modal title="Thêm khách mời" isOpen={isModalOpen}
                 onClose={() => { setModal(false); setError(""); }}>
                 <form onSubmit={handleCreate}>
                     {error && <div className="alert alert-error">{error}</div>}
                     <div className="form-group">
-                        <label>Event <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                        <label>Sự kiện <span style={{ color: "var(--color-danger)" }}>*</span></label>
                         <select className="form-control" value={form.event_id}
                             onChange={e => setForm({ ...form, event_id: e.target.value })} required>
-                            <option value="">-- Select Event --</option>
+                            <option value="">-- Chọn sự kiện --</option>
                             {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                         </select>
                     </div>
                     <div className="form-group">
-                        <label>Full Name <span style={{ color: "var(--color-danger)" }}>*</span></label>
-                        <input className="form-control" placeholder="Nguyen Van A"
+                        <label>Họ và tên <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                        <input className="form-control" placeholder="Nguyễn Văn A"
                             value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
                     </div>
                     <div className="form-group">
@@ -199,7 +211,7 @@ export default function GuestList() {
                             value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
                     </div>
                     <div className="form-group">
-                        <label>Phone (Optional)</label>
+                        <label>Số điện thoại (tùy chọn)</label>
                         <input type="tel" className="form-control" placeholder="0912 345 678"
                             value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                     </div>
@@ -207,34 +219,81 @@ export default function GuestList() {
                         🔒 QR code được tạo và ký bởi server — không thể giả mạo. Chỉ dùng được đúng cho sự kiện đã đăng ký.
                     </div>
                     <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={submitting}>
-                        {submitting ? "Adding..." : "Add Guest & Generate QR"}
+                        {submitting ? "Đang thêm..." : "Thêm khách & Tạo mã QR"}
                     </button>
                 </form>
             </Modal>
 
             {/* QR Code Modal */}
-            <Modal title={`QR Code — ${qrGuest?.name || ""}`} isOpen={!!qrGuest}
-                onClose={() => setQrGuest(null)}>
+            <Modal title={qrGuest?.isNew ? `✅ Đã thêm khách — ${qrGuest?.name || ""}` : `Mã QR — ${qrGuest?.name || ""}`}
+                isOpen={!!qrGuest} onClose={() => setQrGuest(null)}>
                 {qrGuest && (
                     <div style={{ textAlign: "center" }}>
+                        {/* Thông báo khi vừa thêm mới */}
+                        {qrGuest.isNew && (
+                            qrGuest.emailSent ? (
+                                <div style={{
+                                    background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)",
+                                    borderRadius: 10, padding: "12px 16px", marginBottom: 16, textAlign: "left"
+                                }}>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: "#059669", marginBottom: 4 }}>
+                                        ✅ Email mời đã được gửi tự động!
+                                    </p>
+                                    <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
+                                        Phiếu mời kèm mã QR đã được gửi đến <strong>{qrGuest.email}</strong>.
+                                        Khách chỉ cần kiểm tra hộp thư và mang mã QR đến sự kiện.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)",
+                                    borderRadius: 10, padding: "12px 16px", marginBottom: 16, textAlign: "left"
+                                }}>
+                                    <p style={{ fontSize: 13, fontWeight: 700, color: "#d97706", marginBottom: 6 }}>
+                                        ⚠️ Đã thêm thành công! (Email chưa được cấu hình)
+                                    </p>
+                                    <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+                                        Gửi link dưới đây cho <strong>{qrGuest.email}</strong> qua Zalo/Telegram.
+                                        Khách nhập email để tra cứu vé và mã QR.
+                                    </p>
+                                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                        <code style={{
+                                            flex: 1, background: "var(--bg-main)", padding: "6px 10px",
+                                            borderRadius: 6, fontSize: 11, color: "var(--color-primary)",
+                                            border: "1px solid var(--border-color)", wordBreak: "break-all", textAlign: "left"
+                                        }}>
+                                            {window.location.origin}/guest-portal
+                                        </code>
+                                        <button className="btn btn-outline btn-sm" style={{ flexShrink: 0 }}
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(`${window.location.origin}/guest-portal`);
+                                                alert("Đã copy link tra cứu vé!");
+                                            }}>
+                                            📋 Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            )
+                        )}
+
                         <div style={{ display: "inline-block", background: "white", padding: 16, borderRadius: 12, border: "2px solid var(--border-color)", marginBottom: 16 }}>
                             <QRImage value={qrGuest.qr_code} size={180} />
                         </div>
                         <div style={{ background: "var(--bg-main)", borderRadius: 10, padding: "14px 16px", marginBottom: 14, textAlign: "left" }}>
                             <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "8px 12px", fontSize: 13 }}>
-                                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Guest:</span>
+                                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Khách:</span>
                                 <span style={{ fontWeight: 700 }}>{qrGuest.name}</span>
-                                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Event:</span>
+                                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Sự kiện:</span>
                                 <span style={{ fontWeight: 600, color: "var(--color-primary)" }}>
                                     🎪 {getEventName(qrGuest.event_id)}
                                 </span>
                                 <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Email:</span>
                                 <span>{qrGuest.email}</span>
-                                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Status:</span>
+                                <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>Trạng thái:</span>
                                 <span>
                                     {qrGuest.checked_in
-                                        ? <span className="badge badge-success">✓ Checked In</span>
-                                        : <span className="badge badge-default">Pending</span>
+                                        ? <span className="badge badge-success">✓ Đã check-in</span>
+                                        : <span className="badge badge-default">Chờ check-in</span>
                                     }
                                 </span>
                             </div>
@@ -249,11 +308,11 @@ export default function GuestList() {
                                     const a = document.createElement("a");
                                     a.href = url; a.download = `QR-${qrGuest.name}.png`; a.click();
                                 }}>
-                                ⬇️ Download
+                                ⬇️ Tải QR
                             </button>
                             <button className="btn btn-primary" style={{ flex: 1 }}
                                 onClick={() => window.print()}>
-                                🖨️ Print
+                                🖨️ In vé
                             </button>
                         </div>
                     </div>

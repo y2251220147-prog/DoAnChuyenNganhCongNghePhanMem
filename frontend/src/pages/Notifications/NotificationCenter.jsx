@@ -1,18 +1,22 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../../components/Layout/Layout";
 import { getNotifications, markRead, markAllRead, deleteNotif } from "../../services/notificationService";
 import "../../styles/global.css";
 
 const TYPE_CFG = {
-    task_assigned: { icon: "📋", color: "#6366f1", label: "Nhiệm vụ" },
-    status_change: { icon: "🔄", color: "#f59e0b", label: "Trạng thái" },
+    task_assigned:  { icon: "📋", color: "#6366f1", label: "Nhiệm vụ" },
+    status_change:  { icon: "🔄", color: "#f59e0b", label: "Trạng thái" },
     event_reminder: { icon: "📅", color: "#10b981", label: "Nhắc nhở" },
-    checkin: { icon: "✅", color: "#059669", label: "Check-in" },
-    budget_alert: { icon: "💰", color: "#ef4444", label: "Ngân sách" },
-    default: { icon: "🔔", color: "#94a3b8", label: "Thông báo" },
+    event_approved: { icon: "✅", color: "#059669", label: "Duyệt sự kiện" },
+    checkin:        { icon: "🎯", color: "#059669", label: "Check-in" },
+    budget_alert:   { icon: "💰", color: "#ef4444", label: "Ngân sách" },
+    registration:   { icon: "🎟️", color: "#6366f1", label: "Đăng ký" },
+    default:        { icon: "🔔", color: "#94a3b8", label: "Thông báo" },
 };
 
 export default function NotificationCenter() {
+    const navigate = useNavigate();
     const [notifs, setNotifs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all"); // all | unread
@@ -28,11 +32,17 @@ export default function NotificationCenter() {
     useEffect(() => { load(); }, []);
 
     const handleRead = async (n) => {
-        if (n.read_at) return;
-        try {
-            await markRead(n.id);
-            setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x));
-        } catch {/**/ }
+        // Đánh dấu đã đọc
+        if (!n.read_at) {
+            try {
+                await markRead(n.id);
+                setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x));
+            } catch {/**/ }
+        }
+        // Nếu có link → điều hướng đến trang liên quan
+        if (n.link) {
+            navigate(n.link);
+        }
     };
 
     const handleMarkAll = async () => {
@@ -112,10 +122,13 @@ export default function NotificationCenter() {
                                     background: isUnread ? "rgba(99,102,241,0.04)" : "var(--bg-card)",
                                     border: `1px solid ${isUnread ? "rgba(99,102,241,0.15)" : "var(--border-color)"}`,
                                     borderRadius: "var(--border-radius)",
-                                    cursor: "pointer",
+                                    cursor: n.link ? "pointer" : isUnread ? "pointer" : "default",
                                     transition: "var(--transition)",
                                     position: "relative",
-                                }}>
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = isUnread ? "rgba(99,102,241,0.08)" : "var(--bg-hover, rgba(255,255,255,0.03))"}
+                                onMouseLeave={e => e.currentTarget.style.background = isUnread ? "rgba(99,102,241,0.04)" : "var(--bg-card)"}
+                            >
                                 {/* Icon */}
                                 <div style={{
                                     width: 38, height: 38, borderRadius: "50%",
@@ -140,6 +153,11 @@ export default function NotificationCenter() {
                                                 width: 7, height: 7, background: "var(--color-primary)",
                                                 borderRadius: "50%", flexShrink: 0
                                             }} />
+                                        )}
+                                        {n.link && (
+                                            <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: "auto" }}>
+                                                Xem chi tiết →
+                                            </span>
                                         )}
                                     </div>
                                     <div style={{ fontWeight: isUnread ? 600 : 400, fontSize: 14, color: "var(--text-primary)", marginBottom: 3 }}>

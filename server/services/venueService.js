@@ -26,6 +26,22 @@ exports.bookVenue = async (data) => {
         throw { status: 400, message: "event_id, venue_id, start_time, end_time là bắt buộc" };
     if (new Date(data.end_time) <= new Date(data.start_time))
         throw { status: 400, message: "Thời gian kết thúc phải sau thời gian bắt đầu" };
+
+    // Validate venue tồn tại
+    const venue = await Venue.getById(data.venue_id);
+    if (!venue) throw { status: 404, message: "Không tìm thấy địa điểm" };
+
+    // Kiểm tra xung đột thời gian (chỉ với các booking đã confirmed)
+    const conflict = await Venue.checkConflict(data.venue_id, data.start_time, data.end_time);
+    if (conflict) {
+        const start = new Date(conflict.start_time).toLocaleString('vi-VN');
+        const end   = new Date(conflict.end_time).toLocaleString('vi-VN');
+        throw {
+            status: 409,
+            message: `Địa điểm đã được đặt cho sự kiện "${conflict.event_name}" từ ${start} đến ${end}`
+        };
+    }
+
     const id = await Venue.createBooking(data);
     return { id };
 };

@@ -239,11 +239,12 @@ export default function EventList() {
                                             <div className="actions">
                                                 <button className="btn btn-outline btn-sm"
                                                     onClick={() => navigate(`/events/${ev.id}`)} title="Xem chi tiết">👁</button>
-                                                {canManage && !["running", "completed", "cancelled"].includes(ev.status) && (
-                                                    <button className="btn btn-outline btn-sm"
-                                                        onClick={() => openEdit(ev)} title="Chỉnh sửa">✎</button>
-                                                )}
-                                                {canManage && !["running", "completed"].includes(ev.status) && (
+                                                {canManage && !["running", "completed", "cancelled", "approved"].includes(ev.status) && (
+                                                <button className="btn btn-outline btn-sm"
+                                                    onClick={() => openEdit(ev)} title="Chỉnh sửa">✎</button>
+                                            )}
+                                            {/* Chỉ xóa được khi ở draft/planning/cancelled — không được xóa khi approved/running/completed */}
+                                            {canManage && !["approved", "running", "completed"].includes(ev.status) && (
                                                     <button className="btn btn-danger btn-sm"
                                                         onClick={() => handleDelete(ev.id)} title="Xóa">🗑</button>
                                                 )}
