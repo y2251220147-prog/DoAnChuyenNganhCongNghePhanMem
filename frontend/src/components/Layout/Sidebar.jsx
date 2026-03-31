@@ -1,74 +1,87 @@
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
+import { getUnreadCount } from "../../services/notificationService";
 import "../../styles/layout.css";
 
 const NAV = {
+    // Admin = Quản trị hệ thống: phê duyệt, thống kê, kiểm soát toàn bộ
+    // KHÔNG cần đăng ký tham dự sự kiện như nhân viên
     admin: [
         {
-            label: "Main", items: [
+            label: "Tổng quan", items: [
                 { to: "/dashboard", icon: "📊", text: "Dashboard" },
-                { to: "/events", icon: "🎪", text: "Events" },
-                { to: "/reports", icon: "📈", text: "Reports" },
+                { to: "/reports", icon: "📈", text: "Báo cáo" },
             ]
         },
         {
-            label: "Management", items: [
-                { to: "/staff", icon: "👥", text: "Staff" },
-                { to: "/guests", icon: "🎟️", text: "Guests" },
-                { to: "/timeline", icon: "📅", text: "Timeline" },
-                { to: "/budget", icon: "💰", text: "Budget" },
-                { to: "/venues", icon: "🏢", text: "Địa điểm & Thiết bị" },
+            label: "Quản lý sự kiện", items: [
+                { to: "/events", icon: "🎪", text: "Tất cả sự kiện" },
+                { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
+                { to: "/guests", icon: "🎟️", text: "Khách mời" },
+                { to: "/venues", icon: "🏢", text: "Địa điểm" },
+                { to: "/budget", icon: "💰", text: "Ngân sách" },
+                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
                 { to: "/checkin", icon: "✅", text: "Check-in" },
-                { to: "/feedback", icon: "💬", text: "Feedback" },
+                { to: "/feedback", icon: "💬", text: "Phản hồi" },
             ]
         },
         {
-            label: "Admin", items: [
-                { to: "/admin/users", icon: "🔧", text: "Users", badge: "Admin" },
+            label: "Hệ thống", items: [
+                { to: "/admin/users", icon: "🔧", text: "Quản lý tài khoản", badge: "Admin" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
-                { to: "/reset-password", icon: "🔒", text: "Reset Password" },
+                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
         },
     ],
+    // Organizer = Ban tổ chức: tạo & vận hành sự kiện
+    // Vẫn là nhân viên → có thể tham dự sự kiện của ban tổ chức khác
     organizer: [
         {
-            label: "Main", items: [
+            label: "Tổng quan", items: [
                 { to: "/dashboard", icon: "📊", text: "Dashboard" },
-                { to: "/events", icon: "🎪", text: "Events" },
-                { to: "/reports", icon: "📈", text: "Reports" },
+                { to: "/reports", icon: "📈", text: "Báo cáo" },
             ]
         },
         {
-            label: "Management", items: [
-                { to: "/staff", icon: "👥", text: "Staff" },
-                { to: "/guests", icon: "🎟️", text: "Guests" },
-                { to: "/timeline", icon: "📅", text: "Timeline" },
-                { to: "/budget", icon: "💰", text: "Budget" },
-                { to: "/venues", icon: "🏢", text: "Địa điểm & Thiết bị" },
+            label: "Tổ chức sự kiện", items: [
+                { to: "/events", icon: "🎪", text: "Quản lý sự kiện" },
+                { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
+                { to: "/guests", icon: "🎟️", text: "Khách mời" },
+                { to: "/venues", icon: "🏢", text: "Địa điểm" },
+                { to: "/budget", icon: "💰", text: "Ngân sách" },
+                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
                 { to: "/checkin", icon: "✅", text: "Check-in" },
-                { to: "/feedback", icon: "💬", text: "Feedback" },
+                { to: "/feedback", icon: "💬", text: "Phản hồi" },
             ]
         },
         {
-            label: "Account", items: [
+            label: "Cá nhân", items: [
+                { to: "/my-portal", icon: "🙋", text: "Sự kiện của tôi" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
-                { to: "/reset-password", icon: "🔒", text: "Reset Password" },
+                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
         },
     ],
+    // User = Nhân viên công ty: chỉ cần tham dự & phản hồi
     user: [
         {
-            label: "Main", items: [
-                { to: "/dashboard", icon: "📊", text: "Dashboard" },
-                { to: "/events", icon: "🎪", text: "Events" },
+            label: "Trang chủ", items: [
+                { to: "/dashboard", icon: "🏠", text: "Trang chủ" },
+                { to: "/calendar", icon: "📅", text: "Lịch sự kiện" },
             ]
         },
         {
-            label: "Account", items: [
-                { to: "/feedback", icon: "💬", text: "Give Feedback" },
+            label: "Sự kiện", items: [
+                { to: "/events", icon: "🎪", text: "Khám phá sự kiện" },
+                { to: "/my-portal", icon: "🙋", text: "Sự kiện của tôi" },
+            ]
+        },
+        {
+            label: "Cá nhân", items: [
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
-                { to: "/reset-password", icon: "🔒", text: "Reset Password" },
+                { to: "/feedback", icon: "💬", text: "Gửi phản hồi" },
+                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
         },
     ],
@@ -82,6 +95,16 @@ export default function Sidebar() {
     const initials = user?.name
         ? user.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
         : "U";
+
+    const [unread, setUnread] = useState(0);
+    useEffect(() => {
+        const fetch = async () => {
+            try { const r = await getUnreadCount(); setUnread(r.data?.count ?? 0); } catch { /**/ }
+        };
+        fetch();
+        const iv = setInterval(fetch, 60000);
+        return () => clearInterval(iv);
+    }, []);
 
     return (
         <div className="sidebar">
@@ -99,6 +122,18 @@ export default function Sidebar() {
                                 <span className="nav-icon">{item.icon}</span>
                                 {item.text}
                                 {item.badge && <span className="nav-badge">{item.badge}</span>}
+                                {/* Badge số thông báo chưa đọc */}
+                                {item.to === "/notifications" && unread > 0 && (
+                                    <span style={{
+                                        marginLeft: "auto", background: "var(--color-danger, #ef4444)",
+                                        color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700,
+                                        minWidth: 18, height: 18, padding: "0 5px",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        lineHeight: 1, flexShrink: 0,
+                                    }}>
+                                        {unread > 99 ? "99+" : unread}
+                                    </span>
+                                )}
                             </NavLink>
                         ))}
                     </div>

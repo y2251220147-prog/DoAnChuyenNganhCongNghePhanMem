@@ -16,9 +16,23 @@ function decodeToken(token) {
 
 export const AuthProvider = ({ children }) => {
 
-    const [token, setToken] = useState(localStorage.getItem("token"));
-    const [user, setUser] = useState(() => {
+    // Kiểm tra token có hết hạn không khi khởi động app
+    const getValidToken = () => {
         const t = localStorage.getItem("token");
+        if (!t) return null;
+        try {
+            const payload = JSON.parse(atob(t.split(".")[1]));
+            if (payload.exp && payload.exp * 1000 < Date.now()) {
+                localStorage.removeItem("token"); // token hết hạn, xóa luôn
+                return null;
+            }
+            return t;
+        } catch { return null; }
+    };
+
+    const [token, setToken] = useState(getValidToken);
+    const [user, setUser] = useState(() => {
+        const t = getValidToken();
         return t ? decodeToken(t) : null;
     });
 

@@ -5,7 +5,7 @@ exports.checkin = async (req, res) => {
         const { qr_code, event_id } = req.body;
         const result = await checkinService.checkin(qr_code, event_id);
         res.json({
-            message: `✅ Check-in successful! Welcome, ${result.guest.name} to "${result.guest.event_name}"`,
+            message: `✅ Check-in thành công! Chào mừng ${result.person.name} đến sự kiện "${result.person.event_name}"`,
             ...result
         });
     } catch (err) {

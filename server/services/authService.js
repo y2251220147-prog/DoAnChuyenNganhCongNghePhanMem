@@ -16,6 +16,16 @@ const register = async ({ name, email, password }) => {
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const id = await User.createUser({ name, email, password: hashedPassword, role: "user" });
+
+    // Thông báo cho toàn bộ admin
+    const { notifyAdmins } = require("./notificationUtils");
+    await notifyAdmins({
+        type: 'default',
+        title: 'Thành viên mới',
+        message: `Tài khoản ${name} (${email}) vừa đăng ký. Hãy phân quyền nếu cần.`,
+        link: '/admin/users'
+    });
+
     return { userId: id };
 };
 
