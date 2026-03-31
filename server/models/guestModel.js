@@ -25,6 +25,27 @@ const Guest = {
     },
     delete: async (id) => {
         await db.query("DELETE FROM guests WHERE id = ?", [id]);
+    },
+    findByEmailAndEvent: async (email, eventId) => {
+        const [rows] = await db.query(
+            "SELECT id FROM guests WHERE email = ? AND event_id = ?",
+            [email, eventId]
+        );
+        return rows[0] || null;
+    },
+    findByEmail: async (email) => {
+        const [rows] = await db.query(
+            `SELECT g.*, 
+                e.name   AS event_name,
+                e.status AS event_status,
+                e.start_date, e.end_date, e.location
+             FROM guests g
+             LEFT JOIN events e ON e.id = g.event_id
+             WHERE g.email = ?
+             ORDER BY g.id DESC`,
+            [email]
+        );
+        return rows;
     }
 };
 

@@ -55,6 +55,32 @@ const Venue = {
         return r.insertId;
     },
 
+    /**
+     * Kiểm tra xung đột thời gian: trả về booking đã confirmed trùng khung giờ
+     * @param {number} venueId
+     * @param {string} startTime
+     * @param {string} endTime
+     * @param {number|null} excludeId - bỏ qua booking này (dùng khi update)
+     */
+    checkConflict: async (venueId, startTime, endTime, excludeId = null) => {
+        let sql = `
+            SELECT b.id, b.start_time, b.end_time, e.name AS event_name
+            FROM event_venue_bookings b
+            JOIN events e ON b.event_id = e.id
+            WHERE b.venue_id = ?
+              AND b.status = 'confirmed'
+              AND b.start_time < ?
+              AND b.end_time > ?
+        `;
+        const params = [venueId, endTime, startTime];
+        if (excludeId) {
+            sql += " AND b.id != ?";
+            params.push(excludeId);
+        }
+        const [rows] = await db.query(sql, params);
+        return rows[0] || null;
+    },
+
     updateBookingStatus: async (id, status) => {
         await db.query("UPDATE event_venue_bookings SET status=? WHERE id=?", [status, id]);
     },

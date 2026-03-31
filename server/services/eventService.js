@@ -1,5 +1,7 @@
 const Event = require("../models/eventModel");
 const Deadline = require("../models/deadlineModel");
+const User = require("../models/userModel");
+const Notification = require("../models/notificationModel");
 
 // Workflow hợp lệ: chỉ cho phép chuyển trạng thái theo chiều này
 const WORKFLOW = {
@@ -51,6 +53,15 @@ const createEvent = async (data, userId) => {
         await Deadline.create({ event_id: id, title: dl.title, due_date: due });
     }
 
+    // Thông báo cho admin
+    const { notifyAdmins } = require("./notificationUtils");
+    await notifyAdmins({
+        type: 'event_reminder',
+        title: 'Sự kiện mới chờ duyệt',
+        message: `Sự kiện "${name}" vừa được lên nháp. Vui lòng kiểm tra và phê duyệt.`,
+        link: `/events/${id}`
+    });
+
     return { id };
 };
 
@@ -99,17 +110,51 @@ const changeStatus = async (id, newStatus, userId, userRole) => {
 
     if (newStatus === "approved") {
         await Event.approve(id, userId);
+        // Thông báo cho tất cả nhân viên (role=user) về sự kiện mới
+        try {
+            const allUsers = await User.getAllUsers();
+            const employees = allUsers.filter(u => u.role === 'user');
+            for (const u of employees) {
+                await Notification.create({
+                    user_id: u.id,
+                    type: 'event_reminder',
+                    title: `Sự kiện mới: ${event.name}`,
+                    message: `Sự kiện "${event.name}" đã được phê duyệt và mở đăng ký. Đừng bỏ lỡ!`,
+                    link: `/events/${id}`
+                });
+            }
+        } catch (e) { console.error("Thông báo lỗi:", e); }
     } else {
         await Event.changeStatus(id, newStatus);
+        
+        // Nếu hủy sự kiện (có thể do organizer hủy)
+        if (newStatus === "cancelled") {
+            const { notifyAdmins } = require("./notificationUtils");
+            await notifyAdmins({
+                type: 'status_change',
+                title: 'Sự kiện bị hủy',
+                message: `Sự kiện "${event.name}" đã bị hủy.`,
+                link: `/events/${id}`
+            });
+        }
     }
 };
 
 const deleteEvent = async (id) => {
     const event = await Event.getById(id);
     if (!event) throw { status: 404, message: "Không tìm thấy sự kiện" };
-    if (["running", "completed"].includes(event.status))
-        throw { status: 400, message: `Không thể xóa sự kiện đang ở trạng thái "${event.status}"` };
+    // Không thể xóa sự kiện đã duyệt, đang chạy hoặc đã hoàn thành
+    if (["approved", "running", "completed"].includes(event.status))
+        throw { status: 400, message: `Không thể xóa sự kiện ở trạng thái "${event.status}". Hãy hủy sự kiện trước.` };
     await Event.delete(id);
+
+    const { notifyAdmins } = require("./notificationUtils");
+    await notifyAdmins({
+        type: 'status_change',
+        title: 'Sự kiện đã bị xóa',
+        message: `Sự kiện "${event.name}" vừa bị xóa khỏi hệ thống.`,
+        link: '/events'
+    });
 };
 
 // ── DEADLINES ─────────────────────────────────

@@ -9,6 +9,7 @@ const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 exports.getAllAttendees = async () => await Attendee.getAll();
 exports.getByEvent = async (id) => await Attendee.getByEvent(id);
 exports.getStats = async (id) => await Attendee.getStats(id);
+exports.getMyRegistrations = async (userId) => await Attendee.getByUser(userId);
 
 exports.checkRegistration = async (eventId, userId) => {
     const att = await Attendee.findByUserAndEvent(userId, eventId);
@@ -21,6 +22,8 @@ exports.addExternal = async (data, registeredBy) => {
     if (!isEmail(email)) throw { status: 400, message: "Email không hợp lệ" };
     const event = await Event.getById(event_id);
     if (!event) throw { status: 404, message: "Không tìm thấy sự kiện" };
+    if (['completed', 'cancelled'].includes(event.status))
+        throw { status: 400, message: `Không thể thêm khách vào sự kiện đã kết thúc hoặc đã huỷ` };
     const dup = await Attendee.findByEmailAndEvent(email, event_id);
     if (dup) throw { status: 409, message: "Email này đã đăng ký sự kiện rồi" };
     const qr_code = generateQR(event_id, name);
@@ -49,6 +52,18 @@ exports.selfRegister = async (eventId, userId) => {
         event_id: eventId, user_id: userId, name: user.name, email: user.email,
         attendee_type: 'internal', qr_code, registered_by: userId
     });
+
+    // Thông báo xác nhận đăng ký thành công
+    try {
+        await Notification.create({
+            user_id: userId,
+            type: 'checkin',
+            title: `Đăng ký thành công: ${event.name}`,
+            message: `Bạn đã đăng ký tham gia "${event.name}". Hãy kiểm tra mã QR trong Sự kiện của tôi.`,
+            link: `/my-events`
+        });
+    } catch (e) { console.error("Lỗi thông báo đăng ký:", e); }
+
     return { id, qr_code };
 };
 

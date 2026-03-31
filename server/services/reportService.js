@@ -1,23 +1,36 @@
 const db = require("../config/database");
 
-// Dashboard tổng quan
+/**
+ * Dashboard tổng quan.
+ * Số liệu người tham dự được gộp từ cả bảng attendees (nội bộ) và guests (khách ngoài).
+ */
 exports.getOverview = async () => {
     const [[ev]] = await db.query("SELECT COUNT(*) AS total FROM events");
     const [[run]] = await db.query("SELECT COUNT(*) AS total FROM events WHERE status='running'");
     const [[usr]] = await db.query("SELECT COUNT(*) AS total FROM users");
-    const [[att]] = await db.query("SELECT COUNT(*) AS total FROM attendees");
-    const [[ci]] = await db.query("SELECT COUNT(*) AS total FROM attendees WHERE checked_in=1");
-    const [[bud]] = await db.query("SELECT COALESCE(SUM(cost),0) AS total FROM event_budget");
+
+    // Gộp attendees + guests
+    const [[att]] = await db.query(`
+        SELECT
+            (SELECT COUNT(*) FROM attendees) + (SELECT COUNT(*) FROM guests) AS total,
+            (SELECT COALESCE(SUM(checked_in),0) FROM attendees) +
+            (SELECT COALESCE(SUM(checked_in),0) FROM guests) AS checked_in
+    `);
+
+    const [[bud]]  = await db.query("SELECT COALESCE(SUM(cost),0) AS total FROM event_budget");
     const [[plan]] = await db.query("SELECT COALESCE(SUM(total_budget),0) AS total FROM events");
+
     return {
         events: { total: ev.total, running: run.total },
         users: usr.total,
-        attendees: { total: att.total, checkedIn: ci.total },
+        attendees: { total: Number(att.total) || 0, checkedIn: Number(att.checked_in) || 0 },
         budget: { planned: Number(plan.total), actual: Number(bud.total) }
     };
 };
 
-// Thống kê sự kiện theo tháng
+/**
+ * Thống kê sự kiện theo tháng.
+ */
 exports.getEventsByMonth = async (year) => {
     const y = year || new Date().getFullYear();
     const [rows] = await db.query(`
@@ -28,19 +41,33 @@ exports.getEventsByMonth = async (year) => {
     return rows;
 };
 
-// Thống kê đăng ký theo event
+/**
+ * Thống kê đăng ký & check-in theo event.
+ * Gộp cả attendees (nội bộ) và guests (khách ngoài).
+ */
 exports.getAttendeesByEvent = async (limit = 10) => {
     const [rows] = await db.query(`
         SELECT e.id, e.name, e.status, e.capacity,
-               COUNT(a.id) AS registered,
-               SUM(a.checked_in) AS checked_in
-        FROM events e LEFT JOIN attendees a ON e.id = a.event_id
-        GROUP BY e.id ORDER BY registered DESC LIMIT ?
+               COALESCE(a.cnt, 0) + COALESCE(g.cnt, 0)        AS registered,
+               COALESCE(a.ci,  0) + COALESCE(g.ci,  0)        AS checked_in
+        FROM events e
+        LEFT JOIN (
+            SELECT event_id, COUNT(*) AS cnt, COALESCE(SUM(checked_in),0) AS ci
+            FROM attendees GROUP BY event_id
+        ) a ON a.event_id = e.id
+        LEFT JOIN (
+            SELECT event_id, COUNT(*) AS cnt, COALESCE(SUM(checked_in),0) AS ci
+            FROM guests GROUP BY event_id
+        ) g ON g.event_id = e.id
+        ORDER BY registered DESC
+        LIMIT ?
     `, [limit]);
     return rows;
 };
 
-// Thống kê ngân sách theo sự kiện
+/**
+ * Thống kê ngân sách theo sự kiện.
+ */
 exports.getBudgetByEvent = async (limit = 10) => {
     const [rows] = await db.query(`
         SELECT e.id, e.name, e.total_budget AS planned,
@@ -51,7 +78,9 @@ exports.getBudgetByEvent = async (limit = 10) => {
     return rows;
 };
 
-// Thống kê tasks
+/**
+ * Thống kê tasks theo trạng thái.
+ */
 exports.getTaskStats = async () => {
     const [rows] = await db.query(`
         SELECT status, COUNT(*) AS count FROM event_tasks GROUP BY status
@@ -59,7 +88,9 @@ exports.getTaskStats = async () => {
     return rows;
 };
 
-// Thống kê theo loại sự kiện
+/**
+ * Thống kê sự kiện theo loại.
+ */
 exports.getEventsByType = async () => {
     const [rows] = await db.query(`
         SELECT COALESCE(event_type,'Khác') AS type, COUNT(*) AS count

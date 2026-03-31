@@ -15,6 +15,17 @@ exports.createFeedback = async (req, res) => {
     if (!message) return res.status(400).json({ message: "Message is required" });
     try {
         const id = await Feedback.create(req.body);
+        
+        // Notify Admins
+        const { notifyAdmins } = require("../services/notificationUtils");
+        // Ta có thể fetch event từ eventService để lấy tên, tạm thời ta có event_id
+        await notifyAdmins({
+            type: 'default',
+            title: 'Phản hồi sự kiện mới',
+            message: `Có phản hồi mới từ tài khoản #${req.body.user_id} cho sự kiện #${req.body.event_id}`,
+            link: '/feedback'
+        });
+
         res.status(201).json({ message: "Feedback submitted", id });
     } catch (err) { res.status(500).json({ message: err.message }); }
 };

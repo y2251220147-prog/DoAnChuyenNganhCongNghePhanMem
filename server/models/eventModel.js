@@ -4,7 +4,8 @@ const Event = {
 
     async getAll() {
         const [rows] = await db.query(`
-            SELECT e.*, u.name AS owner_name, a.name AS approver_name
+            SELECT e.*, u.name AS owner_name, a.name AS approver_name,
+                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
             FROM events e
             LEFT JOIN users u ON e.owner_id = u.id
             LEFT JOIN users a ON e.approved_by = a.id
@@ -15,7 +16,8 @@ const Event = {
 
     async getById(id) {
         const [rows] = await db.query(`
-            SELECT e.*, u.name AS owner_name, a.name AS approver_name
+            SELECT e.*, u.name AS owner_name, a.name AS approver_name,
+                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
             FROM events e
             LEFT JOIN users u ON e.owner_id = u.id
             LEFT JOIN users a ON e.approved_by = a.id
