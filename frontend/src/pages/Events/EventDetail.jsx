@@ -156,6 +156,7 @@ export default function EventDetail() {
 
     const TABS = [
         { key: "overview", label: "📋 Tổng quan" },
+        { key: "tasks", label: `✅ Công việc (${tasks.length})` },
         { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})` },
         { key: "participants", label: `🎟️ Người tham gia (${totalParticipants})` },
         { key: "staff", label: `👥 Staff (${staff.length})` },
