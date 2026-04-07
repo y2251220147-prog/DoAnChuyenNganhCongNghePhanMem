@@ -28,7 +28,7 @@ import { EmployeeExplore, EmployeeMyEvents } from "./pages/Employee/EmployeeEven
 import EmployeeEventDetail from "./pages/Employee/EmployeeEventDetail";
 import EmployeeCalendar from "./pages/Employee/EmployeeCalendar";
 import EmployeeNotifications from "./pages/Employee/EmployeeNotifications";
-import EmployeeProfile from "./pages/Employee/EmployeeProfile";
+import ProfilePage from "./pages/Profile/ProfilePage";
 
 // ── Route guards ─────────────────────────────────────────────────────────────
 function ProtectedRoute({ children }) {
@@ -96,7 +96,7 @@ export default function App() {
           {/* Calendar: user → employee calendar; others → redirect to dashboard */}
           <EmployeeCalendar />
         </ProtectedRoute>} />
-        <Route path="/profile" element={<RoleRoute roles={["user"]}><EmployeeProfile /></RoleRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
         {/* Shared */}
         <Route path="/events/:id" element={<ProtectedRoute><SmartEventDetail /></ProtectedRoute>} />

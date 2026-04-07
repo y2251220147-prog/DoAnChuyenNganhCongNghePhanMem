@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { AuthContext } from "../context/AuthContext";
 import Layout from "../components/Layout/Layout";
 import Modal from "../components/UI/Modal";
 import { changeRole, createUser, deleteUser, getUsers } from "../services/userService";
@@ -16,6 +17,7 @@ function getInitials(name = "") {
 }
 
 export default function AdminUsers() {
+    const { getAvatarUrl } = useContext(AuthContext);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(null);
@@ -105,8 +107,17 @@ export default function AdminUsers() {
                                 <tr key={u.id}>
                                     <td>
                                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                            <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#06b6d4)", color: "white", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                {getInitials(u.name)}
+                                            <div style={{ 
+                                                width: 38, height: 38, borderRadius: "50%", 
+                                                background: "linear-gradient(135deg,#6366f1,#06b6d4)", 
+                                                color: "white", fontWeight: 700, fontSize: 13, 
+                                                display: "flex", alignItems: "center", justifyContent: "center", 
+                                                flexShrink: 0, overflow: "hidden",
+                                                border: "2px solid rgba(255,255,255,0.1)"
+                                            }}>
+                                                {u.avatar ? (
+                                                    <img src={getAvatarUrl(u.avatar)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                ) : getInitials(u.name)}
                                             </div>
                                             <span style={{ fontWeight: 600 }}>{u.name}</span>
                                         </div>

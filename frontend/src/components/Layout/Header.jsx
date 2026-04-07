@@ -23,7 +23,7 @@ const ROLE_ICON  = { admin: "🔧", organizer: "🎪", user: "👤" };
 const ROLE_LABEL = { admin: "Admin", organizer: "Organizer", user: "User" };
 
 export default function Header() {
-    const { user } = useContext(AuthContext);
+    const { user, getAvatarUrl } = useContext(AuthContext);
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const page = PAGE_TITLES[pathname] || { title: "EventPro", sub: "" };
@@ -99,7 +99,25 @@ export default function Header() {
                 <span className={`header-badge ${role}`}>
                     {ROLE_ICON[role]}&nbsp;{ROLE_LABEL[role]}
                 </span>
-                <span className="header-user-name">{user?.name || "User"}</span>
+                
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", marginLeft: "10px" }} onClick={() => navigate("/profile")}>
+                    <div style={{ 
+                        width: 32, height: 32, borderRadius: "50%", overflow: "hidden", 
+                        background: "var(--bg-card, #1e1e2e)", display: "flex", 
+                        alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600,
+                        border: "1px solid var(--border-color, rgba(255,255,255,0.1))",
+                        flexShrink: 0
+                    }}>
+                        {user?.avatar ? (
+                            <img src={getAvatarUrl(user.avatar)} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                            user?.name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "U"
+                        )}
+                    </div>
+                    <span className="header-user-name" style={{ color: "var(--text-primary)", fontWeight: 500 }}>
+                        {user?.name || "User"}
+                    </span>
+                </div>
             </div>
 
             {/* CSS animation cho bell shake */}

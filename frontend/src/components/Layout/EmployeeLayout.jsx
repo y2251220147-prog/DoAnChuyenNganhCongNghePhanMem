@@ -83,7 +83,7 @@ const BOTTOM_NAV = [
 ];
 
 export default function EmployeeLayout({ children, title, subtitle, unreadCount = 0 }) {
-    const { user } = useContext(AuthContext);
+    const { user, getAvatarUrl } = useContext(AuthContext);
     const navigate = useNavigate();
 
     const initials = user?.name
@@ -139,8 +139,16 @@ export default function EmployeeLayout({ children, title, subtitle, unreadCount 
                     className="emp-sb-avatar"
                     onClick={() => navigate("/profile")}
                     title={user?.name}
+                    style={{ 
+                        padding: 0, overflow: "hidden", display: "flex", 
+                        alignItems: "center", justifyContent: "center",
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.1)"
+                    }}
                 >
-                    {initials}
+                    {user?.avatar ? (
+                        <img src={getAvatarUrl(user.avatar)} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : initials}
                 </button>
             </aside>
 

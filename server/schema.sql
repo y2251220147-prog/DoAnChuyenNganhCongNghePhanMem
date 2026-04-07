@@ -621,6 +621,8 @@ CREATE TABLE `users` (
   `position` varchar(100) DEFAULT NULL,
   `avatar` varchar(300) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
+  `gender` enum('male','female', 'other') DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `resetToken` varchar(255) DEFAULT NULL,
   `resetTokenExpire` datetime DEFAULT NULL,
@@ -661,6 +663,8 @@ CREATE TABLE `venues` (
   KEY `created_by` (`created_by`),
   CONSTRAINT `venues_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+ALTER TABLE users ADD COLUMN gender ENUM('male', 'female', 'other') DEFAULT NULL AFTER phone;
+ALTER TABLE users ADD COLUMN address VARCHAR(255) DEFAULT NULL AFTER gender;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

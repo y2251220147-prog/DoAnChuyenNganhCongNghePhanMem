@@ -20,6 +20,8 @@ async function migrate() {
         { name: "events.status", sql: `ALTER TABLE events ADD COLUMN IF NOT EXISTS status ENUM('planned','active','completed','cancelled') DEFAULT 'planned'` },
         { name: "event_budget.note", sql: `ALTER TABLE event_budget ADD COLUMN IF NOT EXISTS note TEXT` },
         { name: "guests.qr_code", sql: `ALTER TABLE guests ADD COLUMN IF NOT EXISTS qr_code VARCHAR(255) UNIQUE` },
+        { name: "users.gender", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS gender ENUM('male', 'female', 'other')` },
+        { name: "users.address", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR(255)` },
     ];
 
     for (const s of steps) {

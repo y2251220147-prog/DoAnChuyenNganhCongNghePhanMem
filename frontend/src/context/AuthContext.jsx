@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import api from "../services/api";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
@@ -51,8 +52,45 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    const updateUserAvatar = (newAvatarUrl) => {
+        setUser(prev => ({
+            ...prev,
+            avatar: newAvatarUrl
+        }));
+    };
+
+    const updateProfileData = (newData) => {
+        setUser(prev => ({
+            ...prev,
+            ...newData
+        }));
+    };
+
+    // Tự động tải thông tin đầy đủ khi khởi động app
+    useEffect(() => {
+        if (!token) return;
+        const fetchFullProfile = async () => {
+            try {
+                const res = await api.get("/users/profile");
+                if (res.data) {
+                    setUser(prev => ({ ...prev, ...res.data }));
+                }
+            } catch (err) {
+                console.error("AuthContext sync error:", err);
+            }
+        };
+        fetchFullProfile();
+    }, [token]);
+
+    const getAvatarUrl = (avatarPath) => {
+        if (!avatarPath) return null;
+        if (avatarPath.startsWith('http')) return avatarPath;
+        // fallback to server uploads
+        return `http://localhost:5000/${avatarPath}`;
+    };
+
     return (
-        <AuthContext.Provider value={{ token, user, loginUser, logoutUser }}>
+        <AuthContext.Provider value={{ token, user, loginUser, logoutUser, updateUserAvatar, updateProfileData, getAvatarUrl }}>
             {children}
         </AuthContext.Provider>
     );
