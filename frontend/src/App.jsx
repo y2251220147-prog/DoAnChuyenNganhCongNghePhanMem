@@ -21,6 +21,7 @@ import VenueList from "./pages/Venues/VenueList";
 import NotificationCenter from "./pages/Notifications/NotificationCenter";
 import UserEventPortal from "./pages/Portal/UserEventPortal";
 import GuestPublicPortal from "./pages/Portal/GuestPublicPortal";
+import SearchPage from "./pages/Events/SearchPage";
 
 // ── Employee (User) pages ───────────────────────────────────────────────────
 import EmployeeDashboard from "./pages/Employee/EmployeeDashboard";
@@ -112,6 +113,7 @@ export default function App() {
         <Route path="/reports" element={<RoleRoute roles={["admin","organizer"]}><Reports /></RoleRoute>} />
         <Route path="/venues" element={<RoleRoute roles={["admin","organizer"]}><VenueList /></RoleRoute>} />
         <Route path="/admin/users" element={<RoleRoute roles={["admin"]}><AdminUsers /></RoleRoute>} />
+        <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
 
         {/* Public */}
         <Route path="/guest-portal" element={<GuestPublicPortal />} />

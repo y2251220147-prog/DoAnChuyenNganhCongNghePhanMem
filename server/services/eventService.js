@@ -25,6 +25,11 @@ const DEFAULT_DEADLINES = [
 
 const getAllEvents = async () => await Event.getAll();
 
+// ── Search server-side với filter + pagination ────────────────
+const searchEvents = async (params) => {
+    return await Event.search(params);
+};
+
 const getEventById = async (id) => {
     const event = await Event.getById(id);
     if (!event) throw { status: 404, message: "Không tìm thấy sự kiện" };
@@ -184,4 +189,5 @@ module.exports = {
     getAllEvents, getEventById,
     createEvent, updateEvent, changeStatus, deleteEvent,
     getDeadlines, createDeadline, toggleDeadline, deleteDeadline,
+    searchEvents,
 };

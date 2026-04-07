@@ -1,11 +1,12 @@
-import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../../components/Layout/Layout";
 import Modal from "../../components/UI/Modal";
+import Pagination from "../../components/UI/Pagination";
 import { AuthContext } from "../../context/AuthContext";
 import {
     changeStatus, createEvent, deleteEvent,
-    getEvents, updateEvent
+    searchEvents, updateEvent
 } from "../../services/eventService";
 import "../../styles/global.css";
 
@@ -51,20 +52,67 @@ export default function EventList() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
-    const [search, setSearch] = useState("");
-    const [filterStatus, setFilterStatus] = useState("all");
+
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // ── Search & Filter State (Initialize from URL) ──────────
+    const [search, setSearch] = useState(searchParams.get("search") || "");
+    const [filterStatus, setFilterStatus] = useState(searchParams.get("status") || "all");
+    const [filterType, setFilterType] = useState(searchParams.get("type") || "");
+    const [dateFrom, setDateFrom] = useState(searchParams.get("from") || "");
+    const [dateTo, setDateTo] = useState(searchParams.get("to") || "");
+
+    // ── Pagination State ─────────────────────────────────────
+    const [page, setPage] = useState(parseInt(searchParams.get("page")) || 1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalItems, setTotalItems] = useState(0);
+    const limit = 10;
 
     const isAdmin = user?.role === "admin";
     const canManage = user?.role === "admin" || user?.role === "organizer";
 
-    const load = async () => {
+    const load = useCallback(async (currentPage = page) => {
         setLoading(true);
-        try { const r = await getEvents(); setEvents(r.data || []); }
-        catch {/**/ }
+        try {
+            const params = {
+                search,
+                status: filterStatus === "all" ? "" : filterStatus,
+                event_type: filterType,
+                date_from: dateFrom,
+                date_to: dateTo,
+                page: currentPage,
+                limit
+            };
+            const r = await searchEvents(params);
+            setEvents(r.data?.data || []);
+            setTotalItems(r.data?.pagination?.total || 0);
+            setTotalPages(r.data?.pagination?.totalPages || 1);
+        }
+        catch (err) {
+            console.error("Load events error:", err);
+        }
         finally { setLoading(false); }
-    };
+    }, [search, filterStatus, filterType, dateFrom, dateTo, page]);
 
-    useEffect(() => { load(); }, []);
+    // Debounce search & Update URL
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            // Update URL params
+            const params = {};
+            if (search) params.search = search;
+            if (filterStatus !== "all") params.status = filterStatus;
+            if (filterType) params.type = filterType;
+            if (dateFrom) params.from = dateFrom;
+            if (dateTo) params.to = dateTo;
+            if (page > 1) params.page = page;
+            setSearchParams(params, { replace: true });
+
+            load(page);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [search, filterStatus, filterType, dateFrom, dateTo, page, load, setSearchParams]);
+
+    // Load khi đổi trang (Đã gộp vào useEffect trên)
 
     // ── Tạo / Cập nhật ───────────────────────────────────────
     const handleSubmit = async (e) => {
@@ -111,15 +159,13 @@ export default function EventList() {
         } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
     };
 
-    // ── Lọc ──────────────────────────────────────────────────
-    const filtered = events.filter(e => {
-        const ms = e.name.toLowerCase().includes(search.toLowerCase()) ||
-            (e.location || "").toLowerCase().includes(search.toLowerCase());
-        const mf = filterStatus === "all" || e.status === filterStatus;
-        return ms && mf;
-    });
-
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setPage(newPage);
+        }
+    };
 
     return (
         <Layout>
@@ -128,7 +174,7 @@ export default function EventList() {
                 <div>
                     <h2>Sự kiện</h2>
                     <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        {events.length} sự kiện · {events.filter(e => e.status === "running").length} đang diễn ra
+                        Tìm thấy {totalItems} sự kiện · {events.filter(e => e.status === "running").length} đang hiển thị
                     </p>
                 </div>
                 {canManage && (
@@ -158,24 +204,61 @@ export default function EventList() {
             </div>
 
             {/* ── Bộ lọc ── */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                <input className="form-control" placeholder="🔍 Tìm theo tên, địa điểm..."
-                    value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
-                <select className="form-control" style={{ maxWidth: 180 }}
-                    value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option value="all">Tất cả trạng thái</option>
-                    {Object.entries(STATUS_LABEL).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
-                    ))}
-                </select>
+            <div className="card" style={{ marginBottom: 16, padding: "16px" }}>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 240px" }}>
+                        <label style={{ fontSize: 12, marginBottom: 4 }}>Tìm kiếm</label>
+                        <input className="form-control" placeholder="🔍 Tên, mô tả, địa điểm..."
+                            value={search} onChange={e => setSearch(e.target.value)} />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 150px" }}>
+                        <label style={{ fontSize: 12, marginBottom: 4 }}>Trạng thái</label>
+                        <select className="form-control"
+                            value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <option value="all">Tất cả</option>
+                            {Object.entries(STATUS_LABEL).map(([k, v]) => (
+                                <option key={k} value={k}>{v}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 150px" }}>
+                        <label style={{ fontSize: 12, marginBottom: 4 }}>Loại</label>
+                        <select className="form-control"
+                            value={filterType} onChange={e => setFilterType(e.target.value)}>
+                            <option value="">Tất cả loại</option>
+                            {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 140px" }}>
+                        <label style={{ fontSize: 12, marginBottom: 4 }}>Từ ngày</label>
+                        <input type="date" className="form-control"
+                            value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 140px" }}>
+                        <label style={{ fontSize: 12, marginBottom: 4 }}>Đến ngày</label>
+                        <input type="date" className="form-control"
+                            value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                    </div>
+
+                    <button className="btn btn-outline" onClick={() => {
+                        setSearch(""); setFilterStatus("all"); setFilterType("");
+                        setDateFrom(""); setDateTo(""); setPage(1);
+                    }} style={{ height: 42 }}>
+                        Đặt lại
+                    </button>
+                </div>
             </div>
 
             {/* ── Bảng sự kiện ── */}
             <div className="data-table-wrapper">
                 {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Đang tải...</p></div>
-                ) : filtered.length === 0 ? (
-                    <div className="empty-state"><span>🎪</span><p>Không có sự kiện nào{canManage ? " — hãy tạo mới!" : "."}</p></div>
+                    <div className="empty-state"><span>⏳</span><p>Đang tìm kiếm...</p></div>
+                ) : events.length === 0 ? (
+                    <div className="empty-state"><span>🎪</span><p>Không tìm thấy kết quả nào phù hợp.</p></div>
                 ) : (
                     <table className="data-table">
                         <thead>
@@ -186,7 +269,7 @@ export default function EventList() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((ev, i) => {
+                            {events.map((ev, i) => {
                                 const wf = WORKFLOW[ev.status] || WORKFLOW.draft;
                                 const nextS = wf.next;
                                 return (
@@ -257,6 +340,13 @@ export default function EventList() {
                     </table>
                 )}
             </div>
+
+            {/* ── Pagination ── */}
+            <Pagination 
+                currentPage={page} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+            />
 
             {/* ── Modal Tạo / Chỉnh sửa ── */}
             <Modal

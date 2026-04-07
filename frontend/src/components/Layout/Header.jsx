@@ -31,6 +31,14 @@ export default function Header() {
 
     const [unread, setUnread] = useState(0);
     const [bellAnim, setBellAnim] = useState(false);
+    const [searchQ, setSearchQ] = useState("");
+
+    const handleGlobalSearch = (e) => {
+        if (e.key === "Enter" && searchQ.trim()) {
+            navigate(`/search?q=${encodeURIComponent(searchQ.trim())}`);
+            setSearchQ("");
+        }
+    };
 
     // Lấy số thông báo chưa đọc khi load và poll mỗi 60s
     useEffect(() => {
@@ -48,7 +56,7 @@ export default function Header() {
         fetch();
         const interval = setInterval(fetch, 60000); // poll 60s
         return () => { mounted = false; clearInterval(interval); };
-    }, [pathname]); // re-fetch khi chuyển trang
+    }, [pathname, unread]); // re-fetch khi chuyển trang
 
     useEffect(() => {
         if (bellAnim) {
@@ -63,6 +71,26 @@ export default function Header() {
                 <div className="page-title">{page.title}</div>
                 <div className="breadcrumb">{page.sub}</div>
             </div>
+
+            <div className="header-search" style={{ flex: 1, display: "flex", justifyContent: "center", padding: "0 20px" }}>
+                <div style={{ position: "relative", width: "100%", maxWidth: "400px" }}>
+                    <input 
+                        type="text" 
+                        className="form-control"
+                        placeholder="🔍 Tìm nhanh sự kiện, địa điểm..." 
+                        value={searchQ}
+                        onChange={(e) => setSearchQ(e.target.value)}
+                        onKeyDown={handleGlobalSearch}
+                        style={{
+                            borderRadius: "20px",
+                            paddingLeft: "15px",
+                            background: "var(--bg-main)",
+                            height: "38px"
+                        }}
+                    />
+                </div>
+            </div>
+
             <div className="header-right">
                 {/* Notification Bell */}
                 <button

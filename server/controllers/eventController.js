@@ -5,6 +5,24 @@ exports.getAllEvents = async (req, res) => {
     catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 
+// GET /api/events/search?search=&status=&event_type=&date_from=&date_to=&page=&limit=
+exports.searchEvents = async (req, res) => {
+    try {
+        const { search, status, event_type, date_from, date_to, page = 1, limit = 10 } = req.query;
+        const result = await eventService.searchEvents({
+            keyword: search || "",
+            status: status || "",
+            event_type: event_type || "",
+            date_from: date_from || "",
+            date_to: date_to || "",
+            page,
+            limit
+        });
+        res.json(result);
+    }
+    catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
 exports.getEventById = async (req, res) => {
     try { res.json(await eventService.getEventById(req.params.id)); }
     catch (err) { res.status(err.status || 500).json({ message: err.message }); }

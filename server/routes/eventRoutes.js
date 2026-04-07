@@ -5,6 +5,8 @@ const auth = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 
 // ── Events CRUD ──────────────────────────────
+// QUAN TRỌNG: route /search phải đứng TRƯỚC /:id
+router.get("/search", auth, c.searchEvents);
 router.get("/", auth, c.getAllEvents);
 router.get("/:id", auth, c.getEventById);
 router.post("/", auth, authorize(["admin", "organizer"]), c.createEvent);
