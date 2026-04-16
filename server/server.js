@@ -44,5 +44,5 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== "test")
-    app.listen(PORT, () => console.log(`✅ EventCore API v3.0 :${PORT}`));
+    app.listen(PORT, () => console.log(`✅ EventCore API v3.0 :${PORT} [DEBUG: ${new Date().toLocaleTimeString()}]`));
 module.exports = app;

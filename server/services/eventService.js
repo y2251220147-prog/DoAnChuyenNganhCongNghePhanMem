@@ -51,11 +51,26 @@ const createEvent = async (data, userId) => {
     const id = await Event.create(payload);
 
     // Tự động tạo deadlines mặc định dựa vào start_date
+    const assigneeId = data.organizer_id || userId;
     const start = new Date(start_date);
+    const now = new Date();
+
     for (const dl of DEFAULT_DEADLINES) {
-        const due = new Date(start);
+        let due = new Date(start);
         due.setDate(due.getDate() - dl.days_before);
-        await Deadline.create({ event_id: id, title: dl.title, due_date: due });
+
+        // Nếu hạn chót rơi vào quá khứ (sự kiện gấp), đặt hạn là cuối ngày hôm nay
+        if (due < now) {
+            due = new Date(now);
+            due.setHours(23, 59, 59, 999);
+        }
+
+        await Deadline.create({
+            event_id: id,
+            title: dl.title,
+            due_date: due,
+            assigned_to: assigneeId
+        });
     }
 
     // Thông báo cho admin
@@ -93,6 +108,10 @@ const updateEvent = async (id, data) => {
         location: data.location ?? event.location,
         capacity: data.capacity ?? event.capacity,
         total_budget: data.total_budget ?? event.total_budget,
+        organizer_id: data.organizer_id ?? event.organizer_id,
+        manager_id: data.manager_id ?? event.manager_id,
+        tracker_id: data.tracker_id ?? event.tracker_id,
+        coordination_unit: data.coordination_unit ?? event.coordination_unit,
         status: event.status, // status chỉ thay đổi qua changeStatus
     });
 };
@@ -170,15 +189,22 @@ const getDeadlines = async (eventId) => {
 
 const createDeadline = async (eventId, data) => {
     await getEventById(eventId);
-    const { title, due_date } = data;
-    if (!title || !due_date)
-        throw { status: 400, message: "Tiêu đề và hạn chót là bắt buộc" };
+    const { title, due_date, assigned_to } = data;
+    if (!title || !due_date || !assigned_to)
+        throw { status: 400, message: "Tiêu đề, hạn chót và người thực hiện là bắt buộc" };
     const id = await Deadline.create({ event_id: eventId, ...data });
     return { id };
 };
 
-const toggleDeadline = async (deadlineId, done) => {
-    await Deadline.toggleDone(deadlineId, done);
+const updateDeadlineStatus = async (deadlineId, status, note, userRole) => {
+    const VALID_DEADLINE_STATUSES = ['pending', 'working', 'completed', 'done', 'problem'];
+    if (!VALID_DEADLINE_STATUSES.includes(status))
+        throw { status: 400, message: "Trạng thái deadline không hợp lệ" };
+
+    if (status === 'done' && userRole?.toLowerCase() !== 'admin')
+        throw { status: 403, message: "Chỉ Admin mới có quyền xác nhận hoàn tất (Done) deadline" };
+
+    await Deadline.updateStatus(deadlineId, status, note);
 };
 
 const deleteDeadline = async (deadlineId) => {
@@ -188,6 +214,6 @@ const deleteDeadline = async (deadlineId) => {
 module.exports = {
     getAllEvents, getEventById,
     createEvent, updateEvent, changeStatus, deleteEvent,
-    getDeadlines, createDeadline, toggleDeadline, deleteDeadline,
+    getDeadlines, createDeadline, updateDeadlineStatus, deleteDeadline,
     searchEvents,
 };

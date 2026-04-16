@@ -19,9 +19,9 @@ const createTransporter = () =>
 
 /**
  * Gửi email mời tham dự sự kiện cho khách mời bên ngoài.
- * @param {{ name, email, qr_code, event: { name, start_date, end_date, location, venue_type, description } }} param
+ * @param {{ name, email, qr_code, custom_message, event: { name, start_date, end_date, location, venue_type, description } }} param
  */
-exports.sendGuestInvitation = async ({ name, email, qr_code, event }) => {
+exports.sendGuestInvitation = async ({ name, email, qr_code, event, custom_message }) => {
     if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
         console.warn("⚠️  MAIL_USER / MAIL_PASS chưa được cấu hình → bỏ qua gửi email mời.");
         return;
@@ -89,6 +89,15 @@ exports.sendGuestInvitation = async ({ name, email, qr_code, event }) => {
             <p style="font-size:14px;color:#475569;margin:0 0 24px;line-height:1.6;">
               Ban tổ chức trân trọng kính mời bạn tham dự sự kiện dưới đây. Vui lòng mang theo thư mời này (hoặc ảnh chụp) để check-in tại sự kiện.
             </p>
+
+            ${custom_message ? `
+            <!-- Lời nhắn riêng -->
+            <div style="background:#F0FDF4;border-left:4px solid #10B981;padding:16px 20px;margin-bottom:24px;">
+              <p style="margin:0;font-size:14px;color:#166534;line-height:1.6;font-style:italic;">
+                "${custom_message}"
+              </p>
+            </div>
+            ` : ""}
 
             <!-- Thông tin sự kiện -->
             <div style="background:#F8FAFF;border:1.5px solid #E0E7FF;border-radius:12px;padding:24px;margin-bottom:24px;">

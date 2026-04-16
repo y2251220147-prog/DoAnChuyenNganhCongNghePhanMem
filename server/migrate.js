@@ -17,11 +17,21 @@ async function migrate() {
                 FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
             )`
         },
-        { name: "events.status", sql: `ALTER TABLE events ADD COLUMN IF NOT EXISTS status ENUM('planned','active','completed','cancelled') DEFAULT 'planned'` },
-        { name: "event_budget.note", sql: `ALTER TABLE event_budget ADD COLUMN IF NOT EXISTS note TEXT` },
-        { name: "guests.qr_code", sql: `ALTER TABLE guests ADD COLUMN IF NOT EXISTS qr_code VARCHAR(255) UNIQUE` },
-        { name: "users.gender", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS gender ENUM('male', 'female', 'other')` },
-        { name: "users.address", sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR(255)` },
+        { name: "events.status", sql: `ALTER TABLE events ADD COLUMN status ENUM('planned','active','completed','cancelled') DEFAULT 'planned'` },
+        { name: "event_budget.note", sql: `ALTER TABLE event_budget ADD COLUMN note TEXT` },
+        { name: "guests.qr_code", sql: `ALTER TABLE guests ADD COLUMN qr_code VARCHAR(255) UNIQUE` },
+        { name: "users.gender", sql: `ALTER TABLE users ADD COLUMN gender ENUM('male', 'female', 'other')` },
+        { name: "users.address", sql: `ALTER TABLE users ADD COLUMN address VARCHAR(255)` },
+        { name: "events roles", sql: `ALTER TABLE events 
+            ADD COLUMN organizer_id INT DEFAULT NULL,
+            ADD COLUMN manager_id INT DEFAULT NULL,
+            ADD COLUMN tracker_id INT DEFAULT NULL,
+            ADD COLUMN coordination_unit TEXT DEFAULT NULL` },
+        { name: "event_deadlines.assigned_to", sql: `ALTER TABLE event_deadlines ADD COLUMN assigned_to INT DEFAULT NULL` },
+        { name: "event_tasks refinement", sql: `ALTER TABLE event_tasks 
+            ADD COLUMN estimated_budget DECIMAL(18,2) DEFAULT 0.00,
+            ADD COLUMN feedback_status ENUM('none', 'completed', 'incomplete', 'budget_shortage', 'difficulty') DEFAULT 'none',
+            ADD COLUMN feedback_note TEXT DEFAULT NULL` },
     ];
 
     for (const s of steps) {

@@ -1,4 +1,5 @@
 import api from "./api";
+export { api };
 
 // Phases
 export const getPhases = (eid) => api.get(`/tasks/phases/event/${eid}`);

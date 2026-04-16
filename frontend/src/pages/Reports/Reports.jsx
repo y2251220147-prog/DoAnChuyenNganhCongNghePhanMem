@@ -98,14 +98,19 @@ export default function Reports() {
         <Layout>
             <div className="page-header">
                 <div>
-                    <h2>📊 Báo cáo & Thống kê</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        Tổng quan hoạt động — {year}
+                    <h2 className="gradient-text">📊 Báo cáo & Thống kê Analytics</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
+                        Phân tích chuyên sâu về tiến độ dự án và hiệu quả sự kiện trong năm {year}
                     </p>
                 </div>
-                <button className="btn btn-outline btn-sm" onClick={() => window.print()}>
-                    🖨️ Xuất báo cáo
-                </button>
+                <div style={{ display: "flex", gap: 12 }}>
+                    <button className="btn btn-outline" style={{ borderRadius: 12, padding: "10px 20px" }} onClick={() => window.print()}>
+                        🖨️ Xuất PDF / In báo cáo
+                    </button>
+                    <button className="btn btn-primary" style={{ borderRadius: 12, padding: "10px 24px" }} onClick={() => window.location.reload()}>
+                        ↻ Làm mới dữ liệu
+                    </button>
+                </div>
             </div>
 
             {loading ? (
@@ -114,42 +119,48 @@ export default function Reports() {
                 <>
                     {/* ── Tổng quan ── */}
                     {overview && (
-                        <div className="grid-4" style={{ marginBottom: 24 }}>
+                        <div className="grid-4" style={{ marginBottom: 32, gap: 20 }}>
                             {[
-                                { icon: "🎪", label: "Tổng sự kiện", value: overview.events?.total || 0, color: "#6366f1" },
-                                { icon: "🔥", label: "Đang diễn ra", value: overview.events?.running || 0, color: "#10b981" },
-                                { icon: "🎟️", label: "Tổng người tham", value: overview.attendees?.total || 0, color: "#f59e0b" },
-                                { icon: "💰", label: "Tổng chi thực tế", value: fmtVND(overview.budget?.actual), color: "#ef4444" },
+                                { icon: "🎪", label: "Tổng sự kiện", value: overview.events?.total || 0, color: "#6366f1", bg: "linear-gradient(135deg, #fff 0%, #f5f3ff 100%)" },
+                                { icon: "🔥", label: "Đang diễn ra", value: overview.events?.running || 0, color: "#10b981", bg: "linear-gradient(135deg, #fff 0%, #f0fdf4 100%)" },
+                                { icon: "🎟️", label: "Tổng người tham gia", value: overview.attendees?.total || 0, color: "#f59e0b", bg: "linear-gradient(135deg, #fff 0%, #fffbeb 100%)" },
+                                { icon: "💰", label: "Tổng chi phí thực tế", value: fmtVND(overview.budget?.actual), color: "#ef4444", bg: "linear-gradient(135deg, #fff 0%, #fef2f2 100%)" },
                             ].map(s => (
-                                <div key={s.label} className="card-stat">
-                                    <div className="card-stat-icon" style={{ background: s.color + "20", fontSize: 20 }}>{s.icon}</div>
+                                <div key={s.label} className="card-stat" style={{ background: s.bg, border: "1px solid #e2e8f0" }}>
+                                    <div className="card-stat-icon" style={{ background: "#fff", color: s.color, fontSize: 22, boxShadow: "var(--shadow-sm)" }}>{s.icon}</div>
                                     <div className="card-stat-info">
-                                        <h3 style={{ color: s.color, fontSize: typeof s.value === "string" ? "14px" : "26px" }}>{s.value}</h3>
-                                        <p>{s.label}</p>
+                                        <h3 style={{ color: s.color, fontSize: typeof s.value === "string" ? "18px" : "28px", fontWeight: 900 }}>{s.value}</h3>
+                                        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    <div className="grid-2" style={{ marginBottom: 24, alignItems: "start" }}>
+                    <div className="grid-2" style={{ marginBottom: 32, alignItems: "start", gap: 28 }}>
                         {/* ── Sự kiện theo tháng ── */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>📅 Sự kiện theo tháng ({year})</h3>
-                            <BarChart data={byMonth} labelKey="label" valueKey="value" color="#6366f1" />
+                        <div className="card" style={{ padding: 24, borderRadius: 20 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
+                                <span>📅</span> SỐ LƯỢNG SỰ KIỆN THEO THÁNG
+                            </h3>
+                            <BarChart data={byMonth} labelKey="label" valueKey="value" color="linear-gradient(180deg, #6366f1, #818cf8)" maxH={180} />
                         </div>
 
                         {/* ── Loại sự kiện ── */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>🏷️ Theo loại sự kiện</h3>
-                            {byType.length === 0
-                                ? <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Chưa có dữ liệu</div>
-                                : byType.map((t, i) => {
-                                    const total = byType.reduce((a, x) => a + Number(x.count), 0);
-                                    const colors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
-                                    return <ProgressRow key={i} label={t.type} value={Number(t.count)} max={total} color={colors[i % colors.length]} />;
-                                })
-                            }
+                        <div className="card" style={{ padding: 24, borderRadius: 20 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
+                                <span>🏷️</span> PHÂN LOẠI HÌNH THỨC SỰ KIỆN
+                            </h3>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {byType.length === 0
+                                    ? <div className="empty-state"><span>🏷️</span><p>Chưa có dữ liệu</p></div>
+                                    : byType.map((t, i) => {
+                                        const total = byType.reduce((a, x) => a + Number(x.count), 0);
+                                        const colors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
+                                        return <ProgressRow key={i} label={t.type?.toUpperCase()} value={Number(t.count)} max={total} color={colors[i % colors.length]} />;
+                                    })
+                                }
+                            </div>
                         </div>
                     </div>
 
@@ -206,46 +217,54 @@ export default function Reports() {
                     </div>
 
                     {/* ── Tỷ lệ đăng ký & check-in ── */}
-                    <div className="card">
-                        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>🎟️ Tỷ lệ đăng ký & check-in theo sự kiện (Top 10)</h3>
+                    <div className="card" style={{ padding: 24, borderRadius: 20 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
+                            <span>🎟️</span> TỶ LỆ ĐĂNG KÝ & CÓ MẶT THEO SỰ KIỆN
+                        </h3>
                         {attendees.length === 0
-                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có dữ liệu</p></div>
-                            : <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Sự kiện</th><th>Sức chứa</th><th>Đã đăng ký</th><th>Đã check-in</th>
-                                        <th>% Đăng ký</th><th>% Check-in</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {attendees.map(a => {
-                                        const regPct = a.capacity ? Math.round((a.registered / a.capacity) * 100) : null;
-                                        const ciPct = a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0;
-                                        return (
-                                            <tr key={a.id}>
-                                                <td style={{ fontWeight: 600 }}>{a.name}</td>
-                                                <td style={{ color: "var(--text-muted)" }}>{a.capacity || "—"}</td>
-                                                <td style={{ fontWeight: 700, color: "var(--color-primary)" }}>{a.registered}</td>
-                                                <td style={{ fontWeight: 700, color: "#10b981" }}>{a.checked_in || 0}</td>
-                                                <td>
-                                                    {regPct !== null
-                                                        ? <span className={`badge ${regPct >= 100 ? "badge-danger" : regPct >= 80 ? "badge-warning" : "badge-success"}`}>{regPct}%</span>
-                                                        : <span className="badge badge-default">—</span>
-                                                    }
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                        <div style={{ flex: 1, height: 6, background: "var(--border-color)", borderRadius: 3, overflow: "hidden", minWidth: 60 }}>
-                                                            <div style={{ height: "100%", width: `${ciPct}%`, background: "#10b981", borderRadius: 3 }} />
+                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có dữ liệu thống kê người tham dự</p></div>
+                            : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 12, overflow: "hidden" }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ paddingLeft: 20 }}>Tên Sự kiện</th>
+                                            <th>Sức chứa</th>
+                                            <th>Đăng ký</th>
+                                            <th>Có mặt</th>
+                                            <th>Tỉ lệ lấp đầy</th>
+                                            <th style={{ textAlign: "right", paddingRight: 20 }}>Tiến độ Check-in</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {attendees.map(a => {
+                                            const regPct = a.capacity ? Math.round((a.registered / a.capacity) * 100) : null;
+                                            const ciPct = a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0;
+                                            return (
+                                                <tr key={a.id}>
+                                                    <td style={{ fontWeight: 700, paddingLeft: 20, color: "var(--text-primary)" }}>{a.name}</td>
+                                                    <td style={{ color: "var(--text-muted)", fontWeight: 600 }}>{a.capacity || "—"}</td>
+                                                    <td style={{ fontWeight: 800, color: "var(--color-primary)" }}>{a.registered}</td>
+                                                    <td style={{ fontWeight: 800, color: "#10b981" }}>{a.checked_in || 0}</td>
+                                                    <td>
+                                                        {regPct !== null
+                                                            ? <span className={`badge ${regPct >= 100 ? "badge-danger" : regPct >= 80 ? "badge-warning" : "badge-success"}`} style={{ borderRadius: 8, padding: "4px 10px", border: "none" }}>{regPct}%</span>
+                                                            : <span className="badge badge-default">—</span>
+                                                        }
+                                                    </td>
+                                                    <td style={{ textAlign: "right", paddingRight: 20 }}>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
+                                                            <div style={{ width: 80, height: 8, background: "#f1f5f9", borderRadius: 4, overflow: "hidden" }}>
+                                                                <div style={{ height: "100%", width: `${ciPct}%`, background: "linear-gradient(90deg, #10b981, #34d399)", borderRadius: 4 }} />
+                                                            </div>
+                                                            <span style={{ fontSize: 12, fontWeight: 900, color: "#059669", minWidth: 35 }}>{ciPct}%</span>
                                                         </div>
-                                                        <span style={{ fontSize: 11, fontWeight: 700, color: "#10b981" }}>{ciPct}%</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         }
                     </div>
                 </>

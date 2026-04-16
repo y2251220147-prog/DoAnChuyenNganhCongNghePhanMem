@@ -20,7 +20,7 @@ router.patch("/:id/status", auth, authorize(["admin", "organizer"]), c.changeSta
 // ── Deadlines nội bộ ─────────────────────────
 router.get("/:id/deadlines", auth, c.getDeadlines);
 router.post("/:id/deadlines", auth, authorize(["admin", "organizer"]), c.createDeadline);
-router.patch("/:id/deadlines/:deadlineId", auth, authorize(["admin", "organizer"]), c.toggleDeadline);
+router.patch("/:id/deadlines/:deadlineId", auth, authorize(["admin", "organizer"]), c.updateDeadlineStatus);
 router.delete("/:id/deadlines/:deadlineId", auth, authorize(["admin", "organizer"]), c.deleteDeadline);
 
 module.exports = router;

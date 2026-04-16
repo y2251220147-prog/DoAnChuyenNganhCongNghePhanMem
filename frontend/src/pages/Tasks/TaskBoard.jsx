@@ -27,7 +27,8 @@ const EMPTY_TASK = {
     title: "", description: "", phase_id: "", parent_id: "",
     assigned_to: "", priority: "medium", status: "todo",
     start_date: "", due_date: "", is_milestone: false,
-    estimated_h: "", progress: 0
+    estimated_h: "", progress: 0,
+    estimated_budget: "", feedback_status: 'none', feedback_note: ""
 };
 
 const fmtDT = (d) => d ? new Date(d).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
@@ -253,6 +254,18 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
         } catch {/**/ }
     };
 
+    const handleFeedbackUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            await import("../../services/taskService").then(m => m.api.patch(`/tasks/${openTask.id}/feedback`, {
+                feedback_status: openTask.feedback_status,
+                feedback_note: openTask.feedback_note
+            }));
+            alert("Đã lưu phản hồi");
+            loadAll();
+        } catch (err) { alert("Lưu phản hồi thất bại"); }
+    };
+
     // ── Create / Edit task ───────────────────────────────────
     const openCreateForm = (parentId = null, phaseId = null) => {
         setEditId(null);
@@ -274,6 +287,9 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
             is_milestone: task.is_milestone || false,
             estimated_h: task.estimated_h || "",
             progress: task.progress || 0,
+            estimated_budget: task.estimated_budget || "",
+            feedback_status: task.feedback_status || 'none',
+            feedback_note: task.feedback_note || "",
         });
         setFormErr(""); setFormModal(true);
     };
@@ -320,84 +336,96 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
         <div>
             {/* ── Stats bar ── */}
             {stats && (
-                <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 28 }}>
                     {[
-                        { label: "Tổng", value: stats.total || 0, color: "#64748b" },
-                        { label: "Đang làm", value: stats.in_progress || 0, color: "#f59e0b" },
-                        { label: "Chờ duyệt", value: stats.review || 0, color: "#6366f1" },
-                        { label: "Hoàn thành", value: stats.done || 0, color: "#10b981" },
-                        { label: "⚠️ Trễ hạn", value: stats.overdue || 0, color: "#ef4444" },
+                        { label: "Tổng số", value: stats.total || 0, color: "#64748b", bg: "#f8fafc" },
+                        { label: "Đang xử lý", value: stats.in_progress || 0, color: "#f59e0b", bg: "#fffbeb" },
+                        { label: "Chờ kiểm duyệt", value: stats.review || 0, color: "#6366f1", bg: "#f5f3ff" },
+                        { label: "Đã hoàn tất", value: stats.done || 0, color: "#10b981", bg: "#f0fdf4" },
+                        { label: "Quá hạn ⚠️", value: stats.overdue || 0, color: "#ef4444", bg: "#fef2f2" },
                     ].map(s => (
-                        <div key={s.label} style={{
-                            background: "var(--bg-card)", border: "1px solid var(--border-color)",
-                            borderRadius: "var(--border-radius-sm)", padding: "8px 14px",
-                            display: "flex", alignItems: "center", gap: 8
+                        <div key={s.label} className="card-stat" style={{ 
+                            background: s.bg, border: "1px solid rgba(0,0,0,0.04)", 
+                            padding: "20px 24px", borderRadius: 16, display: "flex", 
+                            flexDirection: "column", alignItems: "flex-start", gap: 4
                         }}>
-                            <span style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</span>
-                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>{s.label}</span>
+                            <span style={{ fontSize: 32, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</span>
+                            <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</span>
                         </div>
                     ))}
                     {stats.avg_progress > 0 && (
-                        <div style={{
-                            background: "var(--bg-card)", border: "1px solid var(--border-color)",
-                            borderRadius: "var(--border-radius-sm)", padding: "8px 14px",
-                            display: "flex", alignItems: "center", gap: 8, marginLeft: "auto"
+                        <div className="card-stat" style={{ 
+                            background: "linear-gradient(135deg, #6366f1 0%, #a855f7 100%)", 
+                            padding: "20px 24px", borderRadius: 16, display: "flex", 
+                            flexDirection: "column", alignItems: "flex-start", gap: 4
                         }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)" }}>
-                                {stats.avg_progress}%
-                            </span>
-                            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>Tiến độ TB</span>
+                            <span style={{ fontSize: 32, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{stats.avg_progress}%</span>
+                            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tiến độ trung bình</span>
                         </div>
                     )}
                 </div>
             )}
 
             {/* ── Toolbar ── */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ 
+                display: "flex", gap: 12, marginBottom: 24, padding: "16px 24px", 
+                background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", 
+                boxShadow: "var(--shadow-sm)", flexWrap: "wrap", alignItems: "center" 
+            }}>
                 {/* View mode */}
                 <div style={{
-                    display: "flex", gap: 4, border: "1px solid var(--border-color)",
-                    borderRadius: "var(--border-radius-sm)", padding: 2
+                    display: "flex", gap: 4, background: "#f1f5f9",
+                    borderRadius: 12, padding: 4
                 }}>
                     {[
-                        { key: "kanban", icon: "▦" },
-                        { key: "list", icon: "≡" },
-                        { key: "gantt", icon: "▬" },
+                        { key: "kanban", icon: "▦", label: "Board" },
+                        { key: "list", icon: "≡", label: "List" },
+                        { key: "gantt", icon: "▬", label: "Timeline" },
                     ].map(v => (
                         <button key={v.key}
-                            className={`btn btn-sm ${viewMode === v.key ? "btn-primary" : "btn-ghost"}`}
-                            style={{ padding: "4px 10px" }}
+                            className={`btn btn-sm ${viewMode === v.key ? "btn-primary" : ""}`}
+                            style={{ 
+                                padding: "6px 14px", border: "none", borderRadius: 8, 
+                                background: viewMode === v.key ? "var(--color-primary)" : "transparent",
+                                color: viewMode === v.key ? "#fff" : "var(--text-secondary)",
+                                fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 6
+                            }}
                             onClick={() => setViewMode(v.key)}>
-                            {v.icon}
+                            <span style={{ fontSize: 18 }}>{v.icon}</span> {v.label}
                         </button>
                     ))}
                 </div>
 
-                {/* Filters */}
-                <select className="form-control" style={{ maxWidth: 130, height: 32, fontSize: 12 }}
-                    value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option value="all">Tất cả trạng thái</option>
-                    {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-                <select className="form-control" style={{ maxWidth: 120, height: 32, fontSize: 12 }}
-                    value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-                    <option value="all">Tất cả ưu tiên</option>
-                    <option value="high">Cao</option>
-                    <option value="medium">Trung bình</option>
-                    <option value="low">Thấp</option>
-                </select>
-                <input className="form-control" placeholder="🔍 Tìm nhiệm vụ..."
-                    value={search} onChange={e => setSearch(e.target.value)}
-                    style={{ maxWidth: 200, height: 32, fontSize: 12 }} />
+                <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 400 }}>
+                    {/* Filters */}
+                    <select className="form-control" style={{ maxWidth: 160, borderRadius: 12, fontSize: 13, height: 44, border: "1px solid #e2e8f0" }}
+                        value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                        <option value="all">Mọi trạng thái</option>
+                        {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                    </select>
+                    <select className="form-control" style={{ maxWidth: 160, borderRadius: 12, fontSize: 13, height: 44, border: "1px solid #e2e8f0" }}
+                        value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+                        <option value="all">Mọi độ ưu tiên</option>
+                        <option value="high">🔴 Ưu tiên Cao</option>
+                        <option value="medium">🟡 Ưu tiên Trung bình</option>
+                        <option value="low">🟢 Ưu tiên Thấp</option>
+                    </select>
+                    <input className="form-control" placeholder="🔍 Nhập từ khóa tìm nhiệm vụ..."
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        style={{ flex: 1, borderRadius: 12, fontSize: 13, height: 44, border: "1px solid #e2e8f0", paddingLeft: 16 }} />
+                </div>
 
                 {canManage && (
-                    <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-                        <button className="btn btn-outline btn-sm"
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn btn-outline"
+                            style={{ borderRadius: 12, height: 44, fontWeight: 700, padding: "0 20px" }}
                             onClick={() => { setPhaseForm({ name: "", color: "#6366f1" }); setPhaseModal(true); }}>
-                            + Giai đoạn
+                            ⚙️ Quản lý Giai đoạn
                         </button>
-                        <button className="btn btn-primary btn-sm" onClick={() => openCreateForm()}>
-                            + Nhiệm vụ
+                        <button className="btn btn-primary" 
+                            style={{ borderRadius: 12, height: 44, fontWeight: 700, padding: "0 24px", boxShadow: "0 4px 12px rgba(99,102,241,0.2)" }}
+                            onClick={() => openCreateForm()}>
+                            + THÊM NHIỆM VỤ
                         </button>
                     </div>
                 )}
@@ -405,7 +433,10 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
 
             {/* ════ VIEW: KANBAN ════ */}
             {viewMode === "kanban" && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10, alignItems: "start" }}>
+                <div style={{ 
+                    display: "grid", gridTemplateColumns: "repeat(5, minmax(280px, 1fr))", 
+                    gap: 16, alignItems: "start", height: "calc(100vh - 350px)", minHeight: 600
+                }}>
                     {STATUSES.map(col => {
                         const colTasks = topTasks(col.key);
                         return (
@@ -413,30 +444,43 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                                 onDragOver={onDragOver}
                                 onDrop={(e) => onDrop(e, col.key)}
                                 style={{
-                                    background: "var(--bg-main)", borderRadius: "var(--border-radius)",
-                                    padding: 10, minHeight: 160,
-                                    border: drag ? "2px dashed var(--border-color)" : "2px solid transparent",
+                                    background: "#f1f5f9", borderRadius: 20,
+                                    padding: 16, height: "100%", overflowY: "auto",
+                                    border: drag ? "2px dashed #94a3b8" : "2px solid transparent",
+                                    boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
                                 }}>
                                 <div style={{
                                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                                    marginBottom: 10, padding: "0 2px"
+                                    marginBottom: 20, padding: "0 4px", position: "sticky", top: 0, 
+                                    background: "#f1f5f9", zIndex: 1, paddingBottom: 12
                                 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: col.color }} />
-                                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>{col.label}</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                        <div style={{ width: 10, height: 10, borderRadius: "50%", background: col.color, boxShadow: `0 0 10px ${col.color}` }} />
+                                        <span style={{ fontSize: 14, fontWeight: 800, color: "#334155", textTransform: "uppercase", letterSpacing: "0.05em" }}>{col.label}</span>
                                     </div>
                                     <span style={{
-                                        fontSize: 11, fontWeight: 700, color: col.color,
-                                        background: col.color + "20", padding: "1px 7px", borderRadius: 999
+                                        fontSize: 12, fontWeight: 900, color: col.color,
+                                        background: "#fff", padding: "4px 12px", borderRadius: 10, boxShadow: "var(--shadow-sm)"
                                     }}>
                                         {colTasks.length}
                                     </span>
                                 </div>
-                                {colTasks.map(task => (
-                                    <TaskCard key={task.id} task={task} canManage={canManage}
-                                        onOpen={openTaskDetail} onStatusChange={() => { }}
-                                        onDragStart={onDragStart} />
-                                ))}
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    {colTasks.map(task => (
+                                        <TaskCard key={task.id} task={task} canManage={canManage}
+                                            onOpen={openTaskDetail} onStatusChange={() => { }}
+                                            onDragStart={onDragStart} />
+                                    ))}
+                                    {colTasks.length === 0 && (
+                                        <div style={{ 
+                                            padding: 40, textAlign: "center", color: "#94a3b8", 
+                                            fontSize: 13, background: "rgba(255,255,255,0.4)", 
+                                            borderRadius: 16, border: "2px dashed #e2e8f0" 
+                                        }}>
+                                            Trống
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -553,7 +597,8 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                                 style: isOverdue(openTask.due_date, openTask.status) ? { color: "#dc2626", fontWeight: 700 } : {}
                             },
                             { label: "Giai đoạn", value: openTask.phase_name || "—" },
-                            { label: "Thời gian ước tính", value: openTask.estimated_h ? `${openTask.estimated_h}h` : "—" },
+                            { label: "Ước tính (giờ)", value: openTask.estimated_h ? `${openTask.estimated_h}h` : "—" },
+                            { label: "Dự trù ngân sách", value: openTask.estimated_budget ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(openTask.estimated_budget) : "—" },
                         ].map(row => (
                             <div key={row.label} style={{ padding: "8px 12px", background: "var(--bg-main)", borderRadius: 6 }}>
                                 <div style={{
@@ -571,6 +616,59 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 16
                         }}>
                             {openTask.description}
+                        </div>
+                    )}
+
+                    {/* Feedback section - Only visible to manager/admin or if has note */}
+                    {(canManage || openTask.feedback_note) && (
+                        <div style={{
+                            padding: "12px 14px", border: "1.5px solid #e2e8f0", borderRadius: 8,
+                            marginBottom: 16, background: openTask.feedback_status === 'approved' ? "#F0FDF4" : openTask.feedback_status === 'rejected' ? "#FEF2F2" : "#F8FAFF"
+                        }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700 }}>💬 Phản hồi của quản lý</span>
+                                {canManage ? (
+                                    <select 
+                                        value={openTask.feedback_status} 
+                                        onChange={e => setOpenTask({...openTask, feedback_status: e.target.value})}
+                                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #cbd5e1" }}
+                                    >
+                                        <option value="none">Chưa phản hồi</option>
+                                        <option value="approved">Duyệt (OK)</option>
+                                        <option value="rejected">Cần sửa lại</option>
+                                    </select>
+                                ) : (
+                                    <span style={{ 
+                                        fontSize: 11, fontWeight: 700, 
+                                        color: openTask.feedback_status === 'approved' ? "#059669" : openTask.feedback_status === 'rejected' ? "#DC2626" : "#64748B"
+                                    }}>
+                                        {openTask.feedback_status === 'approved' ? "Đã duyệt" : openTask.feedback_status === 'rejected' ? "Cần sửa" : "Chờ phản hồi"}
+                                    </span>
+                                )}
+                            </div>
+                            {canManage ? (
+                                <>
+                                    <textarea 
+                                        className="form-control" 
+                                        rows="2" 
+                                        placeholder="Nhập nhận xét, góp ý..."
+                                        style={{ fontSize: 12 }}
+                                        value={openTask.feedback_note || ""} 
+                                        onChange={e => setOpenTask({...openTask, feedback_note: e.target.value})}
+                                    />
+                                    <button 
+                                        className="btn btn-primary btn-sm" 
+                                        style={{ marginTop: 8, width: "100%" }}
+                                        onClick={handleFeedbackUpdate}
+                                    >
+                                        Lưu phản hồi
+                                    </button>
+                                </>
+                            ) : (
+                                <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
+                                    {openTask.feedback_note || "Chưa có nhận xét."}
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -744,11 +842,16 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             <input type="number" step="0.5" min="0" className="form-control" value={form.estimated_h}
                                 onChange={e => setForm({ ...form, estimated_h: e.target.value })} placeholder="8" />
                         </div>
-                        <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 22 }}>
-                            <input type="checkbox" id="milestone" checked={form.is_milestone}
-                                onChange={e => setForm({ ...form, is_milestone: e.target.checked })} />
-                            <label htmlFor="milestone" style={{ cursor: "pointer", fontWeight: 600 }}>🏁 Milestone</label>
+                        <div className="form-group">
+                            <label>Dự trù ngân sách (VND)</label>
+                            <input type="number" min="0" className="form-control" value={form.estimated_budget}
+                                onChange={e => setForm({ ...form, estimated_budget: e.target.value })} placeholder="500000" />
                         </div>
+                    </div>
+                    <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                        <input type="checkbox" id="milestone" checked={form.is_milestone}
+                            onChange={e => setForm({ ...form, is_milestone: e.target.checked })} />
+                        <label htmlFor="milestone" style={{ cursor: "pointer", fontWeight: 600 }}>🏁 Milestone (Mốc quan trọng)</label>
                     </div>
                     <div className="form-group">
                         <label>Mô tả</label>

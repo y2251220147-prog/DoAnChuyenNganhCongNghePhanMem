@@ -131,6 +131,16 @@ exports.updateProgress = async (id, progress, userId) => {
     });
 };
 
+exports.updateFeedback = async (id, data, userId) => {
+    const task = await Task.getById(id);
+    if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
+    await Task.updateFeedback(id, data);
+    await Task.addHistory({
+        task_id: id, user_id: userId, action: 'feedback',
+        new_value: `Trạng thái: ${data.feedback_status}, Ghi chú: ${data.feedback_note}`
+    });
+};
+
 exports.delete = async (id) => {
     if (!(await Task.getById(id))) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
     await Task.delete(id);

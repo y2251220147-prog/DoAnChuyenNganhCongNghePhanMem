@@ -8,6 +8,7 @@ import {
     changeStatus, createEvent, deleteEvent,
     searchEvents, updateEvent
 } from "../../services/eventService";
+import { getAllUsers } from "../../services/userService";
 import "../../styles/global.css";
 
 // ── Workflow config ───────────────────────────────────────────
@@ -39,6 +40,7 @@ const EMPTY_FORM = {
     start_date: "", end_date: "",
     venue_type: "offline", location: "", capacity: "",
     total_budget: "", status: "draft",
+    organizer_id: "", manager_id: "", tracker_id: "", coordination_unit: "",
 };
 
 export default function EventList() {
@@ -52,6 +54,7 @@ export default function EventList() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [users, setUsers] = useState([]);
 
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -70,6 +73,16 @@ export default function EventList() {
 
     const isAdmin = user?.role === "admin";
     const canManage = user?.role === "admin" || user?.role === "organizer";
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const r = await getAllUsers();
+                setUsers(r.data || []);
+            } catch (err) { console.error("Fetch users error:", err); }
+        };
+        fetchUsers();
+    }, []);
 
     const load = useCallback(async (currentPage = page) => {
         setLoading(true);
@@ -138,6 +151,10 @@ export default function EventList() {
             capacity: ev.capacity || "",
             total_budget: ev.total_budget || "",
             status: ev.status || "draft",
+            organizer_id: ev.organizer_id || "",
+            manager_id: ev.manager_id || "",
+            tracker_id: ev.tracker_id || "",
+            coordination_unit: ev.coordination_unit || "",
         });
         setEditingId(ev.id); setError(""); setModalOpen(true);
     };
@@ -170,31 +187,33 @@ export default function EventList() {
     return (
         <Layout>
             {/* ── Header ── */}
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 40 }}>
                 <div>
-                    <h2>Sự kiện</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        Tìm thấy {totalItems} sự kiện · {events.filter(e => e.status === "running").length} đang hiển thị
+                    <h1 style={{ fontSize: 32, fontWeight: 900, marginBottom: 8 }}>
+                        <span className="gradient-text">Sự kiện</span>
+                    </h1>
+                    <p style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 500 }}>
+                        Hiện có {totalItems} sự kiện trong hệ thống · {events.filter(e => e.status === "running").length} đang diễn ra sôi nổi
                     </p>
                 </div>
                 {canManage && (
-                    <button className="btn btn-primary" onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(""); setModalOpen(true); }}>
-                        + Tạo sự kiện
+                    <button className="btn btn-primary btn-lg" onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(""); setModalOpen(true); }}>
+                        ✨ Tạo sự kiện mới
                     </button>
                 )}
             </div>
 
             {/* ── Thống kê nhanh ── */}
-            <div className="grid-4" style={{ marginBottom: 20 }}>
+            <div className="grid-4" style={{ marginBottom: 32 }}>
                 {[
-                    { label: "Bản nháp", status: "draft", icon: "📝", color: "#94a3b8" },
-                    { label: "Chờ duyệt", status: "planning", icon: "🕐", color: "#f59e0b" },
-                    { label: "Đã duyệt", status: "approved", icon: "✅", color: "#6366f1" },
+                    { label: "Bản nháp", status: "draft", icon: "📝", color: "#64748b" },
+                    { label: "Lên kế hoạch", status: "planning", icon: "🗓️", color: "#f59e0b" },
+                    { label: "Đã duyệt", status: "approved", icon: "✅", color: "#4f46e5" },
                     { label: "Đang diễn ra", status: "running", icon: "🔥", color: "#10b981" },
                 ].map(s => (
-                    <div key={s.status} className="card-stat" style={{ cursor: "pointer" }}
+                    <div key={s.status} className="card-stat" style={{ cursor: "pointer", border: filterStatus === s.status ? `2px solid ${s.color}` : "1px solid var(--border-color)" }}
                         onClick={() => setFilterStatus(s.status)}>
-                        <div className="card-stat-icon" style={{ background: s.color + "22", fontSize: 20 }}>{s.icon}</div>
+                        <div className="card-stat-icon" style={{ background: s.color + "15", color: s.color }}>{s.icon}</div>
                         <div className="card-stat-info">
                             <h3 style={{ color: s.color }}>{events.filter(e => e.status === s.status).length}</h3>
                             <p>{s.label}</p>
@@ -204,19 +223,19 @@ export default function EventList() {
             </div>
 
             {/* ── Bộ lọc ── */}
-            <div className="card" style={{ marginBottom: 16, padding: "16px" }}>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 240px" }}>
-                        <label style={{ fontSize: 12, marginBottom: 4 }}>Tìm kiếm</label>
-                        <input className="form-control" placeholder="🔍 Tên, mô tả, địa điểm..."
+            <div className="card" style={{ marginBottom: 32, padding: "24px", border: "none", boxShadow: "var(--shadow-md)" }}>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
+                    <div className="form-group" style={{ marginBottom: 0, flex: "2 1 300px" }}>
+                        <label>Tìm kiếm thông minh</label>
+                        <input className="form-control" style={{ background: "white" }} placeholder="🔍 Tên sự kiện, địa điểm hoặc mô tả..."
                             value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 150px" }}>
-                        <label style={{ fontSize: 12, marginBottom: 4 }}>Trạng thái</label>
-                        <select className="form-control"
+                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 180px" }}>
+                        <label>Trạng thái</label>
+                        <select className="form-control" style={{ background: "white" }}
                             value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                            <option value="all">Tất cả</option>
+                            <option value="all">Tất cả trạng thái</option>
                             {Object.entries(STATUS_LABEL).map(([k, v]) => (
                                 <option key={k} value={k}>{v}</option>
                             ))}
@@ -224,31 +243,21 @@ export default function EventList() {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 0, flex: "1 1 150px" }}>
-                        <label style={{ fontSize: 12, marginBottom: 4 }}>Loại</label>
-                        <select className="form-control"
-                            value={filterType} onChange={e => setFilterType(e.target.value)}>
-                            <option value="">Tất cả loại</option>
-                            {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 140px" }}>
-                        <label style={{ fontSize: 12, marginBottom: 4 }}>Từ ngày</label>
-                        <input type="date" className="form-control"
-                            value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0, flex: "1 1 140px" }}>
-                        <label style={{ fontSize: 12, marginBottom: 4 }}>Đến ngày</label>
-                        <input type="date" className="form-control"
-                            value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                        <label>Khoảng ngày</label>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input type="date" className="form-control" style={{ background: "white" }}
+                                value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                            <span style={{ color: "var(--text-muted)" }}>→</span>
+                            <input type="date" className="form-control" style={{ background: "white" }}
+                                value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                        </div>
                     </div>
 
                     <button className="btn btn-outline" onClick={() => {
                         setSearch(""); setFilterStatus("all"); setFilterType("");
                         setDateFrom(""); setDateTo(""); setPage(1);
-                    }} style={{ height: 42 }}>
-                        Đặt lại
+                    }} style={{ height: 48, borderRadius: 12 }}>
+                        🔄 Làm mới
                     </button>
                 </div>
             </div>
@@ -349,115 +358,169 @@ export default function EventList() {
             />
 
             {/* ── Modal Tạo / Chỉnh sửa ── */}
-            <Modal
-                title={editingId ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}
-                isOpen={isModalOpen}
-                onClose={() => { setModalOpen(false); setError(""); }}>
-                <form onSubmit={handleSubmit}>
+            <Modal 
+                title={editingId ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"} 
+                isOpen={isModalOpen} 
+                onClose={() => { setModalOpen(false); setError(""); }}
+                maxWidth="1200px"
+            >
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
                     {error && <div className="alert alert-error">{error}</div>}
 
-                    {/* Thông tin cơ bản */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", marginBottom: 10
-                    }}>🧾 Thông tin cơ bản</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", width: "100%" }}>
+                        
+                        {/* Cột trái: Thông tin cơ bản & Thời gian */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
+                                    <span style={{ fontSize: 20 }}>📝</span> THÔNG TIN CƠ BẢN
+                                </div>
+                                <div className="form-group">
+                                    <label>Tên sự kiện <span style={{ color: "red" }}>*</span></label>
+                                    <input className="form-control" placeholder="VD: Hội thảo AI 2026"
+                                        value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                                </div>
+                                <div className="grid-2" style={{ marginTop: 12 }}>
+                                    <div className="form-group">
+                                        <label>Loại sự kiện</label>
+                                        <select className="form-control" value={form.event_type}
+                                            onChange={e => setForm({ ...form, event_type: e.target.value })}>
+                                            <option value="">-- Chọn loại --</option>
+                                            {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Hình thức</label>
+                                        <select className="form-control" value={form.venue_type}
+                                            onChange={e => setForm({ ...form, venue_type: e.target.value })}>
+                                            <option value="offline">🏢 Offline</option>
+                                            <option value="online">🌐 Online</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="form-group" style={{ marginTop: 12 }}>
+                                    <label>Mô tả ngắn</label>
+                                    <textarea className="form-control" rows="3" placeholder="Nhập mô tả sự kiện..."
+                                        value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                                </div>
+                            </div>
 
-                    <div className="form-group">
-                        <label>Tên sự kiện <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control" placeholder="VD: Hội thảo AI 2026"
-                            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
+                                    <span style={{ fontSize: 20 }}>⏰</span> THỜI GIAN & ĐỊA ĐIỂM
+                                </div>
+                                <div className="grid-2">
+                                    <div className="form-group">
+                                        <label>Ngày bắt đầu <span style={{ color: "red" }}>*</span></label>
+                                        <input type="datetime-local" className="form-control"
+                                            value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Ngày kết thúc <span style={{ color: "red" }}>*</span></label>
+                                        <input type="datetime-local" className="form-control"
+                                            value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} required />
+                                    </div>
+                                </div>
+                                <div className="grid-2" style={{ marginTop: 12 }}>
+                                    <div className="form-group">
+                                        <label>{form.venue_type === "online" ? "Link họp trực tuyến" : "Địa chỉ / Phòng"}</label>
+                                        <input className="form-control" placeholder={form.venue_type === "online" ? "https://meet.google.com/..." : "VD: Hội trường A1, Tòa nhà ..." }
+                                            value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Sức chứa (người)</label>
+                                        <input type="number" className="form-control" placeholder="200"
+                                            value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Cột phải: Ngân sách & Phân công */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
+                                    <span style={{ fontSize: 20 }}>💰</span> NGÂN SÁCH DỰ KIẾN
+                                </div>
+                                <div className="form-group">
+                                    <label>Tổng ngân sách đầu tư (VND)</label>
+                                    <div style={{ position: "relative" }}>
+                                        <input type="number" className="form-control" style={{ paddingLeft: 40 }}
+                                            placeholder="50000000"
+                                            value={form.total_budget} onChange={e => setForm({ ...form, total_budget: e.target.value })} />
+                                        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#64748b" }}>₫</span>
+                                    </div>
+                                    <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8, marginBottom: 0 }}>
+                                        Để trống nếu chưa có dự toán cụ thể.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
+                                    <span style={{ fontSize: 20 }}>👥</span> PHÂN CÔNG & ĐIỀU PHỐI
+                                </div>
+                                <div className="grid-2">
+                                    <div className="form-group">
+                                        <label>Người tổ chức (Organizer)</label>
+                                        <select className="form-control" value={form.organizer_id}
+                                            onChange={e => setForm({ ...form, organizer_id: e.target.value })}>
+                                            <option value="">-- Chọn nhân sự --</option>
+                                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Người quản lý (Manager)</label>
+                                        <select className="form-control" value={form.manager_id}
+                                            onChange={e => setForm({ ...form, manager_id: e.target.value })}>
+                                            <option value="">-- Chọn nhân sự --</option>
+                                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid-2" style={{ marginTop: 12 }}>
+                                    <div className="form-group">
+                                        <label>Theo dõi tiến độ (Tracker)</label>
+                                        <select className="form-control" value={form.tracker_id}
+                                            onChange={e => setForm({ ...form, tracker_id: e.target.value })}>
+                                            <option value="">-- Chọn nhân sự --</option>
+                                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Đơn vị điều phối</label>
+                                        <input className="form-control" placeholder="VD: Phòng Hành chính, IT, ..."
+                                            value={form.coordination_unit} onChange={e => setForm({ ...form, coordination_unit: e.target.value })} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {!editingId && (
+                                <div style={{
+                                    background: "rgba(99,102,241,0.05)", borderRadius: 16, padding: "20px",
+                                    fontSize: 12, color: "var(--text-secondary)", border: "1px dashed rgba(99,102,241,0.3)"
+                                }}>
+                                    <div style={{ fontWeight: 800, marginBottom: 6, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 6 }}>
+                                        <span>💡</span> Tự động hóa thông minh
+                                    </div>
+                                    Hệ thống sẽ tự động tạo <strong>4 deadline nội bộ</strong> mặc định 
+                                    (chốt concept, địa điểm, marketing, tổng duyệt) dựa trên ngày bắt đầu.
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Loại sự kiện</label>
-                            <select className="form-control" value={form.event_type}
-                                onChange={e => setForm({ ...form, event_type: e.target.value })}>
-                                <option value="">-- Chọn loại --</option>
-                                {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Hình thức</label>
-                            <select className="form-control" value={form.venue_type}
-                                onChange={e => setForm({ ...form, venue_type: e.target.value })}>
-                                <option value="offline">🏢 Offline</option>
-                                <option value="online">🌐 Online</option>
-                            </select>
-                        </div>
+                    <div style={{ 
+                        marginTop: 10, padding: "20px 0 0", borderTop: "1px solid #f1f5f9",
+                        display: "flex", justifyContent: "flex-end", gap: 12
+                    }}>
+                        <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ minWidth: 120, borderRadius: 12 }}>
+                            Hủy bỏ
+                        </button>
+                        <button type="submit" className="btn btn-primary" style={{ minWidth: 180, borderRadius: 12, padding: "12px 24px" }} disabled={submitting}>
+                            {submitting ? "Đang lưu..." : (editingId ? "Lưu thay đổi" : "🚀 Tạo sự kiện ngay")}
+                        </button>
                     </div>
-
-                    <div className="form-group">
-                        <label>Mô tả</label>
-                        <textarea className="form-control" rows="2" placeholder="Mô tả ngắn về sự kiện..."
-                            value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-                    </div>
-
-                    {/* Thời gian */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>⏰ Thời gian diễn ra</div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Ngày bắt đầu <span style={{ color: "red" }}>*</span></label>
-                            <input type="datetime-local" className="form-control"
-                                value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Ngày kết thúc <span style={{ color: "red" }}>*</span></label>
-                            <input type="datetime-local" className="form-control"
-                                value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} required />
-                        </div>
-                    </div>
-
-                    {/* Địa điểm */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>📍 Địa điểm</div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Địa chỉ / Link</label>
-                            <input className="form-control" placeholder={form.venue_type === "online" ? "https://meet.google.com/..." : "123 Nguyễn Huệ, Q1"}
-                                value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                            <label>Sức chứa (người)</label>
-                            <input type="number" className="form-control" placeholder="200"
-                                value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
-                        </div>
-                    </div>
-
-                    {/* Ngân sách */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>💰 Ngân sách</div>
-
-                    <div className="form-group">
-                        <label>Tổng ngân sách dự kiến (VND)</label>
-                        <input type="number" className="form-control" placeholder="50000000"
-                            value={form.total_budget} onChange={e => setForm({ ...form, total_budget: e.target.value })} />
-                    </div>
-
-                    {/* Ghi chú deadline */}
-                    {!editingId && (
-                        <div style={{
-                            background: "rgba(99,102,241,0.07)", borderRadius: 8, padding: "10px 14px",
-                            marginBottom: 14, fontSize: 12, color: "var(--text-secondary)"
-                        }}>
-                            💡 Sau khi tạo, hệ thống sẽ tự động tạo <strong>4 deadline nội bộ</strong> mặc định
-                            (chốt concept, địa điểm, marketing, tổng duyệt) dựa trên ngày bắt đầu.
-                        </div>
-                    )}
-
-                    <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 8 }}
-                        disabled={submitting}>
-                        {submitting ? "Đang lưu..." : (editingId ? "Lưu thay đổi" : "Tạo sự kiện")}
-                    </button>
                 </form>
             </Modal>
         </Layout>

@@ -5,10 +5,14 @@ const Event = {
     async getAll() {
         const [rows] = await db.query(`
             SELECT e.*, u.name AS owner_name, a.name AS approver_name,
+                   org.name AS organizer_name, mng.name AS manager_name, trk.name AS tracker_name,
                    (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
             FROM events e
             LEFT JOIN users u ON e.owner_id = u.id
             LEFT JOIN users a ON e.approved_by = a.id
+            LEFT JOIN users org ON e.organizer_id = org.id
+            LEFT JOIN users mng ON e.manager_id = mng.id
+            LEFT JOIN users trk ON e.tracker_id = trk.id
             ORDER BY e.created_at DESC
         `);
         return rows;
@@ -17,10 +21,14 @@ const Event = {
     async getById(id) {
         const [rows] = await db.query(`
             SELECT e.*, u.name AS owner_name, a.name AS approver_name,
+                   org.name AS organizer_name, mng.name AS manager_name, trk.name AS tracker_name,
                    (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
             FROM events e
             LEFT JOIN users u ON e.owner_id = u.id
             LEFT JOIN users a ON e.approved_by = a.id
+            LEFT JOIN users org ON e.organizer_id = org.id
+            LEFT JOIN users mng ON e.manager_id = mng.id
+            LEFT JOIN users trk ON e.tracker_id = trk.id
             WHERE e.id = ?
         `, [id]);
         return rows[0] || null;
@@ -31,18 +39,21 @@ const Event = {
             name, description, event_type, owner_id,
             start_date, end_date,
             venue_type, location, capacity,
-            total_budget, status
+            total_budget, status,
+            organizer_id, manager_id, tracker_id, coordination_unit
         } = data;
         const [result] = await db.query(`
             INSERT INTO events
                 (name, description, event_type, owner_id, start_date, end_date,
-                 venue_type, location, capacity, total_budget, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 venue_type, location, capacity, total_budget, status,
+                 organizer_id, manager_id, tracker_id, coordination_unit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             name, description || null, event_type || null, owner_id || null,
             start_date, end_date,
             venue_type || "offline", location || null, capacity || null,
-            total_budget || 0, status || "draft"
+            total_budget || 0, status || "draft",
+            organizer_id || null, manager_id || null, tracker_id || null, coordination_unit || null
         ]);
         return result.insertId;
     },
@@ -52,20 +63,23 @@ const Event = {
             name, description, event_type, owner_id,
             start_date, end_date,
             venue_type, location, capacity,
-            total_budget, status
+            total_budget, status,
+            organizer_id, manager_id, tracker_id, coordination_unit
         } = data;
         await db.query(`
             UPDATE events
             SET name=?, description=?, event_type=?, owner_id=?,
                 start_date=?, end_date=?,
                 venue_type=?, location=?, capacity=?,
-                total_budget=?, status=?
+                total_budget=?, status=?,
+                organizer_id=?, manager_id=?, tracker_id=?, coordination_unit=?
             WHERE id=?
         `, [
             name, description, event_type, owner_id,
             start_date, end_date,
             venue_type, location, capacity,
-            total_budget, status, id
+            total_budget, status,
+            organizer_id, manager_id, tracker_id, coordination_unit, id
         ]);
     },
 
@@ -135,10 +149,14 @@ const Event = {
         // Lấy dữ liệu với phân trang
         const [rows] = await db.query(`
             SELECT e.*, u.name AS owner_name, a.name AS approver_name,
+                   org.name AS organizer_name, mng.name AS manager_name, trk.name AS tracker_name,
                    (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
             FROM events e
             LEFT JOIN users u ON e.owner_id = u.id
             LEFT JOIN users a ON e.approved_by = a.id
+            LEFT JOIN users org ON e.organizer_id = org.id
+            LEFT JOIN users mng ON e.manager_id = mng.id
+            LEFT JOIN users trk ON e.tracker_id = trk.id
             ${where}
             ORDER BY e.created_at DESC
             LIMIT ? OFFSET ?

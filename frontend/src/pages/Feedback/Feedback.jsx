@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+
 import Layout from "../../components/Layout/Layout";
 import { AuthContext } from "../../context/AuthContext";
 import { getEvents } from "../../services/eventService";
@@ -49,75 +49,67 @@ function EmployeeFeedbackForm({ events }) {
     );
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {error && (
-                <div style={{ background: "var(--emp-red-bg)", border: "1px solid rgba(248,113,113,0.3)", color: "var(--emp-red)", borderRadius: "var(--emp-radius-sm)", padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
-                    {error}
+                <div style={{ background: "var(--emp-red-bg)", border: "1px solid rgba(248,113,113,0.3)", color: "var(--emp-red)", borderRadius: "var(--emp-radius-sm)", padding: "12px 16px", marginBottom: 0, fontSize: 13 }}>
+                    ⚠️ {error}
                 </div>
             )}
 
-            {/* Event picker */}
-            <div className="emp-form-group">
-                <label className="emp-form-label">Sự kiện (tuỳ chọn)</label>
-                <select className="emp-form-input" value={form.event_id} onChange={e => setForm({ ...form, event_id: e.target.value })}>
-                    <option value="">— Phản hồi chung —</option>
-                    {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
-                </select>
-            </div>
-
-            {/* Name + Email */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div className="grid-2" style={{ gap: 20 }}>
                 <div className="emp-form-group" style={{ marginBottom: 0 }}>
-                    <label className="emp-form-label">Họ tên của bạn</label>
-                    <input className="emp-form-input" placeholder="Nguyễn Văn A"
-                        value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                    <label className="emp-form-label">Tên sự kiện</label>
+                    <select className="emp-form-input" value={form.event_id} onChange={e => setForm({ ...form, event_id: e.target.value })}>
+                        <option value="">— Đánh giá hệ thống / Phản hồi chung —</option>
+                        {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                    </select>
                 </div>
                 <div className="emp-form-group" style={{ marginBottom: 0 }}>
-                    <label className="emp-form-label">Email</label>
-                    <input type="email" className="emp-form-input" placeholder="ban@congty.vn"
+                    <label className="emp-form-label">Email liên hệ (tuỳ chọn)</label>
+                    <input type="email" className="emp-form-input" placeholder="nguyenvan@congty.vn"
                         value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                 </div>
             </div>
 
-            {/* Rating */}
             <div className="emp-form-group">
-                <label className="emp-form-label">Đánh giá tổng thể</label>
-                <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+                <label className="emp-form-label">Bạn cảm thấy thế nào về trải nghiệm này?</label>
+                <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
                     {RATINGS.map(r => (
                         <button key={r.score} type="button"
                             onClick={() => setForm({ ...form, rating: r.score })}
                             style={{
-                                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                                fontSize: 26, padding: "10px 14px", borderRadius: "var(--emp-radius-sm)", cursor: "pointer", transition: "all 0.15s",
+                                flex: 1, minWidth: 100,
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                                fontSize: 32, padding: "20px 14px", borderRadius: 16, cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                                 background: form.rating === r.score ? "var(--emp-accent-light)" : "var(--emp-surface2)",
                                 border: form.rating === r.score ? "2px solid var(--emp-accent)" : "2px solid transparent",
-                                boxShadow: form.rating === r.score ? "0 0 12px var(--emp-accent-glow)" : "none",
+                                transform: form.rating === r.score ? "translateY(-4px)" : "none",
+                                boxShadow: form.rating === r.score ? "0 10px 20px -5px rgba(108,114,255,0.3)" : "none",
                             }}>
                             {r.emoji}
-                            <span style={{ fontSize: 10, color: form.rating === r.score ? "var(--emp-accent)" : "var(--emp-text3)", fontWeight: 600 }}>{r.label}</span>
+                            <span style={{ fontSize: 11, color: form.rating === r.score ? "var(--emp-accent)" : "var(--emp-text3)", fontWeight: 800, textTransform: "uppercase" }}>{r.label}</span>
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* Message */}
             <div className="emp-form-group">
-                <label className="emp-form-label">Nội dung phản hồi *</label>
+                <label className="emp-form-label">Chia sẻ chi tiết cảm nghĩ của bạn</label>
                 <textarea
                     className="emp-form-input"
-                    rows={5}
-                    placeholder="Chia sẻ trải nghiệm của bạn về sự kiện này..."
+                    rows={6}
+                    placeholder="Những điều bạn hài lòng hoặc cần chúng tôi cải thiện..."
                     value={form.message}
                     onChange={e => setForm({ ...form, message: e.target.value })}
                     required
-                    style={{ resize: "vertical" }}
+                    style={{ resize: "vertical", padding: 16, fontSize: 15 }}
                 />
             </div>
 
             <button type="submit" className="emp-btn emp-btn-primary"
-                style={{ width: "100%", justifyContent: "center", borderRadius: "var(--emp-radius-sm)", padding: "12px" }}
+                style={{ width: "100%", justifyContent: "center", borderRadius: 16, padding: "16px", fontSize: 16, fontWeight: 800, boxShadow: "0 4px 12px rgba(108,114,255,0.2)" }}
                 disabled={submitting}>
-                {submitting ? "Đang gửi..." : "💬 Gửi phản hồi"}
+                {submitting ? "Đang xử lý..." : "💬 GỬI PHẢN HỒI NGAY"}
             </button>
         </form>
     );
@@ -126,12 +118,12 @@ function EmployeeFeedbackForm({ events }) {
 // ── Admin/Organizer Feedback View ────────────────────────────────────────────
 function AdminFeedbackView({ events }) {
     const [feedbackList, setFeedbackList] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState("view");
     const [form, setForm] = useState({ event_id: "", name: "", email: "", rating: 5, message: "" });
 
     useEffect(() => {
-        setLoading(true);
+
         getFeedback().then(r => setFeedbackList(r.data || [])).catch(() => {}).finally(() => setLoading(false));
     }, []);
 
@@ -148,35 +140,74 @@ function AdminFeedbackView({ events }) {
     return (
         <>
             <div className="page-header">
-                <div><h2>Phản hồi &amp; Đánh giá</h2><p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>Xem tất cả phản hồi từ nhân viên</p></div>
-                <div style={{ display: "flex", gap: 8 }}>
-                    <button className={`btn ${tab === "view" ? "btn-primary" : "btn-outline"}`} onClick={() => setTab("view")}>Danh sách</button>
-                    <button className={`btn ${tab === "submit" ? "btn-primary" : "btn-outline"}`} onClick={() => setTab("submit")}>Gửi phản hồi</button>
+                <div>
+                    <h2 className="gradient-text">💬 Quản lý Phản hồi</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
+                        Lắng nghe ý kiến từ nhân viên để cải thiện chất lượng tổ chức.
+                    </p>
+                </div>
+                <div style={{ display: "flex", gap: 12, padding: 6, background: "#f1f5f9", borderRadius: 14 }}>
+                    <button className={`btn ${tab === "view" ? "btn-primary" : "btn-outline"}`} style={{ border: "none", boxShadow: tab === "view" ? "var(--shadow-sm)" : "none", borderRadius: 10 }} onClick={() => setTab("view")}>Danh sách</button>
+                    <button className={`btn ${tab === "submit" ? "btn-primary" : "btn-outline"}`} style={{ border: "none", boxShadow: tab === "submit" ? "var(--shadow-sm)" : "none", borderRadius: 10 }} onClick={() => setTab("submit")}>Gửi thử</button>
                 </div>
             </div>
 
             {tab === "view" ? (
                 <>
-                    <div className="grid-2" style={{ marginBottom: 24 }}>
-                        <div className="card-stat"><div className="card-stat-icon indigo">💬</div><div className="card-stat-info"><h3>{feedbackList.length}</h3><p>Tổng phản hồi</p></div></div>
-                        <div className="card-stat"><div className="card-stat-icon amber">⭐</div><div className="card-stat-info"><h3>{avg}</h3><p>Điểm TB</p></div></div>
+                    <div className="grid-2" style={{ marginBottom: 28, gap: 20 }}>
+                        <div className="card-stat" style={{ background: "linear-gradient(135deg, #fff 0%, #f5f3ff 100%)", border: "1px solid #e2e8f0" }}>
+                            <div className="card-stat-icon indigo" style={{ background: "#fff", boxShadow: "var(--shadow-sm)" }}>💬</div>
+                            <div className="card-stat-info">
+                                <h3 style={{ fontSize: 26, fontWeight: 900 }}>{feedbackList.length}</h3>
+                                <p style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase" }}>Tổng phản hồi</p>
+                            </div>
+                        </div>
+                        <div className="card-stat" style={{ background: "linear-gradient(135deg, #fff 0%, #fffbeb 100%)", border: "1px solid #e2e8f0" }}>
+                            <div className="card-stat-icon amber" style={{ background: "#fff", boxShadow: "var(--shadow-sm)" }}>⭐</div>
+                            <div className="card-stat-info">
+                                <h3 style={{ fontSize: 26, fontWeight: 900 }}>{avg}</h3>
+                                <p style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase" }}>Điểm trung bình</p>
+                            </div>
+                        </div>
                     </div>
-                    <div className="data-table-wrapper">
-                        {loading ? <div className="empty-state"><span>⏳</span><p>Đang tải...</p></div>
-                            : feedbackList.length === 0 ? <div className="empty-state"><span>💬</span><p>Chưa có phản hồi nào.</p></div>
+                    <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 20, overflow: "hidden", border: "1px solid #f1f5f9" }}>
+                        {loading ? <div className="empty-state"><span>⏳</span><p>Đang tải dữ liệu...</p></div>
+                            : feedbackList.length === 0 ? <div className="empty-state"><span>💬</span><p>Chưa có phản hồi nào được ghi nhận.</p></div>
                             : (
                                 <table className="data-table">
-                                    <thead><tr><th>#</th><th>Tên</th><th>Sự kiện</th><th>ĐG</th><th>Nội dung</th><th>Ngày</th><th></th></tr></thead>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ paddingLeft: 24 }}>Người gửi</th>
+                                            <th>Sự kiện liên quan</th>
+                                            <th>Đánh giá</th>
+                                            <th>Nội dung chi tiết</th>
+                                            <th>Ngày gửi</th>
+                                            <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
-                                        {feedbackList.map((f, i) => (
+                                        {feedbackList.map((f) => (
                                             <tr key={f.id}>
-                                                <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                                <td style={{ fontWeight: 600 }}>{f.name || "Ẩn danh"}</td>
-                                                <td><span className="badge badge-default">{f.event_name || "Chung"}</span></td>
-                                                <td>{RATINGS[(f.rating || 5) - 1]?.emoji} {f.rating}/5</td>
-                                                <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{f.message}</td>
-                                                <td style={{ color: "var(--text-muted)", fontSize: 12 }}>{new Date(f.created_at).toLocaleDateString("vi-VN")}</td>
-                                                <td><button className="btn btn-danger btn-sm" onClick={() => handleDelete(f.id)}>🗑</button></td>
+                                                <td style={{ paddingLeft: 24 }}>
+                                                    <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{f.name || "Người dùng ẩn danh"}</div>
+                                                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{f.email || "Không để lại email"}</div>
+                                                </td>
+                                                <td><span className="badge badge-default" style={{ borderRadius: 8, padding: "4px 10px", fontWeight: 700 }}>{f.event_name?.toUpperCase() || "HỆ THỐNG"}</span></td>
+                                                <td>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 800 }}>
+                                                        <span style={{ fontSize: 18 }}>{RATINGS[(f.rating || 5) - 1]?.emoji}</span>
+                                                        <span>{f.rating}/5</span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ maxWidth: 300, color: "var(--text-secondary)", fontSize: 14 }}>
+                                                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", lineHeight: 1.5 }}>
+                                                        {f.message}
+                                                    </div>
+                                                </td>
+                                                <td style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 500 }}>{new Date(f.created_at).toLocaleDateString("vi-VN")}</td>
+                                                <td style={{ textAlign: "right", paddingRight: 24 }}>
+                                                    <button className="btn btn-outline btn-sm" onClick={() => handleDelete(f.id)} style={{ color: "#ef4444", border: "1px solid #fee2e2", borderRadius: 8 }}>🗑 Xóa</button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

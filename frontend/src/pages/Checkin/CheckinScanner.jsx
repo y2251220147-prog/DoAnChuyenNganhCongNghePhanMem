@@ -146,23 +146,21 @@ export default function CheckinScanner() {
 
     return (
         <Layout>
-            {/* Header */}
             <div className="page-header">
                 <div>
-                    <h2>Check-in</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        Quét mã QR check-in — nhân viên nội bộ và khách mời
+                    <h2 className="gradient-text">🎟️ Kiểm soát Check-in</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
+                        Quản lý lượt vào/ra bằng cách quét mã QR cho cả khách mời và nhân sự.
                     </p>
                 </div>
-                {/* Event selector */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Sự kiện:</span>
-                    <select className="form-control" style={{ minWidth: 240 }}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#f8fafc", padding: "8px 16px", borderRadius: 14, border: "1px solid #e2e8f0" }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-secondary)" }}>SỰ KIỆN:</span>
+                    <select className="form-control" style={{ minWidth: 280, border: "none", background: "transparent", fontWeight: 700, color: "var(--color-primary)" }}
                         value={selectedEvent} onChange={e => setSelected(e.target.value)}>
-                        <option value="">-- Chọn sự kiện --</option>
+                        <option value="">-- Chọn sự kiện tiếp nhận --</option>
                         {events.map(ev => (
                             <option key={ev.id} value={ev.id}>
-                                {ev.name} {ev.status === "running" ? "🟢" : ""}
+                                {ev.name} {ev.status === "running" ? "🔥" : ""}
                             </option>
                         ))}
                     </select>
@@ -172,27 +170,39 @@ export default function CheckinScanner() {
             {/* Event banner */}
             {currentEvent && (
                 <div style={{
-                    background: "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
-                    borderRadius: 12, padding: "14px 20px", marginBottom: 20,
-                    display: "flex", alignItems: "center", justifyContent: "space-between"
+                    background: "linear-gradient(135deg, var(--color-primary) 0%, #4f46e5 100%)",
+                    borderRadius: 16, padding: "24px 32px", marginBottom: 28,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    boxShadow: "0 10px 15px -3px rgba(79, 70, 229, 0.2)"
                 }}>
                     <div>
-                        <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                            Sự kiện đang check-in
-                        </p>
-                        <h3 style={{ color: "white", fontSize: 18, fontWeight: 800, marginTop: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <span style={{ background: "rgba(255,255,255,0.2)", color: "white", padding: "4px 12px", borderRadius: 99, fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>
+                                {currentEvent.status === "running" ? "🔴 Đang diễn ra" : "📅 Sắp tới"}
+                            </span>
+                        </div>
+                        <h3 style={{ color: "white", fontSize: 24, fontWeight: 800, margin: 0 }}>
                             🎪 {currentEvent.name}
                         </h3>
-                        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 }}>
-                            📅 {new Date(currentEvent.start_date || currentEvent.date).toLocaleDateString("vi-VN")}
-                            {currentEvent.location && ` · 📍 ${currentEvent.location}`}
-                        </p>
+                        <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
+                            <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                                📅 {new Date(currentEvent.start_date || currentEvent.date).toLocaleDateString("vi-VN")}
+                            </span>
+                            {currentEvent.location && (
+                                <span style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                                    📍 {currentEvent.location}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     {stats && (
-                        <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 32, fontWeight: 800, color: "white", lineHeight: 1 }}>{pct}%</div>
-                            <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 }}>
-                                {stats.checkedIn}/{stats.total} checked in
+                        <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: 24 }}>
+                            <div style={{ width: 64, height: 64, borderRadius: "50%", border: "4px solid rgba(255,255,255,0.2)", borderTopColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "white" }}>
+                                {pct}%
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 24, fontWeight: 900, color: "white", lineHeight: 1 }}>{stats.checkedIn}</div>
+                                <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>Đã có mặt / {stats.total}</div>
                             </div>
                         </div>
                     )}
@@ -200,72 +210,83 @@ export default function CheckinScanner() {
             )}
 
             {/* Tabs */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-                {["scanner", "guests", "history"].map(t => (
-                    <button key={t} className={`btn ${tab === t ? "btn-primary" : "btn-outline"} btn-sm`}
-                        onClick={() => setTab(t)}>
-                        {t === "scanner" && "📷 Quét QR"}
-                        {t === "guests" && `👥 Danh sách ${stats ? `(${stats.total})` : ""}`}
-                        {t === "history" && `📋 Lịch sử ${history.length > 0 ? `(${history.length})` : ""}`}
+            <div style={{ display: "flex", gap: 12, marginBottom: 24, padding: "6px", background: "#f1f5f9", borderRadius: 16, width: "fit-content" }}>
+                {[
+                    { id: "scanner", label: "📷 Quét mã QR", icon: "📸" },
+                    { id: "guests", label: `👥 Danh sách ${stats ? `(${stats.total})` : ""}`, icon: "👥" },
+                    { id: "history", label: `📋 Lịch sử quét ${history.length > 0 ? `(${history.length})` : ""}`, icon: "📋" }
+                ].map(t => (
+                    <button key={t.id} 
+                        style={{ 
+                            padding: "10px 20px", borderRadius: 12, fontSize: 14, fontWeight: 800, 
+                            display: "flex", alignItems: "center", gap: 8, transition: "all 0.2s",
+                            background: tab === t.id ? "#fff" : "transparent",
+                            color: tab === t.id ? "var(--color-primary)" : "var(--text-secondary)",
+                            border: "none",
+                            boxShadow: tab === t.id ? "0 4px 6px -1px rgba(0,0,0,0.1)" : "none",
+                            cursor: "pointer"
+                        }}
+                        onClick={() => setTab(t.id)}>
+                        {t.label}
                     </button>
                 ))}
             </div>
 
             {/* ===== TAB: SCANNER ===== */}
             {tab === "scanner" && (
-                <div className="grid-2" style={{ alignItems: "start" }}>
-                    <div className="card">
-                        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
-                            📷 Quét mã QR check-in
+                <div className="grid-2" style={{ alignItems: "start", gap: 28 }}>
+                    <div className="card" style={{ padding: 32, borderRadius: 20 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ fontSize: 24 }}>📸</span> CỬA SỔ QUÉT QR
                         </h3>
                         {message && (
                             <div className={`alert ${message.type === "success" ? "alert-success" : "alert-error"}`}
-                                style={{ marginBottom: 16 }}>
-                                {message.text}
-                            </div>
-                        )}
-                        {!selectedEvent && (
-                            <div className="alert alert-error" style={{ marginBottom: 16 }}>
-                                ⚠️ Vui lòng chọn sự kiện trước khi quét QR.
+                                style={{ marginBottom: 24, borderRadius: 12, padding: 16 }}>
+                                <div style={{ fontSize: 15, fontWeight: 700 }}>{message.text}</div>
                             </div>
                         )}
                         <form onSubmit={checkin}>
-                            <div className="form-group">
-                                <label style={{ fontWeight: 600 }}>Mã QR (nhân viên hoặc khách mời)</label>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label style={{ fontWeight: 800, color: "var(--text-secondary)", marginBottom: 12, display: "block" }}>
+                                    Mã định danh (QR Code)
+                                </label>
                                 
                                 {cameraOpen ? (
-                                    <ScannerWidget 
-                                        onScan={handleCameraScan} 
-                                        onClose={() => setCameraOpen(false)} 
-                                    />
+                                    <div style={{ marginBottom: 20 }}>
+                                        <ScannerWidget 
+                                            onScan={handleCameraScan} 
+                                            onClose={() => setCameraOpen(false)} 
+                                        />
+                                    </div>
                                 ) : (
-                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                                    <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
                                         <button type="button" className="btn btn-outline" 
+                                            style={{ borderRadius: 12, padding: "12px 20px", display: "flex", alignItems: "center", gap: 8 }}
                                             disabled={!selectedEvent}
                                             onClick={() => setCameraOpen(true)}>
-                                            📷 Bật Camera quét
+                                            📷 Mở Camera quét
                                         </button>
-                                        <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "auto 0" }}>
-                                            Hoặc sử dụng máy quét mã vạch USB.
-                                        </p>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-muted)", fontSize: 13, fontWeight: 500 }}>
+                                            <span>💡</span> Hoặc dùng máy quét tay
+                                        </div>
                                     </div>
                                 )}
 
-                                <div style={{ display: "flex", gap: 10 }}>
+                                <div style={{ display: "flex", gap: 12 }}>
                                     <input
                                         ref={inputRef}
                                         className="form-control"
-                                        placeholder="Scan hoặc nhập mã QR..."
+                                        placeholder={cameraOpen ? "Đang chờ camera..." : "Đưa mã vào vùng quét hoặc nhập tay tại đây..."}
                                         value={qr}
                                         onChange={e => setQr(e.target.value)}
                                         autoFocus
                                         disabled={loading || !selectedEvent || cameraOpen}
-                                        style={{ fontFamily: "monospace" }}
+                                        style={{ fontFamily: "'JetBrains Mono', monospace", padding: 16, fontSize: 16, borderRadius: 12 }}
                                     />
                                     <button type="submit" id="btn-checkin-submit" className="btn btn-primary"
                                         disabled={loading || !qr.trim() || !selectedEvent || cameraOpen}
-                                        style={{ flexShrink: 0, minWidth: 90 }}>
-                                        {loading ? "⏳" : "✅ Check in"}
+                                        style={{ flexShrink: 0, minWidth: 120, borderRadius: 12, fontSize: 15, fontWeight: 800 }}>
+                                        {loading ? "..." : "CHECK-IN ✅"}
                                     </button>
                                 </div>
                             </div>
@@ -273,85 +294,89 @@ export default function CheckinScanner() {
                     </div>
 
                     {/* Stats */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        <div className="card-stat">
-                            <div className="card-stat-icon emerald">✅</div>
-                            <div className="card-stat-info">
-                                <h3>{stats?.checkedIn ?? "—"}</h3>
-                                <p>Đã check-in</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        <div className="card" style={{ padding: 24, borderRadius: 20 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+                                <span style={{ fontSize: 14, fontWeight: 800, color: "var(--text-secondary)" }}>TIẾN ĐỘ HIỆN TẠI</span>
+                                <span style={{ fontSize: 18, fontWeight: 900, color: "var(--color-primary)" }}>{pct}%</span>
                             </div>
-                        </div>
-                        <div className="card-stat">
-                            <div className="card-stat-icon rose">⏳</div>
-                            <div className="card-stat-info">
-                                <h3>{stats?.notCheckedIn ?? "—"}</h3>
-                                <p>Chưa check-in</p>
+                            <div style={{ height: 12, background: "#f1f5f9", borderRadius: 6, overflow: "hidden", marginBottom: 24 }}>
+                                <div style={{
+                                    height: "100%", width: `${pct}%`,
+                                    background: "linear-gradient(90deg, #6366f1, #818cf8)",
+                                    borderRadius: 6, transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                                }} />
                             </div>
-                        </div>
-                        <div className="card-stat">
-                            <div className="card-stat-icon cyan">🎟️</div>
-                            <div className="card-stat-info">
-                                <h3>{stats?.total ?? "—"}</h3>
-                                <p>Tổng đã đăng ký</p>
-                            </div>
-                        </div>
-                        {stats && (
-                            <div className="card" style={{ padding: 16 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, fontWeight: 600 }}>Tỉ lệ check-in</span>
-                                <span style={{ fontSize: 14, fontWeight: 800, color: "var(--color-primary)" }}>{pct}%</span>
-                            </div>
-                                <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
-                                    <div style={{
-                                        height: "100%", width: `${pct}%`,
-                                        background: "linear-gradient(90deg, var(--color-primary), var(--color-accent))",
-                                        borderRadius: 5, transition: "width 0.6s ease"
-                                    }} />
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                                <div style={{ padding: 16, background: "#f0fdf4", borderRadius: 16, border: "1px solid #dcfce7" }}>
+                                    <div style={{ fontSize: 11, fontWeight: 800, color: "#16a34a", textTransform: "uppercase" }}>ĐÃ CÓ MẶT</div>
+                                    <div style={{ fontSize: 24, fontWeight: 900, color: "#15803d", marginTop: 4 }}>{stats?.checkedIn ?? "—"}</div>
+                                </div>
+                                <div style={{ padding: 16, background: "#fff1f2", borderRadius: 16, border: "1px solid #ffe4e6" }}>
+                                    <div style={{ fontSize: 11, fontWeight: 800, color: "#e11d48", textTransform: "uppercase" }}>CHƯA ĐẾN</div>
+                                    <div style={{ fontSize: 24, fontWeight: 900, color: "#be123c", marginTop: 4 }}>{stats?.notCheckedIn ?? "—"}</div>
                                 </div>
                             </div>
-                        )}
+                        </div>
+
+                        <div className="card-stat" style={{ borderRadius: 20, border: "1px solid #f1f5f9" }}>
+                            <div className="card-stat-icon cyan" style={{ borderRadius: 12 }}>🎟️</div>
+                            <div className="card-stat-info">
+                                <h3 style={{ fontSize: 22, fontWeight: 900 }}>{stats?.total ?? "—"}</h3>
+                                <p style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase", color: "var(--text-muted)" }}>Tổng số lượt đăng ký</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* ===== TAB: GUESTS ===== */}
             {tab === "guests" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>Danh sách người tham dự — {currentEvent?.name || "Chọn sự kiện"}</h3>
-                        <button className="btn btn-outline btn-sm" onClick={loadGuestList}>↻ Làm mới</button>
+                <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 20, overflow: "hidden", border: "1px solid #f1f5f9" }}>
+                    <div style={{ background: "#f8fafc", padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>👥 DANH SÁCH NGƯỜI THAM DỰ</h3>
+                        <button className="btn btn-outline btn-sm" onClick={loadGuestList} style={{ borderRadius: 8 }}>↻ Cập nhật mới nhất</button>
                     </div>
                     {!selectedEvent ? (
-                        <div className="empty-state"><span>🎪</span><p>Chọn sự kiện để xem danh sách</p></div>
+                        <div className="empty-state" style={{ padding: 60 }}><span>🎪</span><p>Chọn sự kiện để xem danh sách chi tiết</p></div>
                     ) : loadingList ? (
-                        <div className="empty-state"><span>⏳</span><p>Đang tải...</p></div>
+                        <div className="empty-state" style={{ padding: 60 }}><span>⏳</span><p>Đang tải dữ liệu người tham dự...</p></div>
                     ) : guestList.length === 0 ? (
-                        <div className="empty-state"><span>🎟️</span><p>Chưa có người đăng ký sự kiện này</p></div>
+                        <div className="empty-state" style={{ padding: 60 }}><span>🎟️</span><p>Chưa có ai đăng ký tham dự sự kiện này</p></div>
                     ) : (
                         <table className="data-table">
                             <thead>
-                                <tr><th>#</th><th>Họ tên</th><th>Email</th><th>Loại</th><th>Trạng thái</th></tr>
+                                <tr>
+                                    <th style={{ paddingLeft: 24 }}>#</th>
+                                    <th>Họ và tên</th>
+                                    <th>Thông tin Email</th>
+                                    <th>Phân nhóm</th>
+                                    <th style={{ textAlign: "right", paddingRight: 24 }}>Trạng thái</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 {guestList.map((g, i) => (
-                                    <tr key={`${g.source}-${g.id}`} style={g.checked_in ? { background: "rgba(16,185,129,0.04)" } : {}}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 600 }}>
-                                            {g.checked_in ? "✅" : "⏳"} {g.name}
-                                        </td>
-                                        <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
+                                    <tr key={`${g.source}-${g.id}`} style={g.checked_in ? { background: "rgba(16,185,129,0.03)" } : {}}>
+                                        <td style={{ color: "var(--text-muted)", paddingLeft: 24 }}>{String(i + 1).padStart(2, '0')}</td>
                                         <td>
-                                            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99,
-                                                background: g.type === "internal" ? "#ede9fe" : "#e0f2fe",
-                                                color: g.type === "internal" ? "#7c3aed" : "#0369a1",
-                                                fontWeight: 600 }}>
-                                                {g.type === "internal" ? "Nhân viên" : "Khách ngoài"}
+                                            <div style={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
+                                                {g.checked_in ? <span style={{ color: "#10b981" }}>✅</span> : <span style={{ color: "#94a3b8" }}>⏳</span>}
+                                                {g.name}
+                                            </div>
+                                        </td>
+                                        <td style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{g.email}</td>
+                                        <td>
+                                            <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 8,
+                                                background: g.type === "internal" ? "#e0e7ff" : "#f0f9ff",
+                                                color: g.type === "internal" ? "#4338ca" : "#0369a1",
+                                                fontWeight: 800 }}>
+                                                {g.type === "internal" ? "NHÂN VIÊN" : "KHÁCH NGOÀI"}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td style={{ textAlign: "right", paddingRight: 24 }}>
                                             {g.checked_in
-                                                ? <span className="badge badge-success">✓ Đã check-in</span>
-                                                : <span className="badge badge-default">Chờ check-in</span>
+                                                ? <span className="badge badge-success" style={{ border: "none", borderRadius: 8, padding: "6px 12px" }}>✓ ĐÃ CÓ MẶT</span>
+                                                : <span className="badge badge-default" style={{ border: "none", borderRadius: 8, padding: "6px 12px" }}>CHỜ CHECK-IN</span>
                                             }
                                         </td>
                                     </tr>
@@ -364,31 +389,39 @@ export default function CheckinScanner() {
 
             {/* ===== TAB: HISTORY ===== */}
             {tab === "history" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>Lịch sử quét (phiên này)</h3>
+                <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 20, overflow: "hidden", border: "1px solid #f1f5f9" }}>
+                    <div style={{ background: "#f8fafc", padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>📋 LỊCH SỬ QUÉT (PHIÊN NÀY)</h3>
                         {history.length > 0 && (
-                            <button className="btn btn-outline btn-sm" onClick={() => setHistory([])}>Xóa lịch sử</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => setHistory([])} style={{ borderRadius: 8, color: "#64748b" }}>Xóa trắng lịch sử</button>
                         )}
                     </div>
                     {history.length === 0 ? (
-                        <div className="empty-state"><span>📋</span><p>Chưa có lượt quét nào trong phiên này</p></div>
+                        <div className="empty-state" style={{ padding: 60 }}><span>📋</span><p>Chưa có lượt quét nào được ghi nhận trong phiên này</p></div>
                     ) : (
                         <table className="data-table">
                             <thead>
-                            <tr><th>Thời gian</th><th>Họ tên</th><th>Loại</th><th>Mã QR</th><th>Kết quả</th></tr>
+                                <tr>
+                                    <th style={{ paddingLeft: 24 }}>Thời gian</th>
+                                    <th>Họ và tên</th>
+                                    <th>Loại đối tượng</th>
+                                    <th>Mã nhận diện (QR)</th>
+                                    <th style={{ textAlign: "right", paddingRight: 24 }}>Kết quả quét</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 {history.map((h, i) => (
                                     <tr key={i}>
-                                        <td style={{ color: "var(--text-muted)", fontSize: 12 }}>{h.time}</td>
-                                        <td style={{ fontWeight: 600 }}>{h.name}</td>
-                                        <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{h.source || "—"}</td>
-                                        <td style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text-muted)" }}>{h.qr}</td>
+                                        <td style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 700, paddingLeft: 24 }}>{h.time}</td>
+                                        <td style={{ fontWeight: 700, color: "var(--text-primary)" }}>{h.name}</td>
                                         <td>
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>{h.source?.toUpperCase() || "—"}</span>
+                                        </td>
+                                        <td><code style={{ fontSize: 12, color: "var(--text-muted)", background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>{h.qr}</code></td>
+                                        <td style={{ textAlign: "right", paddingRight: 24 }}>
                                             {h.ok
-                                                ? <span className="badge badge-success">✓ Thành công</span>
-                                                : <span className="badge badge-danger" title={h.error}>✗ Thất bại</span>
+                                                ? <span className="badge badge-success" style={{ border: "none", borderRadius: 8, padding: "6px 12px" }}>✓ THÀNH CÔNG</span>
+                                                : <span className="badge badge-danger" title={h.error} style={{ border: "none", borderRadius: 8, padding: "6px 12px" }}>✗ THẤT BẠI</span>
                                             }
                                         </td>
                                     </tr>

@@ -75,10 +75,16 @@ exports.createDeadline = async (req, res) => {
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 
-exports.toggleDeadline = async (req, res) => {
+exports.updateDeadlineStatus = async (req, res) => {
     try {
-        await eventService.toggleDeadline(req.params.deadlineId, req.body.done);
-        res.json({ message: "Cập nhật deadline thành công" });
+        const { status, note } = req.body;
+        await eventService.updateDeadlineStatus(
+            req.params.deadlineId, 
+            status, 
+            note, 
+            req.user.role
+        );
+        res.json({ message: "Cập nhật trạng thái deadline thành công" });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 

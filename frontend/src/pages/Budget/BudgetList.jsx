@@ -88,93 +88,85 @@ export default function BudgetList() {
         <Layout>
             <div className="page-header">
                 <div>
-                    <h2>Event Budget</h2>
-                    <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
-                        Track expenses and financial planning
+                    <h2 className="gradient-text">💰 Ngân sách & Chi phí</h2>
+                    <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginTop: "6px" }}>
+                        Theo dõi dòng tiền, hoạch định ngân sách và quản lý chi tiêu chi tiết cho từng sự kiện.
                     </p>
                 </div>
                 {canManage && (
-                    <button className="btn btn-primary" onClick={handleAddClick}>
-                        + Add Expense
+                    <button className="btn btn-primary" onClick={handleAddClick} style={{ borderRadius: 12, padding: "10px 24px" }}>
+                        + Thêm khoản chi mới
                     </button>
                 )}
             </div>
 
-            <div className="grid-2" style={{ marginBottom: "24px" }}>
-                <div className="card-stat">
-                    <div className="card-stat-icon indigo">📋</div>
+            <div className="grid-2" style={{ marginBottom: "28px", gap: "24px" }}>
+                <div className="card-stat" style={{ background: "linear-gradient(135deg, #fff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }}>
+                    <div className="card-stat-icon indigo" style={{ borderRadius: 14 }}>📋</div>
                     <div className="card-stat-info">
-                        <h3>{budgetItems.length}</h3>
-                        <p>Total Items</p>
+                        <h3 style={{ fontSize: 24, fontWeight: 800 }}>{budgetItems.length}</h3>
+                        <p style={{ fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", fontSize: 11, letterSpacing: "0.05em" }}>Hạng mục chi tiêu</p>
                     </div>
                 </div>
-                <div className="card-stat">
-                    <div className="card-stat-icon amber">💰</div>
+                <div className="card-stat" style={{ background: "linear-gradient(135deg, #fff 0%, #fffbeb 100%)", border: "1px solid #fde68a" }}>
+                    <div className="card-stat-icon amber" style={{ borderRadius: 14 }}>💰</div>
                     <div className="card-stat-info">
-                        <h3 style={{ fontSize: "18px" }}>{formatVND(totalCost)}</h3>
-                        <p>Total Cost</p>
+                        <h3 style={{ fontSize: 24, fontWeight: 800, color: "#b45309" }}>{formatVND(totalCost)}</h3>
+                        <p style={{ fontWeight: 600, color: "#92400e", textTransform: "uppercase", fontSize: 11, letterSpacing: "0.05em" }}>Tổng ngân sách đã chi</p>
                     </div>
                 </div>
             </div>
 
-            <div className="data-table-wrapper">
+            <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 16, overflow: "hidden", border: "1px solid #f1f5f9" }}>
                 {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Loading budget...</p></div>
+                    <div className="empty-state"><span>⏳</span><p>Đang tải dữ liệu...</p></div>
                 ) : budgetItems.length === 0 ? (
                     <div className="empty-state">
                         <span>💸</span>
-                        <p>No budget records found{canManage ? ". Add expenses above!" : "."}</p>
+                        <p>Chưa có bản ghi ngân sách nào{canManage ? ". Hãy thêm chi phí ngay!" : "."}</p>
                     </div>
                 ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Item Name</th>
-                                <th>Event</th>
-                                <th style={{ textAlign: "right" }}>Cost (VND)</th>
-                                {canManage && <th>Actions</th>}
+                                <th style={{ paddingLeft: 24 }}>#</th>
+                                <th>Hạng mục chi tiêu</th>
+                                <th>Sự kiện liên quan</th>
+                                <th style={{ textAlign: "right" }}>Số tiền (VND)</th>
+                                {canManage && <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {budgetItems.map((b, i) => (
                                 <tr key={b.id}>
-                                    <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                    <td style={{ fontWeight: 600 }}>💼 {b.item}</td>
+                                    <td style={{ color: "var(--text-muted)", paddingLeft: 24 }}>{String(i + 1).padStart(2, '0')}</td>
+                                    <td style={{ fontWeight: 700, color: "var(--text-primary)" }}>💼 {b.item}</td>
                                     <td>
-                                        <span className="badge badge-default">
+                                        <span className="badge badge-default" style={{ borderRadius: 6, fontWeight: 600 }}>
                                             {getEventName(b.event_id)}
                                         </span>
                                     </td>
-                                    <td style={{ textAlign: "right", color: "var(--color-primary-dark)", fontWeight: 600 }}>
+                                    <td style={{ textAlign: "right", color: "var(--color-primary)", fontWeight: 800, fontSize: 15 }}>
                                         {formatVND(b.cost)}
                                     </td>
                                     {canManage && (
-                                        <td>
-                                            <div className="actions">
-                                                <button
-                                                    className="btn btn-outline btn-sm"
-                                                    onClick={() => handleEditClick(b)}
-                                                    title="Edit"
-                                                >✎</button>
-                                                <button
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() => handleDelete(b.id)}
-                                                    title="Delete"
-                                                >🗑</button>
+                                        <td style={{ textAlign: "right", paddingRight: 24 }}>
+                                            <div className="actions" style={{ justifyContent: "flex-end" }}>
+                                                <button className="btn btn-outline btn-sm" onClick={() => handleEditClick(b)} title="Chỉnh sửa" style={{ borderRadius: 8 }}>✎</button>
+                                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(b.id)} title="Xóa" style={{ borderRadius: 8 }}>🗑</button>
                                             </div>
                                         </td>
                                     )}
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot>
+                        <tfoot style={{ background: "#f8fafc" }}>
                             <tr>
-                                <th colSpan={canManage ? 3 : 3} style={{ textAlign: "right" }}>Total:</th>
-                                <th style={{ textAlign: "right", color: "var(--color-primary)", fontSize: "15px" }}>
+                                <th colSpan={3} style={{ textAlign: "right", padding: "16px 24px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", color: "var(--text-secondary)" }}>Tổng cộng:</th>
+                                <th style={{ textAlign: "right", color: "var(--color-primary)", fontSize: "18px", fontWeight: 900, paddingRight: canManage ? "12px" : "24px" }}>
                                     {formatVND(totalCost)}
                                 </th>
-                                {canManage && <th></th>}
+                                {canManage && <th style={{ paddingRight: 24 }}></th>}
                             </tr>
                         </tfoot>
                     </table>
@@ -182,44 +174,44 @@ export default function BudgetList() {
             </div>
 
             <Modal
-                title={editingId ? "Edit Expense" : "Add Expense"}
+                title={editingId ? "Chỉnh sửa khoản chi" : "Thêm khoản chi mới"}
                 isOpen={isModalOpen}
                 onClose={() => { setModalOpen(false); setError(""); }}
             >
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                     {error && <div className="alert alert-error">{error}</div>}
                     {!editingId && (
-                        <div className="form-group">
-                            <label>Event</label>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label>Sự kiện áp dụng</label>
                             <select
                                 className="form-control"
                                 value={formData.event_id}
                                 onChange={e => setFormData({ ...formData, event_id: e.target.value })}
                                 required
                             >
-                                <option value="">-- Select Event --</option>
+                                <option value="">-- Chọn sự kiện trong danh sách --</option>
                                 {events.map(ev => (
                                     <option key={ev.id} value={ev.id}>{ev.name}</option>
                                 ))}
                             </select>
                         </div>
                     )}
-                    <div className="form-group">
-                        <label>Item Name</label>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Tên hạng mục / Khoản chi</label>
                         <input
                             className="form-control"
-                            placeholder="e.g. Sound system rental"
+                            placeholder="VD: Thuê âm thanh, trang trí, tea-break..."
                             value={formData.item}
                             onChange={e => setFormData({ ...formData, item: e.target.value })}
                             required
                         />
                     </div>
-                    <div className="form-group">
-                        <label>Cost (VND)</label>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Số tiền dự toán (VND)</label>
                         <input
                             type="number"
                             className="form-control"
-                            placeholder="e.g. 5000000"
+                            placeholder="VD: 5000000"
                             value={formData.cost}
                             onChange={e => setFormData({ ...formData, cost: e.target.value })}
                             required
@@ -227,14 +219,17 @@ export default function BudgetList() {
                             step="1000"
                         />
                     </div>
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        style={{ width: "100%", marginTop: "10px" }}
-                        disabled={submitting}
-                    >
-                        {submitting ? "Saving..." : (editingId ? "Save Changes" : "Add Expense")}
-                    </button>
+                    <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                        <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ borderRadius: 12, padding: "10px 24px" }}>Hủy</button>
+                        <button
+                            type="submit"
+                            className="btn btn-primary"
+                            style={{ borderRadius: 12, padding: "10px 32px" }}
+                            disabled={submitting}
+                        >
+                            {submitting ? "Đang xử lý..." : (editingId ? "Lưu thay đổi" : "✅ Xác nhận thêm chi phí")}
+                        </button>
+                    </div>
                 </form>
             </Modal>
         </Layout>

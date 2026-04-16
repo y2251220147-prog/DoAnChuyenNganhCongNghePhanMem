@@ -18,6 +18,7 @@ r.post("/", auth, can(mgr), c.create);
 r.put("/:id", auth, can(mgr), c.update);
 r.patch("/:id/status", auth, c.updateStatus);       // all logged-in
 r.patch("/:id/progress", auth, c.updateProgress);     // all logged-in
+r.patch("/:id/feedback", auth, c.updateFeedback);     // all logged-in
 
 r.delete("/:id", auth, can(mgr), c.delete);
 
