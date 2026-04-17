@@ -393,36 +393,46 @@ export default function GuestList() {
                 )}
             </Modal>
             {/* Bulk Invite Modal */}
-            <Modal title="💌 Mời khách hàng loạt" isOpen={isBulkOpen} onClose={() => setBulkOpen(false)}>
-                <form onSubmit={handleBulkInvite}>
-                    <div className="form-group">
-                        <label>Sự kiện mục tiêu <span style={{ color: "var(--color-danger)" }}>*</span></label>
+            <Modal title="💌 Mời khách hàng loạt" isOpen={isBulkOpen} onClose={() => setBulkOpen(false)} maxWidth="1100px">
+                <form onSubmit={handleBulkInvite} style={{ padding: "10px 0" }}>
+                    <div className="form-group" style={{ marginBottom: 32 }}>
+                        <label style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>Sự kiện mục tiêu <span style={{ color: "var(--color-danger)" }}>*</span></label>
                         <select className="form-control" value={bulkForm.event_id}
+                            style={{ height: 52, fontSize: 16, borderRadius: 14, border: "2px solid #e2e8f0" }}
                             onChange={e => setBulkForm({ ...bulkForm, event_id: e.target.value })} required>
-                            <option value="">-- Chọn sự kiện --</option>
+                            <option value="">-- Chọn sự kiện mục tiêu để gửi lời mời --</option>
                             {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                         </select>
                     </div>
-                    <div className="grid-2" style={{ gap: 24 }}>
+                    
+                    <div className="grid-2" style={{ gap: 32, marginBottom: 32 }}>
                         <div className="form-group">
-                            <label>Danh sách khách mời (Tên, Email) <span style={{ color: "var(--color-danger)" }}>*</span></label>
-                            <textarea className="form-control" style={{ height: 200 }}
-                                placeholder="Nguyễn Văn A, anguyen@gmail.com&#10;Trần Thị B, btran@gmail.com"
+                            <label style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>Danh sách khách mời (Tên, Email) <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Định dạng: Tên, Email (Ví dụ: Nguyễn Văn A, anguyen@gmail.com)</p>
+                            <textarea className="form-control" 
+                                style={{ height: 350, fontSize: 15, lineHeight: 1.6, padding: 20, borderRadius: 16, border: "2px solid #e2e8f0", background: "#fcfcfd" }}
+                                placeholder="🔍 Nhập danh sách tại đây...&#10;Nguyễn Văn A, anguyen@gmail.com&#10;Trần Thị B, btran@gmail.com"
                                 value={bulkForm.guests}
                                 onChange={e => setBulkForm({ ...bulkForm, guests: e.target.value })}
                                 required />
                         </div>
                         <div className="form-group">
-                            <label>Lời nhắn trong thư mời</label>
-                            <textarea className="form-control" style={{ height: 200 }}
-                                placeholder="VD: Trân trọng kính mời bạn đến tham dự..."
+                            <label style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)" }}>Nội dung thư mời (Lời nhắn riêng)</label>
+                            <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Lời nhắn này sẽ được đính kèm trong Email gửi tới khách</p>
+                            <textarea className="form-control" 
+                                style={{ height: 350, fontSize: 15, lineHeight: 1.6, padding: 20, borderRadius: 16, border: "2px solid #e2e8f0", background: "#fcfcfd" }}
+                                placeholder="VD: Trân trọng kính mời bạn đến tham dự sự kiện đặc biệt của chúng tôi..."
                                 value={bulkForm.content}
                                 onChange={e => setBulkForm({ ...bulkForm, content: e.target.value })} />
                         </div>
                     </div>
-                    <button type="submit" className="btn btn-primary btn-lg w-full" disabled={bulkSending}>
-                        {bulkSending ? "Đang gửi email..." : "🚀 Gửi lời mời hàng loạt"}
-                    </button>
+
+                    <div style={{ display: "flex", gap: 16 }}>
+                        <button type="button" className="btn btn-outline btn-lg" onClick={() => setBulkOpen(false)} style={{ flex: 1, height: 56, borderRadius: 14, fontSize: 16 }}>Hủy bỏ</button>
+                        <button type="submit" className="btn btn-primary btn-lg" disabled={bulkSending} style={{ flex: 2, height: 56, borderRadius: 14, fontSize: 16, fontWeight: 800, boxShadow: "0 10px 20px -5px rgba(79,70,229,0.3)" }}>
+                            {bulkSending ? "🚀 Đang xử lý gửi email hàng loạt..." : "🚀 Xác nhận gửi lời mời ngay"}
+                        </button>
+                    </div>
                 </form>
             </Modal>
         </Layout>

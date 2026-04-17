@@ -25,7 +25,7 @@ function ScannerWidget({ onScan, onClose }) {
                     }
                     onScan(decodedText);
                 },
-                (err) => { /* ignore */ }
+                () => { /* ignore */ }
             );
         }
         return () => {
@@ -80,6 +80,7 @@ export default function CheckinScanner() {
             .then(r => setStats(r.data))
             .catch(() => setStats(null));
         loadGuestList();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedEvent]);
 
     const loadGuestList = async () => {
@@ -139,6 +140,30 @@ export default function CheckinScanner() {
         setTimeout(() => {
             document.getElementById("btn-checkin-submit")?.click();
         }, 100);
+    };
+
+    const exportToCSV = () => {
+        if (!guestList || guestList.length === 0) return;
+        const headers = ["STT", "Họ và tên", "Email", "Phân nhóm", "Thời gian Check-in", "Trạng thái"];
+        const rows = guestList.map((g, i) => [
+            i + 1,
+            `"${(g.name || '').replace(/"/g, '""')}"`,
+            `"${(g.email || '').replace(/"/g, '""')}"`,
+            g.type === "internal" ? "Nhân viên" : "Khách ngoài",
+            `"${g.checked_in_at ? new Date(g.checked_in_at).toLocaleString('vi-VN') : ''}"`,
+            g.checked_in ? "Đã có mặt" : "Chưa đến"
+        ]);
+        
+        // Dùng uFEFF để support tiếng Việt tốt trong Excel
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `DanhSachKhachMoi_Event_${selectedEvent}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const pct = stats ? Math.round((stats.checkedIn / (stats.total || 1)) * 100) : 0;
@@ -335,7 +360,10 @@ export default function CheckinScanner() {
                 <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 20, overflow: "hidden", border: "1px solid #f1f5f9" }}>
                     <div style={{ background: "#f8fafc", padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>👥 DANH SÁCH NGƯỜI THAM DỰ</h3>
-                        <button className="btn btn-outline btn-sm" onClick={loadGuestList} style={{ borderRadius: 8 }}>↻ Cập nhật mới nhất</button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn btn-outline btn-sm" onClick={loadGuestList} style={{ borderRadius: 8 }}>↻ Cập nhật</button>
+                            <button className="btn btn-primary btn-sm" onClick={exportToCSV} style={{ borderRadius: 8, background: "#10b981", border: "none" }} disabled={guestList.length === 0}>📥 Xuất Excel (CSV)</button>
+                        </div>
                     </div>
                     {!selectedEvent ? (
                         <div className="empty-state" style={{ padding: 60 }}><span>🎪</span><p>Chọn sự kiện để xem danh sách chi tiết</p></div>

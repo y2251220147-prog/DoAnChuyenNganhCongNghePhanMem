@@ -45,7 +45,7 @@ exports.getEventsByMonth = async (year) => {
  * Thống kê đăng ký & check-in theo event.
  * Gộp cả attendees (nội bộ) và guests (khách ngoài).
  */
-exports.getAttendeesByEvent = async (limit = 10) => {
+exports.getAttendeesByEvent = async () => {
     const [rows] = await db.query(`
         SELECT e.id, e.name, e.status, e.capacity,
                COALESCE(a.cnt, 0) + COALESCE(g.cnt, 0)        AS registered,
@@ -60,21 +60,20 @@ exports.getAttendeesByEvent = async (limit = 10) => {
             FROM guests GROUP BY event_id
         ) g ON g.event_id = e.id
         ORDER BY registered DESC
-        LIMIT ?
-    `, [limit]);
+    `);
     return rows;
 };
 
 /**
  * Thống kê ngân sách theo sự kiện.
  */
-exports.getBudgetByEvent = async (limit = 10) => {
+exports.getBudgetByEvent = async () => {
     const [rows] = await db.query(`
         SELECT e.id, e.name, e.total_budget AS planned,
                COALESCE(SUM(b.cost),0) AS actual
         FROM events e LEFT JOIN event_budget b ON e.id = b.event_id
-        GROUP BY e.id HAVING planned > 0 ORDER BY actual DESC LIMIT ?
-    `, [limit]);
+        GROUP BY e.id HAVING planned > 0 ORDER BY actual DESC
+    `);
     return rows;
 };
 
@@ -95,6 +94,22 @@ exports.getEventsByType = async () => {
     const [rows] = await db.query(`
         SELECT COALESCE(event_type,'Khác') AS type, COUNT(*) AS count
         FROM events GROUP BY event_type ORDER BY count DESC
+    `);
+    return rows;
+};
+
+/**
+ * Thống kê phản hồi theo sự kiện.
+ */
+exports.getFeedbackStats = async () => {
+    const [rows] = await db.query(`
+        SELECT e.name, 
+               COUNT(f.id) AS total_feedback,
+               AVG(f.rating) AS avg_rating
+        FROM events e 
+        JOIN feedbacks f ON e.id = f.event_id
+        GROUP BY e.id
+        ORDER BY avg_rating DESC
     `);
     return rows;
 };

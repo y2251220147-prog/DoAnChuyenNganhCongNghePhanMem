@@ -66,7 +66,8 @@ CREATE TABLE `events` (
   `organizer_id` int DEFAULT NULL,
   `manager_id` int DEFAULT NULL,
   `tracker_id` int DEFAULT NULL,
-  `coordination_unit` text,
+  `coordination_unit` varchar(255) DEFAULT NULL,
+  `venue_id` int DEFAULT NULL,
   `start_date` datetime NOT NULL,
   `end_date` datetime NOT NULL,
   `venue_type` enum('online','offline') DEFAULT 'offline',
@@ -83,11 +84,13 @@ CREATE TABLE `events` (
   KEY `organizer_id` (`organizer_id`),
   KEY `manager_id` (`manager_id`),
   KEY `tracker_id` (`tracker_id`),
+  KEY `venue_id` (`venue_id`),
   CONSTRAINT `events_ibfk_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_approver` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_organizer` FOREIGN KEY (`organizer_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_manager` FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `events_ibfk_tracker` FOREIGN KEY (`tracker_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `events_ibfk_tracker` FOREIGN KEY (`tracker_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `events_ibfk_venue` FOREIGN KEY (`venue_id`) REFERENCES `venues` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -138,6 +141,7 @@ CREATE TABLE `event_tasks` (
   `event_id` int NOT NULL,
   `phase_id` int DEFAULT NULL,
   `parent_id` int DEFAULT NULL,
+  `deadline_id` int DEFAULT NULL,
   `title` varchar(255) NOT NULL,
   `description` text,
   `assigned_to` int DEFAULT NULL,
@@ -164,6 +168,7 @@ CREATE TABLE `event_tasks` (
   CONSTRAINT `event_tasks_ibfk_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
   CONSTRAINT `event_tasks_ibfk_phase` FOREIGN KEY (`phase_id`) REFERENCES `task_phases` (`id`) ON DELETE SET NULL,
   CONSTRAINT `event_tasks_ibfk_parent` FOREIGN KEY (`parent_id`) REFERENCES `event_tasks` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `event_tasks_ibfk_deadline` FOREIGN KEY (`deadline_id`) REFERENCES `event_deadlines` (`id`) ON DELETE SET NULL,
   CONSTRAINT `event_tasks_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

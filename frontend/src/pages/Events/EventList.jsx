@@ -9,6 +9,7 @@ import {
     searchEvents, updateEvent
 } from "../../services/eventService";
 import { getAllUsers } from "../../services/userService";
+import { getVenues, getAllResources } from "../../services/venueService";
 import "../../styles/global.css";
 
 // ── Workflow config ───────────────────────────────────────────
@@ -41,6 +42,7 @@ const EMPTY_FORM = {
     venue_type: "offline", location: "", capacity: "",
     total_budget: "", status: "draft",
     organizer_id: "", manager_id: "", tracker_id: "", coordination_unit: "",
+    venue_id: "", resources: [],
 };
 
 export default function EventList() {
@@ -55,6 +57,8 @@ export default function EventList() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [users, setUsers] = useState([]);
+    const [venues, setVenues] = useState([]);
+    const [resourcesList, setResourcesList] = useState([]);
 
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -75,13 +79,19 @@ export default function EventList() {
     const canManage = user?.role === "admin" || user?.role === "organizer";
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchInitial = async () => {
             try {
-                const r = await getAllUsers();
-                setUsers(r.data || []);
-            } catch (err) { console.error("Fetch users error:", err); }
+                const [uR, vR, rR] = await Promise.all([
+                    getAllUsers(),
+                    getVenues(),
+                    getAllResources()
+                ]);
+                setUsers(uR.data || []);
+                setVenues(vR.data || []);
+                setResourcesList(rR.data || []);
+            } catch (err) { console.error("Fetch initial data error:", err); }
         };
-        fetchUsers();
+        fetchInitial();
     }, []);
 
     const load = useCallback(async (currentPage = page) => {
@@ -155,6 +165,8 @@ export default function EventList() {
             manager_id: ev.manager_id || "",
             tracker_id: ev.tracker_id || "",
             coordination_unit: ev.coordination_unit || "",
+            venue_id: ev.venue_id || "",
+            resources: ev.resources || [],
         });
         setEditingId(ev.id); setError(""); setModalOpen(true);
     };
@@ -364,14 +376,14 @@ export default function EventList() {
                 onClose={() => { setModalOpen(false); setError(""); }}
                 maxWidth="1200px"
             >
-                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
                     {error && <div className="alert alert-error">{error}</div>}
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", width: "100%" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", width: "100%" }}>
                         
                         {/* Cột trái: Thông tin cơ bản & Thời gian */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                            <div style={{ padding: 16, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
                                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
                                     <span style={{ fontSize: 20 }}>📝</span> THÔNG TIN CƠ BẢN
                                 </div>
@@ -398,14 +410,14 @@ export default function EventList() {
                                         </select>
                                     </div>
                                 </div>
-                                <div className="form-group" style={{ marginTop: 12 }}>
+                                <div className="form-group" style={{ margin: 0 }}>
                                     <label>Mô tả ngắn</label>
-                                    <textarea className="form-control" rows="3" placeholder="Nhập mô tả sự kiện..."
+                                    <textarea className="form-control" rows="1" placeholder="Nhập mô tả sự kiện..."
                                         value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                                 </div>
                             </div>
 
-                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                            <div style={{ padding: 16, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
                                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
                                     <span style={{ fontSize: 20 }}>⏰</span> THỜI GIAN & ĐỊA ĐIỂM
                                 </div>
@@ -423,22 +435,73 @@ export default function EventList() {
                                 </div>
                                 <div className="grid-2" style={{ marginTop: 12 }}>
                                     <div className="form-group">
-                                        <label>{form.venue_type === "online" ? "Link họp trực tuyến" : "Địa chỉ / Phòng"}</label>
-                                        <input className="form-control" placeholder={form.venue_type === "online" ? "https://meet.google.com/..." : "VD: Hội trường A1, Tòa nhà ..." }
-                                            value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+                                        <label>{form.venue_type === "online" ? "Link họp trực tuyến" : "Địa điểm / Phòng"}</label>
+                                        {form.venue_type === "offline" ? (
+                                            <select 
+                                                className="form-control"
+                                                value={form.venue_id}
+                                                onChange={e => {
+                                                    const v = venues.find(vn => vn.id === parseInt(e.target.value));
+                                                    setForm({ 
+                                                        ...form, 
+                                                        venue_id: e.target.value,
+                                                        location: v ? v.name : "",
+                                                        capacity: v ? v.capacity : form.capacity
+                                                    });
+                                                }}
+                                            >
+                                                <option value="">-- Chọn địa điểm --</option>
+                                                {venues.map(v => (
+                                                    <option key={v.id} value={v.id}>{v.name} (Sức chứa: {v.capacity})</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input className="form-control" placeholder="https://meet.google.com/..."
+                                                value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+                                        )}
                                     </div>
                                     <div className="form-group">
                                         <label>Sức chứa (người)</label>
                                         <input type="number" className="form-control" placeholder="200"
-                                            value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
+                                            value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} 
+                                            readOnly={form.venue_type === "offline" && form.venue_id}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* ── CHỌN TÀI NGUYÊN (RESOURCES) ── */}
+                                <div style={{ marginTop: 16 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 6, color: "#475569" }}>
+                                        📦 TÀI NGUYÊN & THIẾT BỊ 
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxHeight: 150, overflowY: "auto", padding: 10, background: "#f8fafc", borderRadius: 12 }}>
+                                        {resourcesList.map(res => {
+                                            const isChecked = form.resources.some(r => r.id === res.id);
+                                            return (
+                                                <label key={res.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer", padding: "4px 8px", borderRadius: 8, background: isChecked ? "#eff6ff" : "white", border: isChecked ? "1px solid #bfdbfe" : "1px solid #e2e8f0" }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={isChecked}
+                                                        onChange={e => {
+                                                            let newRes = [...form.resources];
+                                                            if (e.target.checked) newRes.push({ id: res.id, resource_id: res.id, quantity: 1 });
+                                                            else newRes = newRes.filter(r => r.id !== res.id);
+                                                            setForm({ ...form, resources: newRes });
+                                                        }}
+                                                    />
+                                                    <span>{res.name} <small style={{ color: "#94a3b8" }}>({res.category})</small></span>
+                                                </label>
+                                            );
+                                        })}
+                                        {resourcesList.length === 0 && <span style={{ fontSize: 11, color: "#94a3b8" }}>Chưa có tài nguyên nào trong kho.</span>}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Cột phải: Ngân sách & Phân công */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                            <div style={{ padding: 16, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
                                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
                                     <span style={{ fontSize: 20 }}>💰</span> NGÂN SÁCH DỰ KIẾN
                                 </div>
@@ -456,7 +519,7 @@ export default function EventList() {
                                 </div>
                             </div>
 
-                            <div style={{ padding: 24, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                            <div style={{ padding: 16, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
                                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
                                     <span style={{ fontSize: 20 }}>👥</span> PHÂN CÔNG & ĐIỀU PHỐI
                                 </div>
@@ -495,23 +558,12 @@ export default function EventList() {
                                 </div>
                             </div>
 
-                            {!editingId && (
-                                <div style={{
-                                    background: "rgba(99,102,241,0.05)", borderRadius: 16, padding: "20px",
-                                    fontSize: 12, color: "var(--text-secondary)", border: "1px dashed rgba(99,102,241,0.3)"
-                                }}>
-                                    <div style={{ fontWeight: 800, marginBottom: 6, color: "var(--color-primary)", display: "flex", alignItems: "center", gap: 6 }}>
-                                        <span>💡</span> Tự động hóa thông minh
-                                    </div>
-                                    Hệ thống sẽ tự động tạo <strong>4 deadline nội bộ</strong> mặc định 
-                                    (chốt concept, địa điểm, marketing, tổng duyệt) dựa trên ngày bắt đầu.
-                                </div>
-                            )}
+                            {/* Hint Removed to save space */}
                         </div>
                     </div>
 
                     <div style={{ 
-                        marginTop: 10, padding: "20px 0 0", borderTop: "1px solid #f1f5f9",
+                        padding: "12px 0 0", borderTop: "1px solid #f1f5f9",
                         display: "flex", justifyContent: "flex-end", gap: 12
                     }}>
                         <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ minWidth: 120, borderRadius: 12 }}>

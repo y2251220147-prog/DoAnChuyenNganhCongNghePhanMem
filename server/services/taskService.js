@@ -1,10 +1,34 @@
 const Task = require("../models/taskModel");
+const Deadline = require("../models/deadlineModel");
 const Notification = require("../models/notificationModel");
 
 const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done', 'cancelled'];
 const STATUS_LABEL = {
     todo: 'Chưa bắt đầu', in_progress: 'Đang làm',
     review: 'Chờ duyệt', done: 'Hoàn thành', cancelled: 'Đã hủy'
+};
+
+// ── Sync Logic ────────────────────────────────────────────────
+const syncDeadlineStatus = async (deadlineId) => {
+    if (!deadlineId) return;
+    try {
+        const tasks = await Task.getByDeadline(deadlineId);
+        if (tasks.length === 0) return;
+
+        const hasWorking = tasks.some(t => ['in_progress', 'review'].includes(t.status));
+        const allDone = tasks.every(t => t.status === 'done' || t.status === 'cancelled') && tasks.some(t => t.status === 'done');
+        const allTodo = tasks.every(t => t.status === 'todo' || t.status === 'cancelled');
+
+        if (hasWorking) {
+            await Deadline.updateStatus(deadlineId, 'working');
+        } else if (allDone) {
+            await Deadline.updateStatus(deadlineId, 'completed');
+        } else if (allTodo) {
+            await Deadline.updateStatus(deadlineId, 'pending');
+        }
+    } catch (err) {
+        console.error("Sync deadline error:", err);
+    }
 };
 
 // ── Phases ────────────────────────────────────────────────────
@@ -44,6 +68,7 @@ exports.create = async (data, creatorId) => {
             link: `/events/${data.event_id}?tab=tasks`
         });
     }
+    if (data.deadline_id) await syncDeadlineStatus(data.deadline_id);
     return { id };
 };
 
@@ -91,6 +116,13 @@ exports.update = async (id, data, userId) => {
     for (const ch of changes) {
         await Task.addHistory({ task_id: id, user_id: userId, ...ch });
     }
+    // SYNC DEADLINE
+    if (data.status || data.deadline_id) {
+        await syncDeadlineStatus(task.deadline_id);
+        if (data.deadline_id && data.deadline_id !== task.deadline_id) {
+            await syncDeadlineStatus(data.deadline_id);
+        }
+    }
 };
 
 exports.updateStatus = async (id, status, userId) => {
@@ -109,7 +141,7 @@ exports.updateStatus = async (id, status, userId) => {
         type: 'status_change'
     });
 
-    // Nếu done → thông báo creator
+    // 如果 done → thông báo creator
     if (status === 'done' && task.created_by && String(task.created_by) !== String(userId)) {
         await Notification.create({
             user_id: task.created_by,
@@ -118,6 +150,11 @@ exports.updateStatus = async (id, status, userId) => {
             message: `"${task.title}" đã được đánh dấu hoàn thành`,
             link: `/events/${task.event_id}?tab=tasks`
         });
+    }
+
+    // SYNC DEADLINE
+    if (task.deadline_id) {
+        await syncDeadlineStatus(task.deadline_id);
     }
 };
 
@@ -139,11 +176,32 @@ exports.updateFeedback = async (id, data, userId) => {
         task_id: id, user_id: userId, action: 'feedback',
         new_value: `Trạng thái: ${data.feedback_status}, Ghi chú: ${data.feedback_note}`
     });
+
+    // Thông báo cho người được giao
+    if (task.assigned_to && String(task.assigned_to) !== String(userId)) {
+        let title = 'Phản hồi mới từ quản lý';
+        if (data.feedback_status === 'approved') title = 'Nhiệm vụ đã được duyệt ✅';
+        if (data.feedback_status === 'rejected') title = 'Nhiệm vụ cần chỉnh sửa ⚠️';
+
+        await Notification.create({
+            user_id: task.assigned_to,
+            type: 'task_feedback',
+            title: title,
+            message: `Nhiệm vụ "${task.title}": ${data.feedback_note || 'Quản lý đã để lại nhận xét'}`,
+            link: `/events/${task.event_id}?tab=tasks`
+        });
+    }
 };
 
 exports.delete = async (id) => {
-    if (!(await Task.getById(id))) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
+    const task = await Task.getById(id);
+    if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
     await Task.delete(id);
+    
+    // SYNC DEADLINE
+    if (task.deadline_id) {
+        await syncDeadlineStatus(task.deadline_id);
+    }
 };
 
 // ── Comments ──────────────────────────────────────────────────

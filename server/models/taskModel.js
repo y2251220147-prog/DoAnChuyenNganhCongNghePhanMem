@@ -34,6 +34,7 @@ const Task = {
                    c.name  AS creator_name,
                    p.name  AS phase_name,
                    p.color AS phase_color,
+                   dl.title AS deadline_title,
                    (SELECT COUNT(*) FROM event_tasks sub WHERE sub.parent_id = t.id) AS subtask_count,
                    (SELECT COUNT(*) FROM event_tasks sub WHERE sub.parent_id = t.id AND sub.status='done') AS subtask_done,
                    (SELECT COUNT(*) FROM task_comments tc WHERE tc.task_id = t.id) AS comment_count
@@ -41,6 +42,7 @@ const Task = {
             LEFT JOIN users      u ON t.assigned_to = u.id
             LEFT JOIN users      c ON t.created_by  = c.id
             LEFT JOIN task_phases p ON t.phase_id   = p.id
+            LEFT JOIN event_deadlines dl ON t.deadline_id = dl.id
             WHERE t.event_id = ?
             ORDER BY COALESCE(t.phase_id,999), t.parent_id IS NOT NULL, t.position, t.priority DESC
         `, [eventId]);
@@ -49,11 +51,12 @@ const Task = {
 
     getById: async (id) => {
         const [r] = await db.query(`
-            SELECT t.*, u.name AS assigned_name, c.name AS creator_name, p.name AS phase_name
+            SELECT t.*, u.name AS assigned_name, c.name AS creator_name, p.name AS phase_name, dl.title AS deadline_title
             FROM event_tasks t
             LEFT JOIN users       u ON t.assigned_to = u.id
             LEFT JOIN users       c ON t.created_by  = c.id
             LEFT JOIN task_phases p ON t.phase_id    = p.id
+            LEFT JOIN event_deadlines dl ON t.deadline_id = dl.id
             WHERE t.id=?
         `, [id]);
         return r[0] || null;
@@ -62,12 +65,12 @@ const Task = {
     create: async (d) => {
         const [r] = await db.query(`
             INSERT INTO event_tasks
-              (event_id,phase_id,parent_id,title,description,assigned_to,supporters,
+              (event_id,phase_id,parent_id,deadline_id,title,description,assigned_to,supporters,
                status,priority,due_date,start_date,is_milestone,position,progress,
                estimated_h,estimated_budget,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         `, [
-            d.event_id, d.phase_id || null, d.parent_id || null,
+            d.event_id, d.phase_id || null, d.parent_id || null, d.deadline_id || null,
             d.title, d.description || null,
             d.assigned_to || null,
             d.supporters ? JSON.stringify(d.supporters) : null,
@@ -82,12 +85,12 @@ const Task = {
     update: async (id, d) => {
         await db.query(`
             UPDATE event_tasks SET
-              phase_id=?,parent_id=?,title=?,description=?,assigned_to=?,supporters=?,
+              phase_id=?,parent_id=?,deadline_id=?,title=?,description=?,assigned_to=?,supporters=?,
               status=?,priority=?,due_date=?,start_date=?,is_milestone=?,position=?,
               progress=?,estimated_h=?,actual_h=?,estimated_budget=?,feedback_status=?,feedback_note=?
             WHERE id=?
         `, [
-            d.phase_id || null, d.parent_id || null,
+            d.phase_id || null, d.parent_id || null, d.deadline_id || null,
             d.title, d.description || null,
             d.assigned_to || null,
             d.supporters ? JSON.stringify(d.supporters) : null,
@@ -118,6 +121,14 @@ const Task = {
 
     delete: async (id) => {
         await db.query("DELETE FROM event_tasks WHERE id=?", [id]);
+    },
+
+    getByDeadline: async (deadlineId) => {
+        const [r] = await db.query(
+            "SELECT id, status FROM event_tasks WHERE deadline_id=?",
+            [deadlineId]
+        );
+        return r;
     },
 
     // ── Comments ──────────────────────────────────────────────

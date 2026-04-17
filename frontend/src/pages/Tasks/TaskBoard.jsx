@@ -24,7 +24,7 @@ const STATUS_BADGE = Object.fromEntries(STATUSES.map(s => [s.key, s]));
 
 const PHASE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
 const EMPTY_TASK = {
-    title: "", description: "", phase_id: "", parent_id: "",
+    title: "", description: "", phase_id: "", parent_id: "", deadline_id: "",
     assigned_to: "", priority: "medium", status: "todo",
     start_date: "", due_date: "", is_milestone: false,
     estimated_h: "", progress: 0,
@@ -81,20 +81,32 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
 
             {/* Priority */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                <span style={{
-                    fontSize: 10, fontWeight: 700, color: p.color,
-                    background: p.bg, padding: "1px 7px", borderRadius: 999
-                }}>
-                    {p.label}
-                </span>
-                {task.phase_name && (
+                <div style={{ display: "flex", gap: 5 }}>
                     <span style={{
-                        fontSize: 9, color: task.phase_color || "var(--text-muted)",
-                        background: (task.phase_color || "#6366f1") + "18",
-                        padding: "1px 6px", borderRadius: 999, fontWeight: 600
+                        fontSize: 10, fontWeight: 700, color: p.color,
+                        background: p.bg, padding: "1px 7px", borderRadius: 999
                     }}>
-                        {task.phase_name}
+                        {p.label}
                     </span>
+                    {task.phase_name && (
+                        <span style={{
+                            fontSize: 9, color: task.phase_color || "var(--text-muted)",
+                            background: (task.phase_color || "#6366f1") + "18",
+                            padding: "1px 6px", borderRadius: 999, fontWeight: 600
+                        }}>
+                            {task.phase_name}
+                        </span>
+                    )}
+                </div>
+                {canManage && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'delete'); }}
+                        className="btn-delete-task"
+                        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, opacity: 0.5 }}
+                        title="Xóa nhiệm vụ"
+                    >
+                        🗑
+                    </button>
                 )}
             </div>
 
@@ -149,7 +161,10 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
 }
 
 // ─── Main Component ──────────────────────────────────────────
-export default function TaskBoard({ eventId, staffList = [], canManage }) {
+export default function TaskBoard({ 
+    eventId, staffList = [], canManage, deadlines = [], 
+    externalFilterDeadlineId, onClearExternalFilter 
+}) {
     const { user } = useContext(AuthContext);
 
     const [phases, setPhases] = useState([]);
@@ -212,6 +227,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
             setTasks(prev => prev.map(t => t.id === drag ? { ...t, status } : t));
             await updateTaskStatus(drag, status);
             await loadAll();
+            if (onRefreshParent) onRefreshParent();
         }
         setDrag(null);
     };
@@ -279,6 +295,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
             description: task.description || "",
             phase_id: task.phase_id || "",
             parent_id: task.parent_id || "",
+            deadline_id: task.deadline_id || "",
             assigned_to: task.assigned_to || "",
             priority: task.priority || "medium",
             status: task.status || "todo",
@@ -299,26 +316,39 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
         try {
             if (editId) await updateTask(editId, { ...form, event_id: eventId });
             else await createTask({ ...form, event_id: eventId });
-            setFormModal(false); setOpenTask(null); loadAll();
+            setFormModal(false); setOpenTask(null); 
+            await loadAll();
+            if (onRefreshParent) onRefreshParent();
         } catch (err) { setFormErr(err.response?.data?.message || "Lưu thất bại"); }
         finally { setSaving(false); }
     };
 
     const handleDeleteTask = async (id) => {
         if (!window.confirm("Xóa nhiệm vụ này?")) return;
-        try { await deleteTask(id); setOpenTask(null); loadAll(); }
+        try { 
+            await deleteTask(id); setOpenTask(null); 
+            await loadAll(); 
+            if (onRefreshParent) onRefreshParent();
+        }
         catch { alert("Xóa thất bại"); }
     };
 
     // ── Create phase ─────────────────────────────────────────
     const handleCreatePhase = async (e) => {
         e.preventDefault();
-        try { await createPhase({ ...phaseForm, event_id: eventId }); setPhaseModal(false); loadAll(); }
+        try { await createPhase({ ...phaseForm, event_id: eventId }); setPhaseForm({ name: "", color: "#6366f1" }); loadAll(); }
         catch {/**/ }
+    };
+
+    const handleDeletePhase = async (id) => {
+        if (!window.confirm("Xóa giai đoạn này có thể ảnh hưởng đến các nhiệm vụ đang gán. Tiếp tục?")) return;
+        try { await deletePhase(id); loadAll(); }
+        catch { alert("Không thể xóa giai đoạn đang có nhiệm vụ"); }
     };
 
     // ── Filter ───────────────────────────────────────────────
     const applyFilters = (t) => {
+        if (externalFilterDeadlineId && t.deadline_id !== externalFilterDeadlineId) return false;
         if (filterStatus !== "all" && t.status !== filterStatus) return false;
         if (filterPriority !== "all" && t.priority !== filterPriority) return false;
         if (filterAssignee !== "all" && String(t.assigned_to) !== String(filterAssignee)) return false;
@@ -363,6 +393,30 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tiến độ trung bình</span>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── Active Filter Chip ── */}
+            {externalFilterDeadlineId && (
+                <div style={{ 
+                    display: "flex", alignItems: "center", gap: 12, marginBottom: 16, 
+                    padding: "10px 16px", background: "var(--color-primary)", color: "white", 
+                    borderRadius: 12, boxShadow: "0 4px 12px rgba(99,102,241,0.3)" 
+                }}>
+                    <span style={{ fontSize: 18 }}>🔍</span>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>
+                        Đang lọc công việc cho: {deadlines.find(d => d.id === externalFilterDeadlineId)?.title || "Deadline"}
+                    </span>
+                    <button 
+                        onClick={onClearExternalFilter}
+                        style={{ 
+                            marginLeft: "auto", background: "rgba(255,255,255,0.2)", border: "none", 
+                            color: "white", width: 24, height: 24, borderRadius: 12, 
+                            display: "flex", alignItems: "center", justifyContent: "center", 
+                            cursor: "pointer", fontWeight: 900, fontSize: 10
+                        }}>
+                        ✕
+                    </button>
                 </div>
             )}
 
@@ -468,7 +522,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                                     {colTasks.map(task => (
                                         <TaskCard key={task.id} task={task} canManage={canManage}
-                                            onOpen={openTaskDetail} onStatusChange={() => { }}
+                                            onOpen={openTaskDetail} onStatusChange={(id) => handleDeleteTask(id)}
                                             onDragStart={onDragStart} />
                                     ))}
                                     {colTasks.length === 0 && (
@@ -540,7 +594,8 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                                     try {
                                         await updateTaskStatus(openTask.id, s.key);
                                         setOpenTask(p => ({ ...p, status: s.key }));
-                                        loadAll();
+                                        await loadAll();
+                                        if (onRefreshParent) onRefreshParent();
                                     } catch {/**/ }
                                 }}
                                 style={{
@@ -554,10 +609,16 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             </button>
                         ))}
                         {canManage && (
-                            <button className="btn btn-outline btn-sm" style={{ marginLeft: "auto" }}
-                                onClick={() => { setOpenTask(null); openEditForm(openTask); }}>
-                                ✎ Sửa
-                            </button>
+                            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                                <button className="btn btn-danger btn-sm"
+                                    onClick={() => handleDeleteTask(openTask.id)}>
+                                    🗑 Xóa
+                                </button>
+                                <button className="btn btn-outline btn-sm"
+                                    onClick={() => { setOpenTask(null); openEditForm(openTask); }}>
+                                    ✎ Sửa
+                                </button>
+                            </div>
                         )}
                     </div>
 
@@ -589,6 +650,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                     {/* Info grid */}
                     <div className="grid-2" style={{ marginBottom: 16, gap: 10 }}>
                         {[
+                            { label: "Thuộc Deadline", value: openTask.deadline_title || "—", style: openTask.deadline_title ? { color: "var(--color-primary)", fontWeight: 800 } : {} },
                             { label: "Người phụ trách", value: openTask.assigned_name || "Chưa giao" },
                             { label: "Ưu tiên", value: PRIORITY_CFG[openTask.priority]?.label || "—" },
                             { label: "Bắt đầu", value: fmtDT(openTask.start_date) || "—" },
@@ -778,7 +840,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
 
             {/* ════ MODAL: Create/Edit Task ════ */}
             <Modal title={editId ? "Chỉnh sửa nhiệm vụ" : "Thêm nhiệm vụ mới"}
-                isOpen={formModal} onClose={() => setFormModal(false)} maxWidth="560px">
+                isOpen={formModal} onClose={() => setFormModal(false)} maxWidth="920px">
                 <form onSubmit={handleSaveTask}>
                     {formErr && <div className="alert alert-error">{formErr}</div>}
                     <div className="form-group">
@@ -786,7 +848,8 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                         <input className="form-control" value={form.title}
                             onChange={e => setForm({ ...form, title: e.target.value })} required />
                     </div>
-                    <div className="grid-2">
+
+                    <div className="grid-3" style={{ marginBottom: 16 }}>
                         <div className="form-group">
                             <label>Giai đoạn</label>
                             <select className="form-control" value={form.phase_id}
@@ -800,12 +863,22 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             <select className="form-control" value={form.parent_id}
                                 onChange={e => setForm({ ...form, parent_id: e.target.value })}>
                                 <option value="">Không có</option>
-                                {tasks.filter(t => !t.parent_id && t.id !== editId)
-                                    .map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+                                {tasks.filter(t => t.id !== editId && !t.parent_id).map(t => (
+                                    <option key={t.id} value={t.id}>{t.title}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Liên kết với Deadline</label>
+                            <select className="form-control" value={form.deadline_id}
+                                onChange={e => setForm({ ...form, deadline_id: e.target.value })}>
+                                <option value="">Không liên kết</option>
+                                {deadlines.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
                             </select>
                         </div>
                     </div>
-                    <div className="grid-2">
+
+                    <div className="grid-2" style={{ marginBottom: 16 }}>
                         <div className="form-group">
                             <label>Người phụ trách</label>
                             <select className="form-control" value={form.assigned_to}
@@ -824,7 +897,8 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             </select>
                         </div>
                     </div>
-                    <div className="grid-2">
+
+                    <div className="grid-3" style={{ marginBottom: 16 }}>
                         <div className="form-group">
                             <label>Ngày bắt đầu</label>
                             <input type="datetime-local" className="form-control" value={form.start_date}
@@ -835,37 +909,70 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             <input type="datetime-local" className="form-control" value={form.due_date}
                                 onChange={e => setForm({ ...form, due_date: e.target.value })} />
                         </div>
-                    </div>
-                    <div className="grid-2">
                         <div className="form-group">
                             <label>Ước tính (giờ)</label>
                             <input type="number" step="0.5" min="0" className="form-control" value={form.estimated_h}
                                 onChange={e => setForm({ ...form, estimated_h: e.target.value })} placeholder="8" />
                         </div>
+                    </div>
+
+                    <div className="grid-2" style={{ marginBottom: 16 }}>
                         <div className="form-group">
                             <label>Dự trù ngân sách (VND)</label>
                             <input type="number" min="0" className="form-control" value={form.estimated_budget}
                                 onChange={e => setForm({ ...form, estimated_budget: e.target.value })} placeholder="500000" />
                         </div>
+                        <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 30 }}>
+                            <input type="checkbox" id="milestone" checked={form.is_milestone}
+                                onChange={e => setForm({ ...form, is_milestone: e.target.checked })} />
+                            <label htmlFor="milestone" style={{ cursor: "pointer", fontWeight: 700, margin: 0 }}>🏁 Milestone (Mốc quan trọng)</label>
+                        </div>
                     </div>
-                    <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                        <input type="checkbox" id="milestone" checked={form.is_milestone}
-                            onChange={e => setForm({ ...form, is_milestone: e.target.checked })} />
-                        <label htmlFor="milestone" style={{ cursor: "pointer", fontWeight: 600 }}>🏁 Milestone (Mốc quan trọng)</label>
-                    </div>
+
                     <div className="form-group">
-                        <label>Mô tả</label>
-                        <textarea className="form-control" rows={2} value={form.description}
-                            onChange={e => setForm({ ...form, description: e.target.value })} />
+                        <label>Mô tả chi tiết</label>
+                        <textarea className="form-control" rows={3} value={form.description}
+                            onChange={e => setForm({ ...form, description: e.target.value })} 
+                            style={{ resize: "vertical" }} />
                     </div>
-                    <button type="submit" className="btn btn-primary w-full" disabled={saving}>
-                        {saving ? "Đang lưu..." : (editId ? "Lưu thay đổi" : "Tạo nhiệm vụ")}
-                    </button>
+                    
+                    <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+                        <button type="button" className="btn btn-ghost" onClick={() => setFormModal(false)} style={{ flex: 1 }}>Hủy</button>
+                        <button type="submit" className="btn btn-primary" disabled={saving} style={{ flex: 2 }}>
+                            {saving ? "Đang lưu..." : (editId ? "Lưu thay đổi" : "Tạo nhiệm vụ")}
+                        </button>
+                    </div>
                 </form>
             </Modal>
 
             {/* ════ MODAL: Phase ════ */}
-            <Modal title="Thêm giai đoạn" isOpen={phaseModal} onClose={() => setPhaseModal(false)}>
+            <Modal title="Quản lý Giai đoạn" isOpen={phaseModal} onClose={() => setPhaseModal(false)}>
+                <div style={{ marginBottom: 24 }}>
+                    <h4 style={{ fontSize: 13, marginBottom: 12, color: "var(--text-muted)" }}>Danh sách giai đoạn hiện có:</h4>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {phases.map(p => (
+                            <div key={p.id} style={{ 
+                                display: "flex", alignItems: "center", justifyContent: "space-between",
+                                padding: "8px 12px", background: "var(--bg-secondary)", borderRadius: 10,
+                                border: "1px solid var(--border-color)"
+                            }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <div style={{ width: 12, height: 12, borderRadius: 3, background: p.color }} />
+                                    <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>
+                                </div>
+                                <button className="btn-delete-small" style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.6 }}
+                                    onClick={() => handleDeletePhase(p.id)} title="Xóa giai đoạn">
+                                    🗑
+                                </button>
+                            </div>
+                        ))}
+                        {phases.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>Chưa có giai đoạn nào</p>}
+                    </div>
+                </div>
+
+                <hr style={{ border: "none", borderTop: "1px solid var(--border-color)", margin: "20px 0" }} />
+
+                <h4 style={{ fontSize: 13, marginBottom: 12, color: "var(--text-muted)" }}>Thêm giai đoạn mới:</h4>
                 <form onSubmit={handleCreatePhase}>
                     <div className="form-group">
                         <label>Tên giai đoạn *</label>
@@ -874,7 +981,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                     </div>
                     <div className="form-group">
                         <label>Màu</label>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                             {PHASE_COLORS.map(c => (
                                 <div key={c} onClick={() => setPhaseForm({ ...phaseForm, color: c })}
                                     style={{
@@ -884,7 +991,7 @@ export default function TaskBoard({ eventId, staffList = [], canManage }) {
                             ))}
                         </div>
                     </div>
-                    <button type="submit" className="btn btn-primary w-full">Tạo giai đoạn</button>
+                    <button type="submit" className="btn btn-primary w-full">+ Thêm giai đoạn</button>
                 </form>
             </Modal>
         </div>

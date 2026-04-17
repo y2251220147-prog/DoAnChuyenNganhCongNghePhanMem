@@ -77,14 +77,13 @@ exports.createDeadline = async (req, res) => {
 
 exports.updateDeadlineStatus = async (req, res) => {
     try {
-        const { status, note } = req.body;
         await eventService.updateDeadlineStatus(
             req.params.deadlineId, 
-            status, 
-            note, 
+            req.body.status, 
+            req.body.note,
             req.user.role
         );
-        res.json({ message: "Cập nhật trạng thái deadline thành công" });
+        res.json({ message: "Cập nhật deadline thành công" });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 

@@ -2,6 +2,8 @@ const Event = require("../models/eventModel");
 const Deadline = require("../models/deadlineModel");
 const User = require("../models/userModel");
 const Notification = require("../models/notificationModel");
+const Venue = require("../models/venueModel");
+const Resource = require("../models/resourceModel");
 
 // Workflow hợp lệ: chỉ cho phép chuyển trạng thái theo chiều này
 const WORKFLOW = {
@@ -47,8 +49,45 @@ const createEvent = async (data, userId) => {
         throw { status: 400, message: "Ngày kết thúc phải sau ngày bắt đầu" };
 
     // Người tạo = owner nếu không truyền owner_id
-    const payload = { ...data, owner_id: data.owner_id || userId, status: "draft" };
+    const payload = { 
+        ...data, 
+        owner_id: data.owner_id || userId, 
+        status: "draft",
+        venue_id: data.venue_id ? Number(data.venue_id) : null
+    };
     const id = await Event.create(payload);
+
+    // Tự động đặt địa điểm nếu chọn từ danh mục
+    if (payload.venue_id && payload.venue_type === 'offline') {
+        try {
+            await Venue.createBooking({
+                event_id: id,
+                venue_id: payload.venue_id,
+                start_time: start_date,
+                end_time: end_date,
+                note: `Đặt chỗ tự động từ sự kiện: ${name}`,
+                status: 'confirmed'
+            });
+        } catch (e) {
+            console.error("Lỗi tự động đặt địa điểm:", e);
+        }
+    }
+
+    // Tự động đặt tài nguyên (nếu có danh sách resources truyền lên)
+    if (data.resources && Array.isArray(data.resources)) {
+        for (const res of data.resources) {
+            try {
+                await Resource.createBooking({
+                    event_id: id,
+                    resource_id: res.resource_id || res.id,
+                    quantity: res.quantity || 1,
+                    status: 'confirmed'
+                });
+            } catch (e) {
+                console.error("Lỗi tự động đặt tài nguyên:", e);
+            }
+        }
+    }
 
     // Tự động tạo deadlines mặc định dựa vào start_date
     const assigneeId = data.organizer_id || userId;
@@ -112,8 +151,49 @@ const updateEvent = async (id, data) => {
         manager_id: data.manager_id ?? event.manager_id,
         tracker_id: data.tracker_id ?? event.tracker_id,
         coordination_unit: data.coordination_unit ?? event.coordination_unit,
+        venue_id: data.venue_id ? Number(data.venue_id) : event.venue_id,
         status: event.status, // status chỉ thay đổi qua changeStatus
     });
+
+    // Nếu thay đổi địa điểm hoặc thời gian, ta cần cập nhật booking (đơn giản nhất là xóa cũ tạo mới hoặc update)
+    // Ở đây ta xử lý đơn giản: nếu chọn địa điểm mới hoặc đổi time thì đồng bộ booking chính
+    const newVenueId = data.venue_id ?? event.venue_id;
+    const newStart = data.start_date ?? event.start_date;
+    const newEnd = data.end_date ?? event.end_date;
+
+    if (newVenueId && (data.venue_id || data.start_date || data.end_date)) {
+        try {
+            const db = require("../config/database");
+            // Xóa booking cũ của venue này cho event này và tạo cái mới
+            await db.query("DELETE FROM event_venue_bookings WHERE event_id = ?", [id]);
+            await Venue.createBooking({
+                event_id: id,
+                venue_id: newVenueId,
+                start_time: newStart,
+                end_time: newEnd,
+                status: 'confirmed'
+            });
+        } catch (e) { console.error("Lỗi cập nhật booking địa điểm:", e); }
+    }
+
+    // Thông báo cho những người đã đăng ký (có user_id nội bộ) biết sự kiện đã có sự thay đổi (US-016)
+    if (['approved', 'planning', 'running'].includes(event.status)) {
+        try {
+            const db = require("../config/database");
+            const [attRows] = await db.query("SELECT user_id FROM attendees WHERE event_id = ? AND user_id IS NOT NULL", [id]);
+            for (const r of attRows) {
+                await Notification.create({
+                    user_id: r.user_id,
+                    type: 'status_change',
+                    title: `Thay đổi thông tin: ${event.name}`,
+                    message: `Ban tổ chức vừa cập nhật thông tin sự kiện "${event.name}". Bạn hãy kiểm tra lại thời gian/địa điểm nhé.`,
+                    link: `/events/${id}`
+                });
+            }
+        } catch (err) {
+            console.error("Lỗi gửi thông báo đổi sự kiện:", err);
+        }
+    }
 };
 
 // Chuyển trạng thái theo workflow — chỉ admin mới approve

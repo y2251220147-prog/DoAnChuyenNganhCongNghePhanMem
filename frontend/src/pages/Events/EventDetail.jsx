@@ -1,14 +1,11 @@
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../../components/Layout/Layout";
 import Modal from "../../components/UI/Modal";
 import { AuthContext } from "../../context/AuthContext";
 import api from "../../services/api";
-import { getTasksByEvent, createTask, updateTaskStatus, deleteTask } from "../../services/taskService";
-import {
-    changeStatus,
-    createDeadline, deleteDeadline, getDeadlines, toggleDeadline
-} from "../../services/eventService";
+import { getTasksByEvent } from "../../services/taskService";
+import { changeStatus, createDeadline, deleteDeadline } from "../../services/eventService";
 import { getAllUsers } from "../../services/userService";
 import "../../styles/global.css";
 import TaskBoard from "../Tasks/TaskBoard";
@@ -28,6 +25,14 @@ const DL_STATUS_CFG = {
     completed: { label: "Hoàn thành", bg: "#ede9fe", color: "#7c3aed" },
     done: { label: "Đã xong", bg: "#d1fae5", color: "#059669" },
     problem: { label: "Vấn đề", bg: "#fee2e2", color: "#dc2626" },
+};
+
+const TASK_STATUS_CFG = {
+    todo: { label: "Chưa bắt đầu", color: "#94a3b8" },
+    in_progress: { label: "Đang làm", color: "#f59e0b" },
+    review: { label: "Chờ duyệt", color: "#6366f1" },
+    done: { label: "Hoàn thành", color: "#10b981" },
+    cancelled: { label: "Đã hủy", color: "#ef4444" },
 };
 
 const WORKFLOW_NEXT = {
@@ -67,8 +72,8 @@ export default function EventDetail() {
     const [users, setUsers] = useState([]);
     const [error, setError] = useState("");
     const [tab, setTab] = useState("overview");
-
-    // Modal thêm deadline
+    const [taskFilterDeadlineId, setTaskFilterDeadlineId] = useState(null);
+    const [expandedDlId, setExpandedDlId] = useState(null);
     const [dlModal, setDlModal] = useState(false);
     const [dlForm, setDlForm] = useState({ title: "", due_date: "", note: "", assigned_to: "" });
     const [dlSaving, setDlSaving] = useState(false);
@@ -91,24 +96,25 @@ export default function EventDetail() {
     const canManage = isAdmin || isOrganizer;
     const nextStatuses = event ? (WORKFLOW_NEXT[event.status] || []) : [];
 
-    useEffect(() => { loadAll(); loadTasks(); fetchUsers(); }, [id]);
-
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             const r = await getAllUsers();
             setUsers(r.data || []);
-        } catch (err) { 
+        } catch (err) {
+            console.error("fetchUsers error:", err);
         }
-    };
+    }, []);
 
-    const loadTasks = async () => {
+    const loadTasks = useCallback(async () => {
         try {
             const r = await getTasksByEvent(id);
             setTasks(r.data || []);
-        } catch {/**/ }
-    };
+        } catch (err) {
+            console.error("loadTasks error:", err);
+        }
+    }, [id]);
 
-    const loadAll = async () => {
+    const loadAll = useCallback(async () => {
         setLoading(true); setError("");
         try {
             const [evR, guR, stR, tlR, buR, dlR, atR] = await Promise.allSettled([
@@ -130,12 +136,16 @@ export default function EventDetail() {
                 : { items: [], total: 0 });
             setDeadlines(dlR.status === "fulfilled" ? (dlR.value.data || []) : []);
             setAttendees(atR.status === "fulfilled" ? (atR.value.data || []) : []);
-        } catch { setError("Lỗi khi tải dữ liệu."); }
+        } catch (err) {
+            console.error("loadAll error:", err);
+            setError("Lỗi khi tải dữ liệu.");
+        }
         finally { setLoading(false); }
-    };
+    }, [id]);
+
+    useEffect(() => { loadAll(); loadTasks(); fetchUsers(); }, [loadAll, loadTasks, fetchUsers]);
 
     const fmtVND = n => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
-    const fmtDate = d => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
     const fmtDT = d => d ? new Date(d).toLocaleString("vi-VN") : "—";
 
     const doneCount = deadlines.filter(d => d.status === 'done').length;
@@ -372,6 +382,7 @@ export default function EventDetail() {
                             { label: "Kết thúc", value: fmtDT(event.end_date) },
                             { label: "Hình thức", value: event.venue_type === "online" ? "🌐 Online" : "🏢 Offline" },
                             { label: "Địa điểm", value: event.location || "—" },
+                            { label: "Địa chỉ cụ thể", value: (event.venue_type === 'offline' && event.venue_id) ? (event.detailed_location || event.venue_address || "Đang cập nhật địa chỉ...") : "—" },
                             { label: "Đơn vị điều phối", value: event.coordination_unit || "—" },
                             { label: "Sức chứa", value: event.capacity ? `${event.capacity} người` : "—" },
                             { label: "Ngân sách dự kiến", value: <strong style={{color:"var(--color-primary)"}}>{fmtVND(event.total_budget || 0)}</strong> },
@@ -494,8 +505,21 @@ export default function EventDetail() {
                                     const st = DL_STATUS_CFG[dl.status] || DL_STATUS_CFG.pending;
 
                                     return (
+                                    <>
                                         <tr key={dl.id}>
-                                            <td style={{ fontWeight: 600 }}>{dl.title}</td>
+                                            <td style={{ fontWeight: 800 }}>
+                                                <button 
+                                                    onClick={() => setExpandedDlId(expandedDlId === dl.id ? null : dl.id)}
+                                                    style={{ 
+                                                        background: "none", border: "none", padding: 0, 
+                                                        color: "var(--color-primary)", fontWeight: 800, 
+                                                        cursor: "pointer", textDecoration: "none",
+                                                        textAlign: "left", display: "flex", alignItems: "center", gap: 6
+                                                    }}>
+                                                    <span>{expandedDlId === dl.id ? "▼" : "▶"}</span>
+                                                    {dl.title}
+                                                </button>
+                                            </td>
                                             <td style={{ color: isOverdue ? "#dc2626" : "var(--text-primary)", fontWeight: isOverdue ? 700 : 400 }}>
                                                 {fmtDT(dl.due_date)} {isOverdue && "⚠️"}
                                             </td>
@@ -558,13 +582,60 @@ export default function EventDetail() {
                                                 </td>
                                             )}
                                         </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            )}
+                                        {expandedDlId === dl.id && (
+                                            <tr key={`expanded-${dl.id}`} style={{ background: "#f8fafc" }}>
+                                                <td colSpan={canManage ? 6 : 5} style={{ padding: "0 40px 16px" }}>
+                                                    <div style={{
+                                                        border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden",
+                                                        background: "white", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
+                                                    }}>
+                                                        <div style={{ padding: "10px 16px", background: "#f1f5f9", fontSize: 13, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
+                                                            <span>📋 Công việc liên quan ({tasks.filter(t => t.deadline_id === dl.id).length})</span>
+                                                            <button className="btn btn-sm" onClick={() => setTab("tasks")} style={{ fontSize: 11, height: 24, padding: "0 10px" }}>👉 Xem trên bảng</button>
+                                                        </div>
+                                                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                                            <thead>
+                                                                <tr style={{ background: "white", borderBottom: "1px solid #f1f5f9" }}>
+                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Nội dung</th>
+                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Phân công</th>
+                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Trạng thái</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {tasks.filter(t => t.deadline_id === dl.id).map(t => (
+                                                                    <tr key={t.id} style={{ borderBottom: "1px dashed #f1f5f9" }}>
+                                                                        <td style={{ padding: "8px 16px", fontWeight: 600 }}>{t.title}</td>
+                                                                        <td style={{ padding: "8px 16px" }}>👤 {t.assigned_name || "—"}</td>
+                                                                        <td style={{ padding: "8px 16px" }}>
+                                                                            {(() => {
+                                                                                const s = TASK_STATUS_CFG[t.status] || { label: t.status, color: "#64748b" };
+                                                                                return (
+                                                                                    <span style={{ 
+                                                                                        fontSize: 11, padding: "2px 10px", borderRadius: 999,
+                                                                                        background: s.color + "20", color: s.color, fontWeight: 700
+                                                                                    }}>{s.label}</span>
+                                                                                );
+                                                                            })()}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                                {tasks.filter(t => t.deadline_id === dl.id).length === 0 && (
+                                                                    <tr><td colSpan={3} style={{ textAlign: "center", padding: 12, color: "var(--text-muted)" }}>Chưa có nhiệm vụ nào được liên kết</td></tr>
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        )}
 
             {/* ════ TAB: PARTICIPANTS (GUESTS & ATTENDEES) ════ */}
             {tab === "participants" && (
@@ -752,7 +823,15 @@ export default function EventDetail() {
 
             {/* ════ TAB: TASKS (Kanban) ════ */}
             {tab === "tasks" && (
-                <TaskBoard eventId={id} staffList={staff} canManage={canManage} />
+                <TaskBoard 
+                    eventId={id} 
+                    staffList={staff} 
+                    canManage={canManage} 
+                    deadlines={deadlines} 
+                    externalFilterDeadlineId={taskFilterDeadlineId}
+                    onClearExternalFilter={() => setTaskFilterDeadlineId(null)}
+                    onRefreshParent={loadAll}
+                />
             )}
             {/* ── Modal thêm deadline ── */}
             <Modal title="Thêm Deadline" isOpen={dlModal} onClose={() => setDlModal(false)}>
@@ -787,26 +866,28 @@ export default function EventDetail() {
             </Modal>
 
             {/* ── Modal Bulk Invite ── */}
-            <Modal title="💌 Mời khách hàng loạt" isOpen={bulkModal} onClose={() => setBulkModal(false)}>
+            <Modal title="💌 Mời khách hàng loạt" isOpen={bulkModal} onClose={() => setBulkModal(false)} maxWidth="800px">
                 <form onSubmit={handleBulkInvite}>
-                    <div className="form-group">
-                        <label>Danh sách khách mời <span style={{ color: "red" }}>*</span></label>
-                        <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
-                            Nhập mỗi dòng: <strong>Tên, Email</strong> (ngăn cách bởi dấu phẩy)
-                        </p>
-                        <textarea className="form-control" rows="6"
-                            placeholder="Nguyễn Văn A, anguyen@gmail.com&#10;Trần Thị B, btran@gmail.com"
-                            value={bulkForm.guests}
-                            onChange={e => setBulkForm({ ...bulkForm, guests: e.target.value })}
-                            required />
-                    </div>
-                    
-                    <div className="form-group">
-                        <label>Lời nhắn trong thư mời</label>
-                        <textarea className="form-control" rows="3"
-                            placeholder="VD: Trân trọng kính mời bạn đến tham dự buổi lễ ra mắt sản phẩm mới của chúng tôi..."
-                            value={bulkForm.content}
-                            onChange={e => setBulkForm({ ...bulkForm, content: e.target.value })} />
+                    <div className="grid-2" style={{ gap: 24 }}>
+                        <div className="form-group">
+                            <label>Danh sách khách mời <span style={{ color: "red" }}>*</span></label>
+                            <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+                                Nhập mỗi dòng: <strong>Tên, Email</strong> (ngăn cách bởi dấu phẩy)
+                            </p>
+                            <textarea className="form-control" rows="6"
+                                placeholder="Nguyễn Văn A, anguyen@gmail.com&#10;Trần Thị B, btran@gmail.com"
+                                value={bulkForm.guests}
+                                onChange={e => setBulkForm({ ...bulkForm, guests: e.target.value })}
+                                required />
+                        </div>
+                        
+                        <div className="form-group">
+                            <label>Lời nhắn trong thư mời</label>
+                            <textarea className="form-control" style={{ height: "calc(100% - 28px)" }}
+                                placeholder="VD: Trân trọng kính mời bạn đến tham dự buổi lễ ra mắt sản phẩm mới của chúng tôi..."
+                                value={bulkForm.content}
+                                onChange={e => setBulkForm({ ...bulkForm, content: e.target.value })} />
+                        </div>
                     </div>
 
                     <div style={{ background: "rgba(99,102,241,0.07)", padding: 12, borderRadius: 8, fontSize: 12, marginBottom: 16 }}>

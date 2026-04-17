@@ -1,8 +1,16 @@
-import { useEffect, useState } from "react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import Layout from "../../components/Layout/Layout";
 import {
-    getOverview, getEventsByMonth, getAttendeeReport,
-    getBudgetReport, getTaskStats, getEventsByType
+    getAttendeeReport,
+    getBudgetReport,
+    getEventsByMonth,
+    getEventsByType,
+    getFeedbackStats,
+    getOverview,
+    getTaskStats
 } from "../../services/reportService";
 import "../../styles/global.css";
 
@@ -51,106 +59,178 @@ function ProgressRow({ label, value, max, color, suffix = "" }) {
 }
 
 export default function Reports() {
+    const reportRef = useRef(null);
     const [overview, setOverview] = useState(null);
     const [byMonth, setByMonth] = useState([]);
     const [attendees, setAttendees] = useState([]);
     const [budgets, setBudgets] = useState([]);
     const [taskStats, setTaskStats] = useState([]);
     const [byType, setByType] = useState([]);
+    const [feedback, setFeedback] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const year = new Date().getFullYear();
 
-    useEffect(() => {
-        const loadAll = async () => {
-            setLoading(true);
-            try {
-                const [ovR, mnR, atR, buR, tkR, tyR] = await Promise.allSettled([
-                    getOverview(), getEventsByMonth(year), getAttendeeReport(),
-                    getBudgetReport(), getTaskStats(), getEventsByType()
-                ]);
-                if (ovR.status === "fulfilled") setOverview(ovR.value.data);
-                if (mnR.status === "fulfilled") {
-                    // Fill 12 tháng
-                    const map = {};
-                    (mnR.value.data || []).forEach(r => { map[r.month] = r.count; });
-                    setByMonth(Array.from({ length: 12 }, (_, i) => ({ label: MONTHS[i], value: map[i + 1] || 0 })));
-                }
-                if (atR.status === "fulfilled") setAttendees(atR.value.data || []);
-                if (buR.status === "fulfilled") setBudgets(buR.value.data || []);
-                if (tkR.status === "fulfilled") setTaskStats(tkR.value.data || []);
-                if (tyR.status === "fulfilled") setByType(tyR.value.data || []);
-            } catch {/**/ }
-            finally { setLoading(false); }
-        };
-        loadAll();
-    }, []);
+    useEffect(() => { loadAll(); }, []);
+
+    const loadAll = async () => {
+        setLoading(true);
+        try {
+            const [ovR, mnR, atR, buR, tkR, tyR, fbR] = await Promise.allSettled([
+                getOverview(), getEventsByMonth(year), getAttendeeReport(),
+                getBudgetReport(), getTaskStats(), getEventsByType(),
+                getFeedbackStats()
+            ]);
+            if (ovR.status === "fulfilled") setOverview(ovR.value.data);
+            if (mnR.status === "fulfilled") {
+                const map = {};
+                (mnR.value.data || []).forEach(r => { map[r.month] = r.count; });
+                setByMonth(Array.from({ length: 12 }, (_, i) => ({ label: MONTHS[i], value: map[i + 1] || 0 })));
+            }
+            if (atR.status === "fulfilled") setAttendees(atR.value.data || []);
+            if (buR.status === "fulfilled") setBudgets(buR.value.data || []);
+            if (tkR.status === "fulfilled") setTaskStats(tkR.value.data || []);
+            if (tyR.status === "fulfilled") setByType(tyR.value.data || []);
+            if (fbR.status === "fulfilled") setFeedback(fbR.value.data || []);
+        } catch {/**/ }
+        finally { setLoading(false); }
+    };
 
     const taskMap = {};
     taskStats.forEach(t => { taskMap[t.status] = Number(t.count); });
     const totalTasks = Object.values(taskMap).reduce((a, b) => a + b, 0);
 
-    const STATUS_CFG_EV = {
-        draft: "#94a3b8", planning: "#f59e0b", approved: "#7c3aed",
-        running: "#10b981", completed: "#2563eb", cancelled: "#dc2626"
+    // ── XUẤT EXCEL ──
+    const exportExcel = (data, filename) => {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Báo cáo");
+        XLSX.writeFile(wb, `${filename}_${new Date().toLocaleDateString("vi-VN")}.xlsx`);
+    };
+
+    const handleExportAll = () => {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Ngân sách & Sự kiện
+        const budgetData = budgets.map(b => ({
+            "Sự kiện": b.name,
+            "Ngân sách Dự kiến (VND)": b.planned,
+            "Chi phí Thực tế (VND)": b.actual,
+            "Tỉ lệ (%)": `${b.planned > 0 ? Math.round((b.actual / b.planned) * 100) : 0}%`
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetData), "Ngân sách");
+
+        // Sheet 2: Khách mời
+        const guestData = attendees.map(a => ({
+            "Sự kiện": a.name,
+            "Sức chứa": a.capacity,
+            "Đã đăng ký": a.registered,
+            "Đã có mặt": a.checked_in,
+            "Tỉ lệ đi họp (%)": `${a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0}%`
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guestData), "Khách mời");
+
+        // Sheet 3: Công việc
+        const taskData = [
+            { "Trạng thái": "Cần làm", "Số lượng": taskMap.todo || 0 },
+            { "Trạng thái": "Đang làm", "Số lượng": taskMap.in_progress || 0 },
+            { "Trạng thái": "Đã xong", "Số lượng": taskMap.done || 0 },
+            { "Trạng thái": "Đã hủy", "Số lượng": taskMap.cancelled || 0 },
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), "Công việc");
+
+        // Sheet 4: Phản hồi
+        const fbData = feedback.map(f => ({
+            "Sự kiện": f.name,
+            "Tổng số phản hồi": f.total_feedback,
+            "Đánh giá trung bình": (Number(f.avg_rating) || 0).toFixed(1) + " / 5.0"
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fbData), "Phản hồi");
+
+        XLSX.writeFile(wb, `Bao-cao-tong-hop-${year}.xlsx`);
+    };
+
+    // ── XUẤT PDF ──
+    const handleExportPDF = async () => {
+        if (!reportRef.current) return;
+        setExporting(true);
+        try {
+            const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL("image/png");
+            const pdf = new jsPDF("p", "mm", "a4");
+            const pdfW = pdf.internal.pageSize.getWidth();
+            const pdfH = (canvas.height * pdfW) / canvas.width;
+            pdf.addImage(imgData, "PNG", 0, 0, pdfW, pdfH);
+            pdf.save(`Báo cáo Analytics ${year}.pdf`);
+        } catch (err) { alert("Lỗi xuất PDF: " + err.message); }
+        finally { setExporting(false); }
     };
 
     return (
         <Layout>
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 32 }}>
                 <div>
-                    <h2 className="gradient-text">📊 Báo cáo & Thống kê Analytics</h2>
-                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
+                    <h2 style={{ fontSize: 32, fontWeight: 900 }}>
+                        <span className="gradient-text">📊 Báo cáo & Thống kê Analytics</span>
+                    </h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6, fontWeight: 500 }}>
                         Phân tích chuyên sâu về tiến độ dự án và hiệu quả sự kiện trong năm {year}
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: 12 }}>
-                    <button className="btn btn-outline" style={{ borderRadius: 12, padding: "10px 20px" }} onClick={() => window.print()}>
-                        🖨️ Xuất PDF / In báo cáo
+                    <button className="btn btn-outline"
+                        disabled={exporting}
+                        style={{ borderRadius: 14, height: 48, padding: "0 24px", fontWeight: 700 }}
+                        onClick={handleExportPDF}>
+                        {exporting ? "⌛ Đang xử lý..." : "📕 Xuất PDF toàn trang"}
                     </button>
-                    <button className="btn btn-primary" style={{ borderRadius: 12, padding: "10px 24px" }} onClick={() => window.location.reload()}>
-                        ↻ Làm mới dữ liệu
+                    <button className="btn btn-primary"
+                        style={{ borderRadius: 14, height: 48, padding: "0 24px", fontWeight: 800, background: "#10b981", border: "none" }}
+                        onClick={handleExportAll}>
+                        📗 Tải Báo cáo Excel (.xlsx)
                     </button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="empty-state"><span>⏳</span><p>Đang tải dữ liệu...</p></div>
+                <div className="empty-state" style={{ padding: 100 }}><span>⌛</span><p>Đang chuẩn bị dữ liệu thống kê...</p></div>
             ) : (
-                <>
+                <div ref={reportRef} style={{ background: "var(--bg-main)", paddingBottom: 40 }}>
                     {/* ── Tổng quan ── */}
                     {overview && (
                         <div className="grid-4" style={{ marginBottom: 32, gap: 20 }}>
                             {[
-                                { icon: "🎪", label: "Tổng sự kiện", value: overview.events?.total || 0, color: "#6366f1", bg: "linear-gradient(135deg, #fff 0%, #f5f3ff 100%)" },
-                                { icon: "🔥", label: "Đang diễn ra", value: overview.events?.running || 0, color: "#10b981", bg: "linear-gradient(135deg, #fff 0%, #f0fdf4 100%)" },
-                                { icon: "🎟️", label: "Tổng người tham gia", value: overview.attendees?.total || 0, color: "#f59e0b", bg: "linear-gradient(135deg, #fff 0%, #fffbeb 100%)" },
-                                { icon: "💰", label: "Tổng chi phí thực tế", value: fmtVND(overview.budget?.actual), color: "#ef4444", bg: "linear-gradient(135deg, #fff 0%, #fef2f2 100%)" },
+                                { icon: "🎪", label: "Tổng sự kiện", value: overview.events?.total || 0, color: "#6366f1", bg: "#f5f3ff" },
+                                { icon: "🔥", label: "Đang diễn ra", value: overview.events?.running || 0, color: "#10b981", bg: "#f0fdf4" },
+                                { icon: "🎟️", label: "Tổng người tham gia", value: overview.attendees?.total || 0, color: "#f59e0b", bg: "#fffbeb" },
+                                { icon: "💰", label: "Tổng chi phí thực tế", value: fmtVND(overview.budget?.actual), color: "#ef4444", bg: "#fef2f2" },
                             ].map(s => (
-                                <div key={s.label} className="card-stat" style={{ background: s.bg, border: "1px solid #e2e8f0" }}>
-                                    <div className="card-stat-icon" style={{ background: "#fff", color: s.color, fontSize: 22, boxShadow: "var(--shadow-sm)" }}>{s.icon}</div>
-                                    <div className="card-stat-info">
-                                        <h3 style={{ color: s.color, fontSize: typeof s.value === "string" ? "18px" : "28px", fontWeight: 900 }}>{s.value}</h3>
-                                        <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
+                                <div key={s.label} className="card-stat" style={{ background: s.bg, border: "1px solid rgba(0,0,0,0.02)", padding: 24, borderRadius: 24, boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }}>
+                                    <div style={{ width: 48, height: 48, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyCenter: "center", fontSize: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", display: "flex", justifyContent: "center" }}>{s.icon}</div>
+                                    <div className="card-stat-info" style={{ marginLeft: 16 }}>
+                                        <h3 style={{ color: s.color, fontSize: typeof s.value === "string" && s.value.length > 10 ? "20px" : "28px", fontWeight: 900, marginBottom: 4 }}>{s.value}</h3>
+                                        <p style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)" }}>{s.label}</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    <div className="grid-2" style={{ marginBottom: 32, alignItems: "start", gap: 28 }}>
+                    <div className="grid-2" style={{ marginBottom: 32, gap: 28 }}>
                         {/* ── Sự kiện theo tháng ── */}
-                        <div className="card" style={{ padding: 24, borderRadius: 20 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
-                                <span>📅</span> SỐ LƯỢNG SỰ KIỆN THEO THÁNG
-                            </h3>
-                            <BarChart data={byMonth} labelKey="label" valueKey="value" color="linear-gradient(180deg, #6366f1, #818cf8)" maxH={180} />
+                        <div className="card" style={{ padding: 28, borderRadius: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>📅 SỐ LƯỢNG SỰ KIỆN THEO THÁNG</h3>
+                            </div>
+                            <BarChart data={byMonth} labelKey="label" valueKey="value" color="linear-gradient(180deg, #6366f1, #818cf8)" maxH={200} />
                         </div>
 
                         {/* ── Loại sự kiện ── */}
-                        <div className="card" style={{ padding: 24, borderRadius: 20 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
-                                <span>🏷️</span> PHÂN LOẠI HÌNH THỨC SỰ KIỆN
-                            </h3>
+                        <div className="card" style={{ padding: 28, borderRadius: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🏷️ PHÂN LOẠI HÌNH THỨC SỰ KIỆN</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(byType, "Loai-su-kien")}>⬇️ Excel</button>
+                            </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                                 {byType.length === 0
                                     ? <div className="empty-state"><span>🏷️</span><p>Chưa có dữ liệu</p></div>
@@ -164,110 +244,153 @@ export default function Reports() {
                         </div>
                     </div>
 
-                    <div className="grid-2" style={{ marginBottom: 24, alignItems: "start" }}>
+                    <div className="grid-2" style={{ marginBottom: 32, gap: 28 }}>
                         {/* ── Tasks ── */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>📋 Tiến độ Nhiệm vụ</h3>
+                        <div className="card" style={{ padding: 28, borderRadius: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>📋 TIẾN ĐỘ NHIỆM VỤ TỔNG THỂ</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(Object.entries(taskMap).map(([k, v]) => ({ Trạng_thái: k, Số_lượng: v })), "Tien-do-cong-viec")}>⬇️ Excel</button>
+                            </div>
                             {totalTasks === 0
-                                ? <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Chưa có nhiệm vụ nào</div>
+                                ? <div className="empty-state"><span>📋</span><p>Chưa có nhiệm vụ nào</p></div>
                                 : <>
                                     {[
-                                        { key: "todo", label: "Cần làm", color: "#94a3b8" },
-                                        { key: "in_progress", label: "Đang làm", color: "#f59e0b" },
-                                        { key: "done", label: "Đã xong", color: "#10b981" },
-                                        { key: "cancelled", label: "Đã hủy", color: "#ef4444" },
+                                        { key: "todo", label: "Chưa bắt đầu", color: "#94a3b8" },
+                                        { key: "in_progress", label: "Đang triển khai", color: "#f59e0b" },
+                                        { key: "review", label: "Đang chờ duyệt", color: "#6366f1" },
+                                        { key: "done", label: "Đã hoàn thành", color: "#10b981" },
+                                        { key: "cancelled", label: "Đã hủy bỏ", color: "#ef4444" },
                                     ].map(s => (
                                         <ProgressRow key={s.key} label={s.label}
                                             value={taskMap[s.key] || 0} max={totalTasks} color={s.color} />
                                     ))}
-                                    <div style={{ textAlign: "right", fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
-                                        Tổng: {totalTasks} nhiệm vụ
+                                    <div style={{ textAlign: "right", fontSize: 13, color: "var(--text-muted)", marginTop: 12, fontWeight: 600 }}>
+                                        Tổng cộng: {totalTasks} nhiệm vụ đang quản lý
                                     </div>
                                 </>
                             }
                         </div>
 
                         {/* ── Ngân sách ── */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>💰 Ngân sách theo sự kiện (Top 5)</h3>
+                        <div className="card" style={{ padding: 28, borderRadius: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>💰 THỐNG KÊ CHI PHÍ KẾ HOẠCH & THỰC TẾ</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(budgets, "Ngan-sach")}>⬇️ Excel</button>
+                            </div>
                             {budgets.length === 0
-                                ? <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Chưa có dữ liệu ngân sách</div>
-                                : <table className="data-table">
-                                    <thead><tr><th>Sự kiện</th><th style={{ textAlign: "right" }}>Kế hoạch</th><th style={{ textAlign: "right" }}>Thực tế</th><th style={{ textAlign: "right" }}>%</th></tr></thead>
-                                    <tbody>
-                                        {budgets.slice(0, 5).map(b => {
-                                            const pct = b.planned > 0 ? Math.round((b.actual / b.planned) * 100) : 0;
-                                            return (
-                                                <tr key={b.id}>
-                                                    <td style={{ fontWeight: 600, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</td>
-                                                    <td style={{ textAlign: "right", fontSize: 12 }}>{fmtVND(b.planned)}</td>
-                                                    <td style={{ textAlign: "right", fontSize: 12, color: pct > 100 ? "#dc2626" : "var(--text-primary)", fontWeight: 700 }}>{fmtVND(b.actual)}</td>
-                                                    <td style={{ textAlign: "right" }}>
-                                                        <span className={`badge ${pct > 100 ? "badge-danger" : pct > 80 ? "badge-warning" : "badge-success"}`}>
-                                                            {pct}%
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                ? <div className="empty-state"><span>💰</span><p>Chưa có dữ liệu ngân sách</p></div>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16 }}>
+                                    <table className="data-table" style={{ fontSize: 13 }}>
+                                        <thead><tr><th>Sự kiện</th><th style={{ textAlign: "right" }}>Kế hoạch</th><th style={{ textAlign: "right" }}>Thực tế</th><th style={{ textAlign: "right" }}>%</th></tr></thead>
+                                        <tbody>
+                                            {budgets.map(b => {
+                                                const pct = b.planned > 0 ? Math.round((b.actual / b.planned) * 100) : 0;
+                                                return (
+                                                    <tr key={b.id}>
+                                                        <td style={{ fontWeight: 800, color: "var(--text-primary)" }}>{b.name}</td>
+                                                        <td style={{ textAlign: "right", color: "var(--text-muted)" }}>{fmtVND(b.planned)}</td>
+                                                        <td style={{ textAlign: "right", color: pct > 100 ? "#ef4444" : "#10b981", fontWeight: 800 }}>{fmtVND(b.actual)}</td>
+                                                        <td style={{ textAlign: "right" }}>
+                                                            <span style={{
+                                                                fontSize: 11, fontWeight: 900, padding: "4px 8px", borderRadius: 8,
+                                                                background: pct > 100 ? "#fee2e2" : "#f0fdf4", color: pct > 100 ? "#ef4444" : "#10b981"
+                                                            }}>{pct}%</span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             }
                         </div>
                     </div>
 
-                    {/* ── Tỷ lệ đăng ký & check-in ── */}
-                    <div className="card" style={{ padding: 24, borderRadius: 20 }}>
-                        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
-                            <span>🎟️</span> TỶ LỆ ĐĂNG KÝ & CÓ MẶT THEO SỰ KIỆN
-                        </h3>
-                        {attendees.length === 0
-                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có dữ liệu thống kê người tham dự</p></div>
-                            : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 12, overflow: "hidden" }}>
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ paddingLeft: 20 }}>Tên Sự kiện</th>
-                                            <th>Sức chứa</th>
-                                            <th>Đăng ký</th>
-                                            <th>Có mặt</th>
-                                            <th>Tỉ lệ lấp đầy</th>
-                                            <th style={{ textAlign: "right", paddingRight: 20 }}>Tiến độ Check-in</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {attendees.map(a => {
-                                            const regPct = a.capacity ? Math.round((a.registered / a.capacity) * 100) : null;
-                                            const ciPct = a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0;
-                                            return (
-                                                <tr key={a.id}>
-                                                    <td style={{ fontWeight: 700, paddingLeft: 20, color: "var(--text-primary)" }}>{a.name}</td>
-                                                    <td style={{ color: "var(--text-muted)", fontWeight: 600 }}>{a.capacity || "—"}</td>
-                                                    <td style={{ fontWeight: 800, color: "var(--color-primary)" }}>{a.registered}</td>
-                                                    <td style={{ fontWeight: 800, color: "#10b981" }}>{a.checked_in || 0}</td>
-                                                    <td>
-                                                        {regPct !== null
-                                                            ? <span className={`badge ${regPct >= 100 ? "badge-danger" : regPct >= 80 ? "badge-warning" : "badge-success"}`} style={{ borderRadius: 8, padding: "4px 10px", border: "none" }}>{regPct}%</span>
-                                                            : <span className="badge badge-default">—</span>
-                                                        }
-                                                    </td>
-                                                    <td style={{ textAlign: "right", paddingRight: 20 }}>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
-                                                            <div style={{ width: 80, height: 8, background: "#f1f5f9", borderRadius: 4, overflow: "hidden" }}>
-                                                                <div style={{ height: "100%", width: `${ciPct}%`, background: "linear-gradient(90deg, #10b981, #34d399)", borderRadius: 4 }} />
+                    <div className="grid-2" style={{ marginBottom: 32, gap: 28 }}>
+                        {/* ── Tỷ lệ tham dự ── */}
+                        <div className="card" style={{ padding: 28, borderRadius: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🎟️ TỔNG HỢP CHI TIẾT KHÁCH MỜI & CHECK-IN</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(attendees, "Tham-du")}>⬇️ Excel</button>
+                            </div>
+                            {attendees.length === 0
+                                ? <div className="empty-state"><span>🎟️</span><p>Chưa có dữ liệu người tham dự</p></div>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16, overflow: "hidden" }}>
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ paddingLeft: 24 }}>Tên Sự kiện</th>
+                                                <th>Sức chứa</th>
+                                                <th>Đăng ký</th>
+                                                <th>Có mặt</th>
+                                                <th>Tỉ lệ lấp đầy</th>
+                                                <th style={{ textAlign: "right", paddingRight: 24 }}>Tiến độ Check-in</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {attendees.map(a => {
+                                                const regPct = a.capacity ? Math.round((a.registered / a.capacity) * 100) : null;
+                                                const ciPct = a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0;
+                                                return (
+                                                    <tr key={a.id}>
+                                                        <td style={{ fontWeight: 800, paddingLeft: 24, fontSize: 15 }}>{a.name}</td>
+                                                        <td style={{ color: "var(--text-muted)", fontWeight: 700 }}>{a.capacity || "—"}</td>
+                                                        <td style={{ fontWeight: 800, color: "var(--color-primary)" }}>{a.registered}</td>
+                                                        <td style={{ fontWeight: 800, color: "#10b981" }}>{a.checked_in || 0}</td>
+                                                        <td>
+                                                            {regPct !== null
+                                                                ? <span style={{ fontWeight: 900, color: regPct >= 100 ? "#ef4444" : "#10b981" }}>{regPct}%</span>
+                                                                : <span style={{ color: "#94a3b8" }}>—</span>
+                                                            }
+                                                        </td>
+                                                        <td style={{ textAlign: "right", paddingRight: 24 }}>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
+                                                                <div style={{ width: 120, height: 10, background: "#f1f5f9", borderRadius: 5, overflow: "hidden" }}>
+                                                                    <div style={{ height: "100%", width: `${ciPct}%`, background: "linear-gradient(90deg, #10b981, #34d399)", borderRadius: 5 }} />
+                                                                </div>
+                                                                <span style={{ fontSize: 14, fontWeight: 900, color: "#059669", minWidth: 45 }}>{ciPct}%</span>
                                                             </div>
-                                                            <span style={{ fontSize: 12, fontWeight: 900, color: "#059669", minWidth: 35 }}>{ciPct}%</span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+
+                        {/* ── Feedback ── */}
+                        <div className="card" style={{ padding: 28, borderRadius: 24 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🌟 ĐÁNH GIÁ & MỨC ĐỘ HÀI LÒNG</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(feedback, "Phan-hoi")}>⬇️ Excel</button>
+                            </div>
+                            {feedback.length === 0
+                                ? <div className="empty-state"><span>⭐</span><p>Chưa có phản hồi từ khách mời</p></div>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16 }}>
+                                    <table className="data-table">
+                                        <thead><tr><th>Sự kiện</th><th style={{ textAlign: "center" }}>Phản hồi</th><th style={{ textAlign: "right" }}>Đánh giá</th></tr></thead>
+                                        <tbody>
+                                            {feedback.map((f, i) => (
+                                                <tr key={i}>
+                                                    <td style={{ fontWeight: 800 }}>{f.name}</td>
+                                                    <td style={{ textAlign: "center", fontWeight: 700, color: "var(--color-primary)" }}>{f.total_feedback} lượt</td>
+                                                    <td style={{ textAlign: "right" }}>
+                                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+                                                            <span style={{ fontWeight: 900, fontSize: 15, color: "#f59e0b" }}>{(Number(f.avg_rating) || 0).toFixed(1)}</span>
+                                                            <span style={{ color: "#f59e0b" }}>⭐</span>
                                                         </div>
                                                     </td>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        }
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
                     </div>
-                </>
+                </div>
             )}
         </Layout>
     );

@@ -358,60 +358,67 @@ export default function TimelineList() {
                 title="✨ Thêm mục lịch trình mới"
                 isOpen={isModalOpen}
                 onClose={() => { setModalOpen(false); setError(""); }}
-                maxWidth="650px">
-                <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                maxWidth="920px">
+                <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 24, padding: "10px 0" }}>
                     {error && <div className="alert alert-error">{error}</div>}
 
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Sự kiện tiếp nhận</label>
-                        <select className="form-control"
-                            value={form.event_id}
-                            onChange={e => setForm({ ...form, event_id: e.target.value })}
-                            required>
-                            <option value="">-- Chọn sự kiện từ danh sách --</option>
-                            {events.map(ev => (
-                                <option key={ev.id} value={ev.id}>{ev.name} ({new Date(ev.start_date).toLocaleDateString()})</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Tiêu đề hoạt động</label>
-                        <input className="form-control"
-                            placeholder="VD: Khai mạc, Phát biểu, Tiệc tối..."
-                            value={form.title}
-                            onChange={e => setForm({ ...form, title: e.target.value })}
-                            required />
-                    </div>
-
-                    <div className="grid-2">
+                    <div className="grid-2" style={{ gap: 24 }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label>Thời điểm bắt đầu</label>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Sự kiện tiếp nhận <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                            <select className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                                value={form.event_id}
+                                onChange={e => setForm({ ...form, event_id: e.target.value })}
+                                required>
+                                <option value="">-- Chọn sự kiện từ danh sách --</option>
+                                {events.map(ev => (
+                                    <option key={ev.id} value={ev.id}>{ev.name} ({new Date(ev.start_date).toLocaleDateString()})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Tiêu đề hoạt động <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                            <input className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                                placeholder="VD: Khai mạc, Phát biểu, Tiệc tối..."
+                                value={form.title}
+                                onChange={e => setForm({ ...form, title: e.target.value })}
+                                required />
+                        </div>
+                    </div>
+
+                    <div className="grid-2" style={{ gap: 24 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Thời điểm bắt đầu <span style={{ color: "var(--color-danger)" }}>*</span></label>
                             <input type="datetime-local" className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
                                 value={form.start_time}
                                 onChange={e => setForm({ ...form, start_time: e.target.value })}
                                 required />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label>Thời điểm kết thúc (tùy chọn)</label>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Thời điểm kết thúc (tùy chọn)</label>
                             <input type="datetime-local" className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
                                 value={form.end_time}
                                 onChange={e => setForm({ ...form, end_time: e.target.value })} />
                         </div>
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Ghi chú nội dung</label>
-                        <textarea className="form-control" rows="2"
-                            placeholder="Chi tiết diễn biến, nhân sự phụ trách..."
+                        <label style={{ fontSize: 15, fontWeight: 700 }}>Ghi chú nội dung kịch bản</label>
+                        <textarea className="form-control" rows="4"
+                            style={{ fontSize: 15, padding: 16, borderRadius: 12, lineHeight: 1.6 }}
+                            placeholder="Chi tiết diễn biến, nhân sự phụ trách, lưu ý kỹ thuật..."
                             value={form.description}
                             onChange={e => setForm({ ...form, description: e.target.value })} />
                     </div>
 
-                    <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 12 }}>
-                        <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ borderRadius: 12, padding: "10px 24px" }}>Hủy</button>
+                    <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 16 }}>
+                        <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ borderRadius: 12, padding: "12px 32px", fontSize: 15 }}>Hủy</button>
                         <button type="submit" className="btn btn-primary"
-                            style={{ borderRadius: 12, padding: "10px 32px" }}
+                            style={{ borderRadius: 12, padding: "12px 40px", fontSize: 15, fontWeight: 800, boxShadow: "0 8px 20px -5px rgba(79,70,229,0.3)" }}
                             disabled={submitting}>
                             {submitting ? "Đang xử lý..." : "✅ Lưu lịch trình"}
                         </button>

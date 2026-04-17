@@ -212,7 +212,7 @@
 .modal-box {
     width: 100%;
     max-width: 800px; 
-    max-height: 90vh; /* Don't exceed screen height */
+    max-height: 96vh; /* Don't exceed screen height */
     overflow-y: auto; /* Scroll inside modal if too long */
     background: white !important;
     border-radius: var(--border-radius-lg);
@@ -228,7 +228,7 @@
 }
 
 .modal-header { 
-    padding: 24px 32px; 
+    padding: 16px 32px; 
     border-bottom: 1px solid var(--border-color); 
     display: flex;
     justify-content: space-between;
@@ -258,7 +258,7 @@
     transform: rotate(90deg);
 }
 
-.modal-body { padding: 32px; background: white; }
+.modal-body { padding: 24px 32px; background: white; }
 
 /* ═══════════════════════════════════════════════
    GRID (ULTRA-WIDE)
