@@ -258,116 +258,102 @@ export default function EventList() {
                 )}
             </div>
 
-            {/* ── Modal Tạo / Chỉnh sửa ── */}
+            {/* ── Modal Tạo / Chỉnh sửa (Giao diện mới) ── */}
             <Modal
-                title={editingId ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}
+                title={editingId ? "✨ Cập nhật sự kiện" : "🚀 Khởi tạo sự kiện mới"}
                 isOpen={isModalOpen}
                 onClose={() => { setModalOpen(false); setError(""); }}>
-                <form onSubmit={handleSubmit}>
-                    {error && <div className="alert alert-error">{error}</div>}
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                    {error && <div style={{ padding: "12px", borderRadius: "8px", background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca", fontSize: "14px" }}>⚠️ {error}</div>}
 
-                    {/* Thông tin cơ bản */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", marginBottom: 10
-                    }}>🧾 Thông tin cơ bản</div>
-
-                    <div className="form-group">
-                        <label>Tên sự kiện <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control" placeholder="VD: Hội thảo AI 2026"
-                            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-                    </div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Loại sự kiện</label>
-                            <select className="form-control" value={form.event_type}
-                                onChange={e => setForm({ ...form, event_type: e.target.value })}>
-                                <option value="">-- Chọn loại --</option>
-                                {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                    {/* Khối Thông tin chung */}
+                    <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: "#334155", fontWeight: "600" }}>
+                            <span style={{ fontSize: "18px" }}>📝</span> <span>Thông tin chung</span>
                         </div>
-                        <div className="form-group">
-                            <label>Hình thức</label>
-                            <select className="form-control" value={form.venue_type}
-                                onChange={e => setForm({ ...form, venue_type: e.target.value })}>
-                                <option value="offline">🏢 Offline</option>
-                                <option value="online">🌐 Online</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="form-group">
-                        <label>Mô tả</label>
-                        <textarea className="form-control" rows="2" placeholder="Mô tả ngắn về sự kiện..."
-                            value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-                    </div>
-
-                    {/* Thời gian */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>⏰ Thời gian diễn ra</div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Ngày bắt đầu <span style={{ color: "red" }}>*</span></label>
-                            <input type="datetime-local" className="form-control"
-                                value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Ngày kết thúc <span style={{ color: "red" }}>*</span></label>
-                            <input type="datetime-local" className="form-control"
-                                value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} required />
+                        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <div>
+                                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Tên sự kiện <span style={{color: "red"}}>*</span></label>
+                                <input className="form-control" placeholder="Nhập tên sự kiện nổi bật..." value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required style={{ width: "100%", padding: "10px", borderRadius: "8px" }} />
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Phân loại</label>
+                                    <select className="form-control" value={form.event_type} onChange={e => setForm({ ...form, event_type: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px" }}>
+                                        <option value="">-- Lựa chọn --</option>
+                                        {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Hình thức tổ chức</label>
+                                    <select className="form-control" value={form.venue_type} onChange={e => setForm({ ...form, venue_type: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px" }}>
+                                        <option value="offline">🏢 Trực tiếp (Offline)</option>
+                                        <option value="online">🌐 Trực tuyến (Online)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Mô tả chi tiết</label>
+                                <textarea className="form-control" rows="3" placeholder="Sự kiện này dành cho ai, mục đích là gì?..." value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px", resize: "vertical" }} />
+                            </div>
                         </div>
                     </div>
 
-                    {/* Địa điểm */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>📍 Địa điểm</div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Địa chỉ / Link</label>
-                            <input className="form-control" placeholder={form.venue_type === "online" ? "https://meet.google.com/..." : "123 Nguyễn Huệ, Q1"}
-                                value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+                    {/* Khối Thời gian & Địa điểm */}
+                    <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: "#334155", fontWeight: "600" }}>
+                            <span style={{ fontSize: "18px" }}>⏱️</span> <span>Kế hoạch triển khai</span>
                         </div>
-                        <div className="form-group">
-                            <label>Sức chứa (người)</label>
-                            <input type="number" className="form-control" placeholder="200"
-                                value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
+                        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Bắt đầu <span style={{color: "red"}}>*</span></label>
+                                    <input type="datetime-local" className="form-control" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required style={{ width: "100%", padding: "10px", borderRadius: "8px" }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Kết thúc <span style={{color: "red"}}>*</span></label>
+                                    <input type="datetime-local" className="form-control" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} required style={{ width: "100%", padding: "10px", borderRadius: "8px" }} />
+                                </div>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "16px" }}>
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Địa điểm / Link Meet</label>
+                                    <input className="form-control" placeholder={form.venue_type === "online" ? "https://..." : "Tòa nhà..."} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px" }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Quy mô (người)</label>
+                                    <input type="number" className="form-control" placeholder="100" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px" }} />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Ngân sách */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>💰 Ngân sách</div>
-
-                    <div className="form-group">
-                        <label>Tổng ngân sách dự kiến (VND)</label>
-                        <input type="number" className="form-control" placeholder="50000000"
-                            value={form.total_budget} onChange={e => setForm({ ...form, total_budget: e.target.value })} />
+                    {/* Khối Tài chính */}
+                    <div style={{ background: "#f8fafc", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: "#334155", fontWeight: "600" }}>
+                            <span style={{ fontSize: "18px" }}>💰</span> <span>Tài chính</span>
+                        </div>
+                        <div>
+                            <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px", color: "#475569" }}>Ngân sách dự kiến (VNĐ)</label>
+                            <input type="number" className="form-control" placeholder="Ví dụ: 10000000" value={form.total_budget} onChange={e => setForm({ ...form, total_budget: e.target.value })} style={{ width: "100%", padding: "10px", borderRadius: "8px" }} />
+                        </div>
                     </div>
 
-                    {/* Ghi chú deadline */}
                     {!editingId && (
-                        <div style={{
-                            background: "rgba(99,102,241,0.07)", borderRadius: 8, padding: "10px 14px",
-                            marginBottom: 14, fontSize: 12, color: "var(--text-secondary)"
-                        }}>
-                            💡 Sau khi tạo, hệ thống sẽ tự động tạo <strong>4 deadline nội bộ</strong> mặc định
-                            (chốt concept, địa điểm, marketing, tổng duyệt) dựa trên ngày bắt đầu.
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", background: "linear-gradient(to right, #eff6ff, #dbeafe)", padding: "16px", borderRadius: "12px", border: "1px solid #bfdbfe", color: "#1e3a8a" }}>
+                            <span style={{ fontSize: "20px" }}>⚡</span>
+                            <div style={{ fontSize: "13px", lineHeight: "1.5" }}>
+                                <strong>Tự động hóa Workflow:</strong> Hệ thống sẽ tự động tạo 4 deadline mặc định (Concept, Địa điểm, Marketing, Tổng duyệt) khi sự kiện được khởi tạo.
+                            </div>
                         </div>
                     )}
 
-                    <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 8 }}
-                        disabled={submitting}>
-                        {submitting ? "Đang lưu..." : (editingId ? "Lưu thay đổi" : "Tạo sự kiện")}
-                    </button>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
+                        <button type="button" onClick={() => setModalOpen(false)} style={{ padding: "10px 24px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", color: "#475569", fontWeight: "600", cursor: "pointer" }}>Hủy bỏ</button>
+                        <button type="submit" style={{ padding: "10px 24px", borderRadius: "8px", border: "none", background: "linear-gradient(to right, #4f46e5, #6366f1)", color: "white", fontWeight: "600", cursor: "pointer", boxShadow: "0 4px 6px -1px rgba(79, 70, 229, 0.2)" }} disabled={submitting}>
+                            {submitting ? "⏳ Đang xử lý..." : (editingId ? "💾 Lưu thay đổi" : "🚀 Khởi tạo sự kiện")}
+                        </button>
+                    </div>
                 </form>
             </Modal>
         </Layout>
