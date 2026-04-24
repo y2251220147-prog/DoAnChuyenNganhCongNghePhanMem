@@ -44,209 +44,246 @@ export default function EventList() {
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
 
-    const [events, setEvents] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isModalOpen, setModalOpen] = useState(false);
-    const [editingId, setEditingId] = useState(null);
+    const [collection, setCollection] = useState([]);
+    const [isSyncing, setIsSyncing] = useState(true);
+    const [view, setView] = useState({ modal: false, editId: null, busy: false });
     const [form, setForm] = useState(EMPTY_FORM);
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState("");
-    const [search, setSearch] = useState("");
-    const [filterStatus, setFilterStatus] = useState("all");
+    const [errorMsg, setErrorMsg] = useState("");
+    const [query, setQuery] = useState({ text: "", status: "all" });
 
-    const isAdmin = user?.role === "admin";
-    const canManage = user?.role === "admin" || user?.role === "organizer";
+    const isPrivileged = user?.role === "admin" || user?.role === "organizer";
 
-    const load = async () => {
-        setLoading(true);
-        try { const r = await getEvents(); setEvents(r.data || []); }
-        catch {/**/ }
-        finally { setLoading(false); }
+    const fetchEvents = async () => {
+        setIsSyncing(true);
+        try {
+            const response = await getEvents();
+            setCollection(response.data || []);
+        } catch (err) {
+            console.error("Failed to fetch events", err);
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { fetchEvents(); }, []);
 
-    // ── Tạo / Cập nhật ───────────────────────────────────────
-    const handleSubmit = async (e) => {
-        e.preventDefault(); setError(""); setSubmitting(true);
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setErrorMsg("");
+        setView(prev => ({ ...prev, busy: true }));
         try {
-            if (editingId) await updateEvent(editingId, form);
+            if (view.editId) await updateEvent(view.editId, form);
             else await createEvent(form);
-            setModalOpen(false); setForm(EMPTY_FORM); setEditingId(null);
-            load();
-        } catch (err) { setError(err.response?.data?.message || "Thao tác thất bại"); }
-        finally { setSubmitting(false); }
+            
+            setView({ modal: false, editId: null, busy: false });
+            setForm(EMPTY_FORM);
+            fetchEvents();
+        } catch (err) {
+            setErrorMsg(err.response?.data?.message || "Đã xảy ra lỗi trong quá trình lưu");
+        } finally {
+            setView(prev => ({ ...prev, busy: false }));
+        }
     };
 
-    const openEdit = (ev) => {
+    const triggerEdit = (item) => {
         setForm({
-            name: ev.name || "",
-            description: ev.description || "",
-            event_type: ev.event_type || "",
-            start_date: ev.start_date?.slice(0, 16) || "",
-            end_date: ev.end_date?.slice(0, 16) || "",
-            venue_type: ev.venue_type || "offline",
-            location: ev.location || "",
-            capacity: ev.capacity || "",
-            total_budget: ev.total_budget || "",
-            status: ev.status || "draft",
+            name: item.name || "",
+            description: item.description || "",
+            event_type: item.event_type || "",
+            start_date: item.start_date?.slice(0, 16) || "",
+            end_date: item.end_date?.slice(0, 16) || "",
+            venue_type: item.venue_type || "offline",
+            location: item.location || "",
+            capacity: item.capacity || "",
+            total_budget: item.total_budget || "",
+            status: item.status || "draft",
         });
-        setEditingId(ev.id); setError(""); setModalOpen(true);
+        setView({ modal: true, editId: item.id, busy: false });
+        setErrorMsg("");
     };
 
-    // ── Xóa ──────────────────────────────────────────────────
-    const handleDelete = async (id) => {
-        if (!window.confirm("Xóa sự kiện này? Tất cả dữ liệu liên quan sẽ mất.")) return;
-        try { await deleteEvent(id); setEvents(events.filter(e => e.id !== id)); }
-        catch (err) { alert(err.response?.data?.message || "Xóa thất bại"); }
-    };
-
-    // ── Chuyển trạng thái workflow ────────────────────────────
-    const handleChangeStatus = async (ev, newStatus) => {
-        const label = STATUS_LABEL[newStatus];
-        if (!window.confirm(`Chuyển trạng thái sang "${label}"?`)) return;
+    const confirmDelete = async (id) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa sự kiện này?")) return;
         try {
-            await changeStatus(ev.id, newStatus);
-            load();
-        } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
+            await deleteEvent(id);
+            setCollection(prev => prev.filter(item => item.id !== id));
+        } catch (err) {
+            alert(err.response?.data?.message || "Xóa không thành công");
+        }
     };
 
-    // ── Lọc ──────────────────────────────────────────────────
-    const filtered = events.filter(e => {
-        const ms = e.name.toLowerCase().includes(search.toLowerCase()) ||
-            (e.location || "").toLowerCase().includes(search.toLowerCase());
-        const mf = filterStatus === "all" || e.status === filterStatus;
-        return ms && mf;
+    const updateWorkflowStatus = async (item, targetStatus) => {
+        const statusText = STATUS_LABEL[targetStatus];
+        if (!window.confirm(`Chuyển trạng thái sang "${statusText}"?`)) return;
+        try {
+            await changeStatus(item.id, targetStatus);
+            fetchEvents();
+        } catch (err) {
+            alert(err.response?.data?.message || "Cập nhật trạng thái thất bại");
+        }
+    };
+
+    const displayedItems = collection.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(query.text.toLowerCase()) ||
+            (item.location || "").toLowerCase().includes(query.text.toLowerCase());
+        const matchesFilter = query.status === "all" || item.status === query.status;
+        return matchesSearch && matchesFilter;
     });
 
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
+    const formatShortDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit' }) : "—";
 
     return (
         <Layout>
-            {/* ── Header ── */}
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 24 }}>
                 <div>
-                    <h2>Sự kiện</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        {events.length} sự kiện · {events.filter(e => e.status === "running").length} đang diễn ra
+                    <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>Hệ thống Sự kiện</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 4 }}>
+                        Quản lý <span style={{ fontWeight: 600, color: "var(--color-primary)" }}>{collection.length}</span> chiến dịch sự kiện của bạn
                     </p>
                 </div>
-                {canManage && (
-                    <button className="btn btn-primary" onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setError(""); setModalOpen(true); }}>
-                        + Tạo sự kiện
+                {isPrivileged && (
+                    <button className="btn btn-primary" 
+                        style={{ borderRadius: 10, padding: "10px 20px", boxShadow: "0 4px 12px rgba(99,102,241,0.25)" }}
+                        onClick={() => { setForm(EMPTY_FORM); setView({ modal: true, editId: null, busy: false }); setErrorMsg(""); }}>
+                        <span style={{ marginRight: 8 }}>+</span> Tạo sự kiện mới
                     </button>
                 )}
             </div>
 
-            {/* ── Thống kê nhanh ── */}
-            <div className="grid-4" style={{ marginBottom: 20 }}>
+            {/* Quick Stats Grid */}
+            <div className="grid-4" style={{ marginBottom: 28, gap: 16 }}>
                 {[
-                    { label: "Bản nháp", status: "draft", icon: "📝", color: "#94a3b8" },
-                    { label: "Chờ duyệt", status: "planning", icon: "🕐", color: "#f59e0b" },
-                    { label: "Đã duyệt", status: "approved", icon: "✅", color: "#6366f1" },
-                    { label: "Đang diễn ra", status: "running", icon: "🔥", color: "#10b981" },
-                ].map(s => (
-                    <div key={s.status} className="card-stat" style={{ cursor: "pointer" }}
-                        onClick={() => setFilterStatus(s.status)}>
-                        <div className="card-stat-icon" style={{ background: s.color + "22", fontSize: 20 }}>{s.icon}</div>
+                    { label: "Bản thảo", key: "draft", icon: "📝", color: "#64748b" },
+                    { label: "Đang lập kế hoạch", key: "planning", icon: "🗓️", color: "#f59e0b" },
+                    { label: "Đã phê duyệt", key: "approved", icon: "✔️", color: "#6366f1" },
+                    { label: "Đang diễn ra", key: "running", icon: "🚀", color: "#10b981" },
+                ].map(stat => (
+                    <div key={stat.key} className="card-stat" 
+                        style={{ 
+                            cursor: "pointer", 
+                            transition: "all 0.2s ease",
+                            border: query.status === stat.key ? `1.5px solid ${stat.color}` : "1.5px solid transparent"
+                        }}
+                        onClick={() => setQuery(prev => ({ ...prev, status: prev.status === stat.key ? "all" : stat.key }))}>
+                        <div className="card-stat-icon" style={{ background: stat.color + "15", color: stat.color }}>{stat.icon}</div>
                         <div className="card-stat-info">
-                            <h3 style={{ color: s.color }}>{events.filter(e => e.status === s.status).length}</h3>
-                            <p>{s.label}</p>
+                            <h3 style={{ fontSize: 22, fontWeight: 800 }}>{collection.filter(i => i.status === stat.key).length}</h3>
+                            <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>{stat.label}</p>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* ── Bộ lọc ── */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                <input className="form-control" placeholder="🔍 Tìm theo tên, địa điểm..."
-                    value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
-                <select className="form-control" style={{ maxWidth: 180 }}
-                    value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option value="all">Tất cả trạng thái</option>
-                    {Object.entries(STATUS_LABEL).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
+            {/* Filter Bar */}
+            <div style={{ 
+                display: "flex", gap: 12, marginBottom: 20, padding: "12px", 
+                background: "rgba(255,255,255,0.5)", backdropFilter: "blur(8px)",
+                borderRadius: 12, border: "1px solid var(--border-color)"
+            }}>
+                <div style={{ position: "relative", flex: 1, maxWidth: 400 }}>
+                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>🔍</span>
+                    <input className="form-control" 
+                        style={{ paddingLeft: 38, borderRadius: 10, border: "1px solid #e2e8f0" }}
+                        placeholder="Tìm kiếm sự kiện, địa điểm..."
+                        value={query.text} onChange={e => setQuery({ ...query, text: e.target.value })} />
+                </div>
+                <select className="form-control" 
+                    style={{ maxWidth: 200, borderRadius: 10, border: "1px solid #e2e8f0" }}
+                    value={query.status} onChange={e => setQuery({ ...query, status: e.target.value })}>
+                    <option value="all">Mọi trạng thái</option>
+                    {Object.entries(STATUS_LABEL).map(([code, name]) => (
+                        <option key={code} value={code}>{name}</option>
                     ))}
                 </select>
             </div>
 
-            {/* ── Bảng sự kiện ── */}
-            <div className="data-table-wrapper">
-                {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Đang tải...</p></div>
-                ) : filtered.length === 0 ? (
-                    <div className="empty-state"><span>🎪</span><p>Không có sự kiện nào{canManage ? " — hãy tạo mới!" : "."}</p></div>
+            {/* Main Content Area */}
+            <div className="data-table-wrapper" style={{ borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                {isSyncing ? (
+                    <div className="empty-state" style={{ padding: 60 }}>
+                        <div className="spinner" style={{ width: 40, height: 40, border: "3px solid #f3f3f3", borderTop: "3px solid var(--color-primary)", borderRadius: "50%", animation: "spin 1s linear infinite", marginBottom: 16 }}></div>
+                        <p style={{ fontWeight: 600 }}>Đang đồng bộ dữ liệu...</p>
+                    </div>
+                ) : displayedItems.length === 0 ? (
+                    <div className="empty-state" style={{ padding: 80 }}>
+                        <div style={{ fontSize: 48, marginBottom: 16 }}>🍃</div>
+                        <p style={{ fontSize: 16, color: "var(--text-muted)" }}>Không tìm thấy sự kiện nào phù hợp</p>
+                    </div>
                 ) : (
                     <table className="data-table">
                         <thead>
-                            <tr>
-                                <th>#</th><th>Tên sự kiện</th><th>Loại</th>
-                                <th>Thời gian</th><th>Địa điểm</th>
-                                <th>Trạng thái</th><th>Thao tác</th>
+                            <tr style={{ background: "#f8fafc" }}>
+                                <th style={{ width: 50 }}>#</th>
+                                <th>Thông tin sự kiện</th>
+                                <th>Phân loại</th>
+                                <th>Lịch trình</th>
+                                <th>Địa điểm</th>
+                                <th>Trạng thái</th>
+                                <th style={{ textAlign: "right" }}>Hành động</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((ev, i) => {
-                                const wf = WORKFLOW[ev.status] || WORKFLOW.draft;
-                                const nextS = wf.next;
+                            {displayedItems.map((item, idx) => {
+                                const flow = WORKFLOW[item.status] || WORKFLOW.draft;
                                 return (
-                                    <tr key={ev.id}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                                    <tr key={item.id} style={{ transition: "background 0.2s" }}>
+                                        <td style={{ color: "#94a3b8", fontWeight: 600 }}>{(idx + 1).toString().padStart(2, '0')}</td>
                                         <td>
-                                            <div style={{ fontWeight: 700 }}>🎪 {ev.name}</div>
-                                            {ev.owner_name && (
-                                                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
-                                                    👤 {ev.owner_name}
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--color-primary-light)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📅</div>
+                                                <div>
+                                                    <div style={{ fontWeight: 700, color: "#1e293b", fontSize: 14 }}>{item.name}</div>
+                                                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>ID: EV-{item.id} • {item.owner_name}</div>
                                                 </div>
-                                            )}
+                                            </div>
                                         </td>
-                                        <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                                            {ev.event_type || "—"}
+                                        <td>
+                                            <span style={{ fontSize: 12, background: "#f1f5f9", padding: "4px 10px", borderRadius: 6, fontWeight: 600, color: "#475569" }}>
+                                                {item.event_type || "Chưa loại"}
+                                            </span>
                                         </td>
                                         <td style={{ fontSize: 12 }}>
-                                            <div style={{ color: "var(--color-primary)", fontWeight: 600 }}>
-                                                📅 {fmtDate(ev.start_date)}
-                                            </div>
-                                            <div style={{ color: "var(--text-muted)" }}>
-                                                → {fmtDate(ev.end_date)}
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>{formatShortDate(item.start_date)}</span>
+                                                <span style={{ color: "#cbd5e1" }}>→</span>
+                                                <span style={{ color: "#64748b" }}>{formatShortDate(item.end_date)}</span>
                                             </div>
                                         </td>
-                                        <td style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                                            {ev.venue_type === "online" ? "🌐 Online" : `📍 ${ev.location || "—"}`}
+                                        <td style={{ fontSize: 12, color: "#475569" }}>
+                                            {item.venue_type === "online" ? "🌐 Trực tuyến" : `📍 ${item.location || "—"}`}
                                         </td>
                                         <td>
-                                            {/* Badge trạng thái + dropdown chuyển */}
-                                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                                <StatusBadge status={ev.status} />
-                                                {canManage && nextS.length > 0 && (
-                                                    <select
-                                                        className="form-control"
-                                                        style={{ fontSize: 11, padding: "2px 6px", height: 26 }}
-                                                        value=""
-                                                        onChange={e => { if (e.target.value) handleChangeStatus(ev, e.target.value); }}>
-                                                        <option value="">Chuyển →</option>
-                                                        {nextS.map(s => (
-                                                            <option key={s} value={s}
-                                                                disabled={s === "approved" && !isAdmin}>
-                                                                {STATUS_LABEL[s]}{s === "approved" && !isAdmin ? " (cần Admin)" : ""}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                                <StatusBadge status={item.status} />
+                                                {isPrivileged && flow.next.length > 0 && (
+                                                    <div style={{ position: "relative" }}>
+                                                        <select
+                                                            className="form-control"
+                                                            style={{ fontSize: 10, padding: "1px 4px", height: 22, background: "#f8fafc" }}
+                                                            value=""
+                                                            onChange={e => e.target.value && updateWorkflowStatus(item, e.target.value)}>
+                                                            <option value="">Chuyển tiếp...</option>
+                                                            {flow.next.map(s => (
+                                                                <option key={s} value={s} disabled={s === "approved" && user?.role !== "admin"}>
+                                                                    {STATUS_LABEL[s]}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
                                                 )}
                                             </div>
                                         </td>
                                         <td>
-                                            <div className="actions">
-                                                <button className="btn btn-outline btn-sm"
-                                                    onClick={() => navigate(`/events/${ev.id}`)} title="Xem chi tiết">👁</button>
-                                                {canManage && !["running", "completed", "cancelled", "approved"].includes(ev.status) && (
-                                                <button className="btn btn-outline btn-sm"
-                                                    onClick={() => openEdit(ev)} title="Chỉnh sửa">✎</button>
-                                            )}
-                                            {/* Chỉ xóa được khi ở draft/planning/cancelled — không được xóa khi approved/running/completed */}
-                                            {canManage && !["approved", "running", "completed"].includes(ev.status) && (
-                                                    <button className="btn btn-danger btn-sm"
-                                                        onClick={() => handleDelete(ev.id)} title="Xóa">🗑</button>
+                                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                                                <button className="btn btn-outline btn-sm" style={{ padding: "6px" }}
+                                                    onClick={() => navigate(`/events/${item.id}`)}>👁️</button>
+                                                {isPrivileged && !["running", "completed", "cancelled", "approved"].includes(item.status) && (
+                                                    <button className="btn btn-outline btn-sm" style={{ padding: "6px" }}
+                                                        onClick={() => triggerEdit(item)}>✏️</button>
+                                                )}
+                                                {isPrivileged && !["approved", "running", "completed"].includes(item.status) && (
+                                                    <button className="btn btn-danger btn-sm" style={{ padding: "6px" }}
+                                                        onClick={() => confirmDelete(item.id)}>🗑️</button>
                                                 )}
                                             </div>
                                         </td>
@@ -258,115 +295,81 @@ export default function EventList() {
                 )}
             </div>
 
-            {/* ── Modal Tạo / Chỉnh sửa ── */}
+            {/* Modal for Create/Edit */}
             <Modal
-                title={editingId ? "Chỉnh sửa sự kiện" : "Tạo sự kiện mới"}
-                isOpen={isModalOpen}
-                onClose={() => { setModalOpen(false); setError(""); }}>
-                <form onSubmit={handleSubmit}>
-                    {error && <div className="alert alert-error">{error}</div>}
+                title={view.editId ? "Cập nhật chiến dịch" : "Khởi tạo chiến dịch mới"}
+                isOpen={view.modal}
+                onClose={() => setView({ ...view, modal: false })}>
+                <form onSubmit={handleSave} style={{ padding: "4px 0" }}>
+                    {errorMsg && <div className="alert alert-error" style={{ marginBottom: 16 }}>{errorMsg}</div>}
 
-                    {/* Thông tin cơ bản */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", marginBottom: 10
-                    }}>🧾 Thông tin cơ bản</div>
-
-                    <div className="form-group">
-                        <label>Tên sự kiện <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control" placeholder="VD: Hội thảo AI 2026"
+                    <div style={{ marginBottom: 18 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Tên sự kiện <span style={{ color: "#ef4444" }}>*</span></label>
+                        <input className="form-control" style={{ borderRadius: 8 }} placeholder="Nhập tiêu đề sự kiện..."
                             value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
                     </div>
 
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Loại sự kiện</label>
-                            <select className="form-control" value={form.event_type}
+                    <div className="grid-2" style={{ gap: 16, marginBottom: 18 }}>
+                        <div>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Phân loại</label>
+                            <select className="form-control" style={{ borderRadius: 8 }} value={form.event_type}
                                 onChange={e => setForm({ ...form, event_type: e.target.value })}>
                                 <option value="">-- Chọn loại --</option>
                                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                             </select>
                         </div>
-                        <div className="form-group">
-                            <label>Hình thức</label>
-                            <select className="form-control" value={form.venue_type}
+                        <div>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Hình thức</label>
+                            <select className="form-control" style={{ borderRadius: 8 }} value={form.venue_type}
                                 onChange={e => setForm({ ...form, venue_type: e.target.value })}>
-                                <option value="offline">🏢 Offline</option>
-                                <option value="online">🌐 Online</option>
+                                <option value="offline">🏢 Trực tiếp</option>
+                                <option value="online">🌐 Trực tuyến</option>
                             </select>
                         </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>Mô tả</label>
-                        <textarea className="form-control" rows="2" placeholder="Mô tả ngắn về sự kiện..."
+                    <div style={{ marginBottom: 18 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Mô tả chi tiết</label>
+                        <textarea className="form-control" style={{ borderRadius: 8, minHeight: 80 }} placeholder="Ghi chú thêm về mục đích, nội dung..."
                             value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                     </div>
 
-                    {/* Thời gian */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>⏰ Thời gian diễn ra</div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Ngày bắt đầu <span style={{ color: "red" }}>*</span></label>
-                            <input type="datetime-local" className="form-control"
+                    <div className="grid-2" style={{ gap: 16, marginBottom: 18 }}>
+                        <div>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Bắt đầu <span style={{ color: "#ef4444" }}>*</span></label>
+                            <input type="datetime-local" className="form-control" style={{ borderRadius: 8 }}
                                 value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required />
                         </div>
-                        <div className="form-group">
-                            <label>Ngày kết thúc <span style={{ color: "red" }}>*</span></label>
-                            <input type="datetime-local" className="form-control"
+                        <div>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Kết thúc <span style={{ color: "#ef4444" }}>*</span></label>
+                            <input type="datetime-local" className="form-control" style={{ borderRadius: 8 }}
                                 value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} required />
                         </div>
                     </div>
 
-                    {/* Địa điểm */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>📍 Địa điểm</div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Địa chỉ / Link</label>
-                            <input className="form-control" placeholder={form.venue_type === "online" ? "https://meet.google.com/..." : "123 Nguyễn Huệ, Q1"}
+                    <div className="grid-2" style={{ gap: 16, marginBottom: 20 }}>
+                        <div>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Vị trí / Liên kết</label>
+                            <input className="form-control" style={{ borderRadius: 8 }} placeholder={form.venue_type === "online" ? "https://link..." : "Số 1, Lê Lợi..."}
                                 value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
                         </div>
-                        <div className="form-group">
-                            <label>Sức chứa (người)</label>
-                            <input type="number" className="form-control" placeholder="200"
+                        <div>
+                            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Số lượng khách</label>
+                            <input type="number" className="form-control" style={{ borderRadius: 8 }} placeholder="Vd: 500"
                                 value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
                         </div>
                     </div>
 
-                    {/* Ngân sách */}
-                    <div style={{
-                        fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase",
-                        letterSpacing: "0.08em", margin: "14px 0 10px"
-                    }}>💰 Ngân sách</div>
-
-                    <div className="form-group">
-                        <label>Tổng ngân sách dự kiến (VND)</label>
-                        <input type="number" className="form-control" placeholder="50000000"
+                    <div style={{ marginBottom: 24 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#475569", marginBottom: 6 }}>Ngân sách dự tính (VND)</label>
+                        <input type="number" className="form-control" style={{ borderRadius: 8 }} placeholder="Nhập số tiền..."
                             value={form.total_budget} onChange={e => setForm({ ...form, total_budget: e.target.value })} />
                     </div>
 
-                    {/* Ghi chú deadline */}
-                    {!editingId && (
-                        <div style={{
-                            background: "rgba(99,102,241,0.07)", borderRadius: 8, padding: "10px 14px",
-                            marginBottom: 14, fontSize: 12, color: "var(--text-secondary)"
-                        }}>
-                            💡 Sau khi tạo, hệ thống sẽ tự động tạo <strong>4 deadline nội bộ</strong> mặc định
-                            (chốt concept, địa điểm, marketing, tổng duyệt) dựa trên ngày bắt đầu.
-                        </div>
-                    )}
-
-                    <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 8 }}
-                        disabled={submitting}>
-                        {submitting ? "Đang lưu..." : (editingId ? "Lưu thay đổi" : "Tạo sự kiện")}
+                    <button type="submit" className="btn btn-primary" 
+                        style={{ width: "100%", padding: "12px", borderRadius: 10, fontWeight: 700 }}
+                        disabled={view.busy}>
+                        {view.busy ? "Đang xử lý dữ liệu..." : (view.editId ? "Cập nhật ngay" : "Khởi tạo sự kiện")}
                     </button>
                 </form>
             </Modal>
@@ -374,23 +377,23 @@ export default function EventList() {
     );
 }
 
-// ── Component badge trạng thái ─────────────────────────────────
 function StatusBadge({ status }) {
-    const cfg = {
-        draft: { label: "Bản nháp", bg: "#f1f5f9", color: "#64748b" },
-        planning: { label: "Lên kế hoạch", bg: "#fef3c7", color: "#d97706" },
-        approved: { label: "Đã duyệt", bg: "#ede9fe", color: "#7c3aed" },
-        running: { label: "Đang diễn ra", bg: "#d1fae5", color: "#059669" },
-        completed: { label: "Hoàn thành", bg: "#dbeafe", color: "#2563eb" },
-        cancelled: { label: "Đã hủy", bg: "#fee2e2", color: "#dc2626" },
-    }[status] || { label: status, bg: "#f1f5f9", color: "#64748b" };
+    const config = {
+        draft: { label: "Bản nháp", bg: "#f1f5f9", text: "#64748b" },
+        planning: { label: "Kế hoạch", bg: "#fffbeb", text: "#b45309" },
+        approved: { label: "Đã duyệt", bg: "#eef2ff", text: "#4338ca" },
+        running: { label: "Đang chạy", bg: "#ecfdf5", text: "#047857" },
+        completed: { label: "Hoàn tất", bg: "#eff6ff", text: "#1d4ed8" },
+        cancelled: { label: "Đã hủy", bg: "#fff1f1", text: "#b91c1c" },
+    }[status] || { label: status, bg: "#f1f5f9", text: "#64748b" };
+
     return (
         <span style={{
-            display: "inline-flex", alignItems: "center", padding: "3px 10px",
-            borderRadius: 999, fontSize: 11, fontWeight: 700,
-            background: cfg.bg, color: cfg.color
+            display: "inline-flex", padding: "2px 8px", borderRadius: 6,
+            fontSize: 10, fontWeight: 800, textTransform: "uppercase",
+            background: config.bg, color: config.text, border: `1px solid ${config.text}20`
         }}>
-            {cfg.label}
+            {config.label}
         </span>
     );
 }
