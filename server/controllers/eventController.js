@@ -70,3 +70,10 @@ exports.deleteDeadline = async (req, res) => {
         res.json({ message: "Xóa deadline thành công" });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
+
+exports.broadcastNotification = async (req, res) => {
+    try {
+        const result = await eventService.broadcastNotification(req.params.id, req.body);
+        res.json({ message: "Đã gửi thông báo thành công", ...result });
+    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};

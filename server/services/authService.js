@@ -47,20 +47,30 @@ const login = async ({ email, password }) => {
     return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
 };
 
-const resetPassword = async (userId, { oldPassword, newPassword }) => {
-    if (!oldPassword || !newPassword)
-        throw { status: 400, message: "oldPassword and newPassword are required" };
-    if (newPassword.length < 6)
-        throw { status: 400, message: "New password must be at least 6 characters" };
+const resetPassword = async (uid, payload) => {
+    const { oldPassword: currentPwd, newPassword: nextPwd } = payload;
 
-    const user = await User.findById(userId);
-    if (!user) throw { status: 404, message: "User not found" };
+    if (!currentPwd || !nextPwd) {
+        throw { status: 400, message: "Thông tin mật khẩu không được để trống" };
+    }
+    
+    if (nextPwd.length < 6) {
+        throw { status: 400, message: "Mật khẩu mới phải từ 6 ký tự trở lên" };
+    }
 
-    const match = await bcrypt.compare(oldPassword, user.password);
-    if (!match) throw { status: 400, message: "Old password incorrect" };
+    const userData = await User.findById(uid);
+    if (!userData) {
+        throw { status: 404, message: "Không tìm thấy người dùng" };
+    }
 
-    const hashed = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await User.updatePassword(userId, hashed);
+    const isCorrect = await bcrypt.compare(currentPwd, userData.password);
+    if (!isCorrect) {
+        throw { status: 400, message: "Mật khẩu hiện tại không chính xác" };
+    }
+
+    const saltRounds = SALT_ROUNDS;
+    const encrypted = await bcrypt.hash(nextPwd, saltRounds);
+    await User.updatePassword(uid, encrypted);
 };
 
 module.exports = { register, login, resetPassword };
