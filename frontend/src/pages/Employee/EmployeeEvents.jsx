@@ -111,70 +111,67 @@ function EventCard({ ev, reg, attRow, busy, onRegister, onCancel, onQR }) {
     const canReg = ["approved","running"].includes(ev.status);
 
     return (
-        <div className={`emp-event-card${reg ? " registered" : ""}`}>
-            <div className="emp-ec-header">
-                <div className="emp-ec-icon" style={{ background:emojiBg(ev) }}>{eventEmoji(ev)}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
-                        <span style={{ fontSize:10, fontWeight:600, color:"var(--emp-text3)", textTransform:"uppercase", letterSpacing:"0.06em" }}>
-                            {TYPE_LABELS[ev.event_type] || ev.event_type || "Sự kiện"}
-                        </span>
-                        <span className={`emp-badge ${s.cls}`}>{s.label}</span>
-                        {reg && <span style={{ fontSize:11, color:"var(--emp-accent)", fontWeight:600 }}>✓ Đã đăng ký</span>}
-                    </div>
-                    <div className="emp-ec-title">{ev.name}</div>
-                    <div className="emp-ec-meta">
-                        <div className="emp-ec-meta-item">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                                <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/>
-                            </svg>
-                            {fmtDate(ev.start_date)}
-                        </div>
-                        {ev.location && (
-                            <div className="emp-ec-meta-item">
-                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                                    <circle cx="8" cy="6" r="2.5"/><path d="M8 1C5.2 1 3 3.3 3 6c0 4 5 9 5 9s5-5 5-9c0-2.7-2.2-5-5-5z"/>
-                                </svg>
-                                {ev.location}
-                            </div>
-                        )}
-                        <div className="emp-ec-meta-item">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                                <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/>
-                            </svg>
-                            {fmtTime(ev.start_date)}
-                        </div>
-                    </div>
+        <div style={{ background: "white", borderRadius: "16px", overflow: "hidden", border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)", display: "flex", flexDirection: "column", transition: "transform 0.2s" }}>
+            <div style={{ position: "relative", height: "80px", background: `linear-gradient(135deg, ${emojiBg(ev)} 0%, #f8fafc 100%)`, padding: "16px", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.2 }}>{eventEmoji(ev)}</div>
+                <div style={{ display: "flex", gap: "8px", position: "relative", zIndex: 1 }}>
+                    <span style={{ background: "white", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "700", color: "#334155", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>{TYPE_LABELS[ev.event_type] || ev.event_type || "Sự kiện"}</span>
+                    <span className={`emp-badge ${s.cls}`} style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.05)" }}>{s.label}</span>
+                    {reg && <span style={{ background: "#dcfce7", color: "#166534", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "700", border: "1px solid #bbf7d0" }}>✓ Đã tham gia</span>}
                 </div>
             </div>
-            <div className="emp-ec-footer">
-                {ev.capacity > 0 ? (
-                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <span style={{ fontSize:12, color:"var(--emp-text2)" }}>{ev.registered_count || 0}/{ev.capacity}</span>
-                        <div className="emp-cap-bar">
-                            <div className="emp-cap-fill" style={{ width:`${pct}%`, background:capColor }} />
-                        </div>
-                        <span style={{ fontSize:11, color:capColor, fontWeight:600 }}>{pct}%</span>
+            
+            <div style={{ padding: "20px", flex: 1, display: "flex", flexDirection: "column" }}>
+                <h3 style={{ margin: "0 0 12px 0", fontSize: "18px", color: "#1e293b", lineHeight: "1.4" }}>{ev.name}</h3>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px", flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#64748b", fontSize: "13px" }}>
+                        <span style={{ fontSize: "16px" }}>📅</span> {fmtDate(ev.start_date)} - {fmtTime(ev.start_date)}
                     </div>
-                ) : <div />}
-                <div style={{ display:"flex", gap:8 }}>
-                    {reg && attRow && (
-                        <button className="emp-btn emp-btn-outline emp-btn-sm" onClick={() => onQR(attRow)}>📱 QR</button>
+                    {ev.location && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#64748b", fontSize: "13px" }}>
+                            <span style={{ fontSize: "16px" }}>📍</span> {ev.location}
+                        </div>
                     )}
+                </div>
+
+                {ev.capacity > 0 && (
+                    <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", marginBottom: "16px", border: "1px solid #f1f5f9" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#475569", marginBottom: "6px", fontWeight: "600" }}>
+                            <span>Sức chứa: {ev.registered_count || 0}/{ev.capacity}</span>
+                            <span style={{ color: capColor }}>{pct}%</span>
+                        </div>
+                        <div style={{ width: "100%", height: "6px", background: "#e2e8f0", borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{ width: `${pct}%`, height: "100%", background: capColor, borderRadius: "3px", transition: "width 0.3s ease" }} />
+                        </div>
+                    </div>
+                )}
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "auto" }}>
+                    <button style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", color: "#475569", fontWeight: "600", cursor: "pointer" }} onClick={() => navigate(`/events/${ev.id}`)}>
+                        👀 Chi tiết
+                    </button>
+                    
                     {reg ? (
-                        <button className="emp-btn emp-btn-cancel emp-btn-sm" disabled={busy} onClick={() => onCancel(ev)}>
-                            {busy ? "..." : "Huỷ đăng ký"}
-                        </button>
+                        <div style={{ display: "flex", gap: "8px", flex: 1 }}>
+                            {attRow && (
+                                <button style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #818cf8", background: "#e0e7ff", color: "#4338ca", fontWeight: "600", cursor: "pointer" }} onClick={() => onQR(attRow)}>
+                                    📱 Mã QR
+                                </button>
+                            )}
+                            <button style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #fecdd3", background: "#fff1f2", color: "#be123c", fontWeight: "600", cursor: "pointer" }} disabled={busy} onClick={() => onCancel(ev)}>
+                                {busy ? "..." : "Huỷ"}
+                            </button>
+                        </div>
                     ) : canReg ? (
-                        <button className="emp-btn emp-btn-primary emp-btn-sm" disabled={busy} onClick={() => onRegister(ev)}>
-                            {busy ? "..." : "Đăng ký ngay"}
+                        <button style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", background: "linear-gradient(to right, #4f46e5, #ec4899)", color: "white", fontWeight: "600", cursor: "pointer", boxShadow: "0 4px 6px -1px rgba(79, 70, 229, 0.3)" }} disabled={busy} onClick={() => onRegister(ev)}>
+                            {busy ? "⏳ Chờ..." : "✨ Đăng ký ngay"}
                         </button>
                     ) : (
-                        <button className="emp-btn emp-btn-outline emp-btn-sm" disabled style={{ opacity:0.4, cursor:"not-allowed" }}>
+                        <button style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", background: "#f1f5f9", color: "#94a3b8", fontWeight: "600", cursor: "not-allowed" }} disabled>
                             {ev.status === "completed" ? "Đã kết thúc" : ev.status === "cancelled" ? "Đã huỷ" : "Chưa mở"}
                         </button>
                     )}
-                    <button className="emp-btn emp-btn-outline emp-btn-sm" onClick={() => navigate(`/events/${ev.id}`)}>Chi tiết</button>
                 </div>
             </div>
         </div>
