@@ -21,4 +21,7 @@ router.post("/:id/deadlines", auth, authorize(["admin", "organizer"]), c.createD
 router.patch("/:id/deadlines/:deadlineId", auth, authorize(["admin", "organizer"]), c.toggleDeadline);
 router.delete("/:id/deadlines/:deadlineId", auth, authorize(["admin", "organizer"]), c.deleteDeadline);
 
+// ── Notifications ─────────────────────────────
+router.post("/:id/broadcast", auth, authorize(["admin", "organizer"]), c.broadcastNotification);
+
 module.exports = router;

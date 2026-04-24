@@ -180,8 +180,23 @@ const deleteDeadline = async (deadlineId) => {
     await Deadline.delete(deadlineId);
 };
 
+const broadcastNotification = async (eventId, data) => {
+    const { broadcast } = require("./notificationService");
+    const db = require("../config/db");
+    const [rows] = await db.execute(
+        "SELECT user_id FROM attendees WHERE event_id = ? AND user_id IS NOT NULL", 
+        [eventId]
+    );
+    const userIds = rows.map(r => r.user_id);
+    if (userIds.length > 0) {
+        await broadcast(userIds, { ...data, link: `/events/${eventId}` });
+    }
+    return { notifiedCount: userIds.length };
+};
+
 module.exports = {
     getAllEvents, getEventById,
     createEvent, updateEvent, changeStatus, deleteEvent,
     getDeadlines, createDeadline, toggleDeadline, deleteDeadline,
+    broadcastNotification
 };
