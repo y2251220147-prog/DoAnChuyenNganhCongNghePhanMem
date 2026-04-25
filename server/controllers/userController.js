@@ -38,3 +38,24 @@ exports.deleteUser = async (req, res) => {
         res.json({ message: "User deleted" });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
+
+// --- AUTHENTICATED PROFILE ACTIONS ---
+
+exports.getProfile = async (req, res) => {
+    try {
+        const user = await userService.getUserById(req.user.id);
+        res.json(user);
+    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
+exports.updateProfile = async (req, res) => {
+    const { name, phone, gender, address } = req.body;
+    if (!name) return res.status(400).json({ message: "Name is required" });
+    
+    try {
+        const updatedUser = await userService.updateUserProfile(req.user.id, { 
+            name, phone, gender, address 
+        });
+        res.json({ message: "Profile updated", user: updatedUser });
+    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};

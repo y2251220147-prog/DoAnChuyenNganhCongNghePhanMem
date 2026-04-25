@@ -39,6 +39,15 @@ exports.createGuest = async (req, res) => {
     }
 };
 
+exports.bulkInvite = async (req, res) => {
+    try {
+        const result = await guestService.bulkInvite(req.body);
+        res.json(result);
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
+
 exports.deleteGuest = async (req, res) => {
     try {
         await guestService.deleteGuest(req.params.id);

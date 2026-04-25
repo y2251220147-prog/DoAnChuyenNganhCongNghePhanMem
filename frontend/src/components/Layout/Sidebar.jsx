@@ -6,7 +6,6 @@ import "../../styles/layout.css";
 
 const NAV = {
     // Admin = Quản trị hệ thống: phê duyệt, thống kê, kiểm soát toàn bộ
-    // KHÔNG cần đăng ký tham dự sự kiện như nhân viên
     admin: [
         {
             label: "Tổng quan", items: [
@@ -29,13 +28,12 @@ const NAV = {
         {
             label: "Hệ thống", items: [
                 { to: "/admin/users", icon: "🔧", text: "Quản lý tài khoản", badge: "Admin" },
+                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
         },
     ],
-    // Organizer = Ban tổ chức: tạo & vận hành sự kiện
-    // Vẫn là nhân viên → có thể tham dự sự kiện của ban tổ chức khác
     organizer: [
         {
             label: "Tổng quan", items: [
@@ -57,13 +55,13 @@ const NAV = {
         },
         {
             label: "Cá nhân", items: [
+                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/my-portal", icon: "🙋", text: "Sự kiện của tôi" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
         },
     ],
-    // User = Nhân viên công ty: chỉ cần tham dự & phản hồi
     user: [
         {
             label: "Trang chủ", items: [
@@ -88,7 +86,7 @@ const NAV = {
 };
 
 export default function Sidebar() {
-    const { user, logoutUser } = useContext(AuthContext);
+    const { user, logoutUser, getAvatarUrl } = useContext(AuthContext);
     const navigate = useNavigate();
     const role = user?.role || "user";
     const sections = NAV[role] || NAV.user;
@@ -122,7 +120,6 @@ export default function Sidebar() {
                                 <span className="nav-icon">{item.icon}</span>
                                 {item.text}
                                 {item.badge && <span className="nav-badge">{item.badge}</span>}
-                                {/* Badge số thông báo chưa đọc */}
                                 {item.to === "/notifications" && unread > 0 && (
                                     <span style={{
                                         marginLeft: "auto", background: "var(--color-danger, #ef4444)",
@@ -141,7 +138,12 @@ export default function Sidebar() {
             </nav>
             <div className="sidebar-footer">
                 <div className="sidebar-user">
-                    <div className="sidebar-avatar">{initials}</div>
+                    <div className="sidebar-avatar">
+                        {user?.avatar ? (
+                            <img src={getAvatarUrl(user.avatar)} alt="Avatar" 
+                                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : initials}
+                    </div>
                     <div className="sidebar-user-info">
                         <div className="user-name">{user?.name || "User"}</div>
                         <div className="user-role">{role}</div>

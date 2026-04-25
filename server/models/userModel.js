@@ -14,7 +14,7 @@ const User = {
         return result.insertId;
     },
     async getAllUsers() {
-        const [rows] = await db.query("SELECT id, name, email, role, created_at FROM users ORDER BY id DESC");
+        const [rows] = await db.query("SELECT id, name, email, role, avatar, phone, gender, address, created_at FROM users ORDER BY id DESC");
         return rows;
     },
     async findById(id) {
@@ -29,6 +29,16 @@ const User = {
     },
     async deleteUser(id) {
         await db.query("DELETE FROM users WHERE id = ?", [id]);
+    },
+    async updateAvatar(id, avatarUrl) {
+        await db.query("UPDATE users SET avatar = ? WHERE id = ?", [avatarUrl, id]);
+    },
+    async updateProfile(id, data) {
+        const { name, phone, gender, address } = data;
+        await db.query(
+            "UPDATE users SET name = ?, phone = ?, gender = ?, address = ? WHERE id = ?",
+            [name, phone, gender, address, id]
+        );
     }
 };
 

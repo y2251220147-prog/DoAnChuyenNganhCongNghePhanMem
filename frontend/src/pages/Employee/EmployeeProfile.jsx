@@ -4,6 +4,7 @@ import EmployeeLayout from "../../components/Layout/EmployeeLayout";
 import { AuthContext } from "../../context/AuthContext";
 import { getMyRegistrations } from "../../services/attendeeService";
 import { getNotifications } from "../../services/notificationService";
+import UploadAvatar from "../../components/UploadAvatar";
 import "../../styles/employee-theme.css";
 
 export default function EmployeeProfile() {
@@ -42,7 +43,7 @@ export default function EmployeeProfile() {
         <EmployeeLayout title="Hồ sơ &amp; Cài đặt" unreadCount={unread}>
             {/* Profile header */}
             <div className="emp-profile-header">
-                <div className="emp-profile-avatar">{initials}</div>
+                <UploadAvatar />
                 <div style={{ flex:1 }}>
                     <div style={{ fontSize:19, fontWeight:600 }}>{user?.name || "Nhân viên"}</div>
                     <div style={{ fontSize:13, color:"var(--emp-text2)", marginTop:3 }}>

@@ -16,6 +16,7 @@ exports.create = async (q, s) => { try { ok(s, await svc.create(q.body, q.user.i
 exports.update = async (q, s) => { try { await svc.update(q.params.id, q.body, q.user.id); ok(s, { message: "OK" }); } catch (e) { err(s, e); } };
 exports.updateStatus = async (q, s) => { try { await svc.updateStatus(q.params.id, q.body.status, q.user.id); ok(s, { message: "OK" }); } catch (e) { err(s, e); } };
 exports.updateProgress = async (q, s) => { try { await svc.updateProgress(q.params.id, q.body.progress, q.user.id); ok(s, { message: "OK" }); } catch (e) { err(s, e); } };
+exports.updateFeedback = async (q, s) => { try { await svc.updateFeedback(q.params.id, q.body, q.user.id); ok(s, { message: "OK" }); } catch (e) { err(s, e); } };
 exports.delete = async (q, s) => { try { await svc.delete(q.params.id); ok(s, { message: "Đã xóa" }); } catch (e) { err(s, e); } };
 
 // Comments
