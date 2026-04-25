@@ -4,16 +4,16 @@ import { AuthContext } from "../../context/AuthContext";
 import {
     createPhase, deletePhase, getPhases,
     createTask, updateTask, updateTaskStatus, updateTaskProgress, deleteTask,
-    getComments, addComment, deleteComment, getHistory, getTaskStats
+    getComments, addComment, deleteComment, getHistory, getTaskStats,
+    getTasksByEvent
 } from "../../services/taskService";
+import { getDeadlines, createDeadline, deleteDeadline } from "../../services/eventService";
 
 // ─── Hằng số ─────────────────────────────────────────────────
 const STATUSES = [
     { key: "todo", label: "Chưa bắt đầu", color: "#94a3b8" },
     { key: "in_progress", label: "Đang làm", color: "#f59e0b" },
-    { key: "review", label: "Chờ duyệt", color: "#6366f1" },
     { key: "done", label: "Hoàn thành", color: "#10b981" },
-    { key: "cancelled", label: "Đã hủy", color: "#ef4444" },
 ];
 const PRIORITY_CFG = {
     high: { label: "Cao", color: "#ef4444", bg: "#fef2f2" },
@@ -162,7 +162,7 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
 
 // ─── Main Component ──────────────────────────────────────────
 export default function TaskBoard({ 
-    eventId, staffList = [], canManage, deadlines = [], 
+    eventId, staffList = [], canManage, 
     externalFilterDeadlineId, onClearExternalFilter 
 }) {
     const { user } = useContext(AuthContext);
@@ -200,35 +200,60 @@ export default function TaskBoard({
     const [filterAssignee, setFilterAssignee] = useState("all");
     const [search, setSearch] = useState("");
 
+    // Deadline management (integrated in TaskForm)
+    const [showNewDlFields, setShowNewDlFields] = useState(false);
+    const [dlForm, setDlForm] = useState({ title: "", due_date: "", note: "", assigned_to: "" });
+    const [deadlines, setDeadlines] = useState([]);
+
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [ph, tk, st] = await Promise.all([
+            const [ph, tk, st, dl] = await Promise.all([
                 getPhases(eventId),
-                import("../../services/taskService").then(m => m.getTasksByEvent(eventId)),
-                import("../../services/taskService").then(m => m.getTaskStats(eventId)),
+                getTasksByEvent(eventId),
+                getTaskStats(eventId),
+                getDeadlines(eventId),
             ]);
             setPhases(ph.data || []);
             setTasks(tk.data || []);
             setStats(st.data || null);
-        } catch {/**/ }
-        finally { setLoading(false); }
+            setDeadlines(dl.data || []);
+        } catch (err) {
+            console.error("TaskBoard loadAll error:", err);
+        } finally {
+            setLoading(false);
+        }
     };
     useEffect(() => { loadAll(); }, [eventId]);
 
     // ── Kanban drag & drop ───────────────────────────────────
-    const onDragStart = (e, id) => { setDrag(id); e.dataTransfer.effectAllowed = "move"; };
+    const onDragStart = (e, id) => { 
+        setDrag(id); 
+        e.dataTransfer.setData("taskId", id);
+        e.dataTransfer.effectAllowed = "move"; 
+    };
     const onDragOver = (e) => { e.preventDefault(); };
+    const handleStatusChange = async (id, status) => {
+        try {
+            await updateTaskStatus(id, status);
+            // Đợi tải lại dữ liệu của bảng trước
+            await loadAll();
+            // Sau đó báo cho trang mẹ cập nhật tiến độ nhân sự
+            if (onRefreshParent) {
+                await onRefreshParent();
+            }
+        } catch (err) { 
+            console.error("Status update error:", err);
+            // Nếu lỗi thì tải lại để đảm bảo UI đúng với DB
+            await loadAll();
+        }
+    };
+
     const onDrop = async (e, status) => {
         e.preventDefault();
-        if (!drag) return;
-        const task = tasks.find(t => t.id === drag);
-        if (task && task.status !== status) {
-            setTasks(prev => prev.map(t => t.id === drag ? { ...t, status } : t));
-            await updateTaskStatus(drag, status);
-            await loadAll();
-            if (onRefreshParent) onRefreshParent();
-        }
+        const id = e.dataTransfer.getData("taskId") || drag;
+        if (!id) return;
+        await handleStatusChange(id, status);
         setDrag(null);
     };
 
@@ -314,13 +339,29 @@ export default function TaskBoard({
     const handleSaveTask = async (e) => {
         e.preventDefault(); setFormErr(""); setSaving(true);
         try {
-            if (editId) await updateTask(editId, { ...form, event_id: eventId });
-            else await createTask({ ...form, event_id: eventId });
-            setFormModal(false); setOpenTask(null); 
+            let finalDeadlineId = form.deadline_id;
+
+            // Nếu người dùng đang nhập mốc mới, tạo nó trước
+            if (showNewDlFields) {
+                if (!dlForm.title || !dlForm.due_date) {
+                    throw new Error("Vui lòng nhập tên và ngày hạn cho mốc Deadline mới");
+                }
+                const newDl = await createDeadline(eventId, dlForm);
+                finalDeadlineId = newDl.data.id;
+            }
+
+            const data = { ...form, deadline_id: finalDeadlineId, event_id: eventId };
+            if (editId) await updateTask(editId, data);
+            else await createTask(data);
+
+            setFormModal(false);
+            setShowNewDlFields(false);
+            setDlForm({ title: "", due_date: "", note: "", assigned_to: "" });
             await loadAll();
             if (onRefreshParent) onRefreshParent();
-        } catch (err) { setFormErr(err.response?.data?.message || "Lưu thất bại"); }
-        finally { setSaving(false); }
+        } catch (err) {
+            setFormErr(err.response?.data?.message || err.message || "Lưu thất bại");
+        } finally { setSaving(false); }
     };
 
     const handleDeleteTask = async (id) => {
@@ -346,6 +387,23 @@ export default function TaskBoard({
         catch { alert("Không thể xóa giai đoạn đang có nhiệm vụ"); }
     };
 
+    // ── Deadline management ──────────────────────────────────
+    const handleCreateDeadline = async (e) => {
+        e.preventDefault(); setDlSaving(true);
+        try {
+            await createDeadline(eventId, dlForm);
+            setDlForm({ title: "", due_date: "", note: "", assigned_to: "" });
+            await loadAll();
+        } catch (err) { alert(err.response?.data?.message || "Thêm thất bại"); }
+        finally { setDlSaving(false); }
+    };
+
+    const handleDeleteDl = async (dlId) => {
+        if (!window.confirm("Xóa mốc deadline này?")) return;
+        try { await deleteDeadline(eventId, dlId); await loadAll(); }
+        catch { alert("Xóa thất bại"); }
+    };
+
     // ── Filter ───────────────────────────────────────────────
     const applyFilters = (t) => {
         if (externalFilterDeadlineId && t.deadline_id !== externalFilterDeadlineId) return false;
@@ -358,7 +416,15 @@ export default function TaskBoard({
     const filtered = tasks.filter(applyFilters);
 
     // Group by phase for kanban
-    const topTasks = (status) => filtered.filter(t => t.status === status && !t.parent_id);
+    const topTasks = (status) => {
+        return filtered.filter(t => {
+            if (!t.parent_id) {
+                if (status === 'in_progress') return t.status === 'in_progress' || t.status === 'review';
+                return t.status === status;
+            }
+            return false;
+        });
+    };
 
     if (loading) return <div className="empty-state"><span>⏳</span><p>Đang tải nhiệm vụ...</p></div>;
 
@@ -474,7 +540,7 @@ export default function TaskBoard({
                         <button className="btn btn-outline"
                             style={{ borderRadius: 12, height: 44, fontWeight: 700, padding: "0 20px" }}
                             onClick={() => { setPhaseForm({ name: "", color: "#6366f1" }); setPhaseModal(true); }}>
-                            ⚙️ Quản lý Giai đoạn
+                            ⚙️ Giai đoạn
                         </button>
                         <button className="btn btn-primary" 
                             style={{ borderRadius: 12, height: 44, fontWeight: 700, padding: "0 24px", boxShadow: "0 4px 12px rgba(99,102,241,0.2)" }}
@@ -488,8 +554,8 @@ export default function TaskBoard({
             {/* ════ VIEW: KANBAN ════ */}
             {viewMode === "kanban" && (
                 <div style={{ 
-                    display: "grid", gridTemplateColumns: "repeat(5, minmax(280px, 1fr))", 
-                    gap: 16, alignItems: "start", height: "calc(100vh - 350px)", minHeight: 600
+                    display: "grid", gridTemplateColumns: "repeat(3, minmax(300px, 1fr))", 
+                    gap: 20, alignItems: "start", height: "calc(100vh - 350px)", minHeight: 600
                 }}>
                     {STATUSES.map(col => {
                         const colTasks = topTasks(col.key);
@@ -869,12 +935,39 @@ export default function TaskBoard({
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Liên kết với Deadline</label>
-                            <select className="form-control" value={form.deadline_id}
-                                onChange={e => setForm({ ...form, deadline_id: e.target.value })}>
-                                <option value="">Không liên kết</option>
-                                {deadlines.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-                            </select>
+                            <label style={{ display: "flex", justifyContent: "space-between" }}>
+                                Liên kết với Deadline (Mốc quan trọng)
+                                <button type="button" onClick={() => setShowNewDlFields(!showNewDlFields)} 
+                                    style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: 12, fontWeight: 800 }}>
+                                    {showNewDlFields ? "✕ Hủy tạo mới" : "+ Tạo mốc mới"}
+                                </button>
+                            </label>
+                            
+                            {!showNewDlFields ? (
+                                <select className="form-control" value={form.deadline_id}
+                                    onChange={e => setForm({ ...form, deadline_id: e.target.value })}>
+                                    <option value="">Không liên kết</option>
+                                    {deadlines.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+                                </select>
+                            ) : (
+                                <div style={{ 
+                                    padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px dashed var(--color-primary)",
+                                    marginTop: 8, display: "flex", flexDirection: "column", gap: 12
+                                }}>
+                                    <div style={{ fontSize: 11, fontWeight: 800, color: "var(--color-primary)", textTransform: "uppercase" }}>✨ Thông tin mốc Deadline mới</div>
+                                    <input className="form-control form-control-sm" placeholder="Tên mốc (VD: Hoàn thành setup...)"
+                                        value={dlForm.title} onChange={e => setDlForm({...dlForm, title: e.target.value})} />
+                                    <div className="grid-2" style={{ gap: 8 }}>
+                                        <input type="datetime-local" className="form-control form-control-sm"
+                                            value={dlForm.due_date} onChange={e => setDlForm({...dlForm, due_date: e.target.value})} />
+                                        <select className="form-control form-control-sm" value={dlForm.assigned_to}
+                                            onChange={e => setDlForm({...dlForm, assigned_to: e.target.value})}>
+                                            <option value="">Giao mốc cho...</option>
+                                            {staffList.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.user_name || s.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -994,6 +1087,8 @@ export default function TaskBoard({
                     <button type="submit" className="btn btn-primary w-full">+ Thêm giai đoạn</button>
                 </form>
             </Modal>
+
+
         </div>
     );
 }

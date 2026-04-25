@@ -43,6 +43,15 @@ const WORKFLOW_NEXT = {
     completed: [], cancelled: [],
 };
 
+const TABS = [
+    { key: "overview", label: "📊 Tổng quan" },
+    { key: "tasks", label: "📋 Công việc" },
+    { key: "participants", label: "👥 Người tham gia" },
+    { key: "staff", label: "👷 Ban tổ chức" },
+    { key: "timeline", label: "🗓️ Lịch trình" },
+    { key: "budget", label: "💰 Ngân sách" },
+];
+
 function StatusBadge({ status }) {
     const cfg = STATUS_CFG[status] || STATUS_CFG.draft;
     return (
@@ -83,12 +92,16 @@ export default function EventDetail() {
     const [dlProbId, setDlProbId] = useState(null);
     const [dlProbNote, setDlProbNote] = useState("");
 
-    // Modal Bulk Invite
+    // Modal Xem vấn đề & Mời khách
+    const [viewProbDl, setViewProbDl] = useState(null);
+    const [viewProbModal, setViewProbModal] = useState(false);
     const [bulkModal, setBulkModal] = useState(false);
     const [bulkForm, setBulkForm] = useState({ guests: "", subject: "", content: "" });
     const [bulkSending, setBulkSending] = useState(false);
-    const [viewProbModal, setViewProbModal] = useState(false);
-    const [viewProbDl, setViewProbDl] = useState(null);
+    
+    const [staffModal, setStaffModal] = useState(false);
+    const [staffForm, setStaffForm] = useState({ user_id: "", role: "support" });
+    const [staffSaving, setStaffSaving] = useState(false);
 
     const role = user?.role?.toLowerCase();
     const isAdmin = role === "admin";
@@ -107,7 +120,7 @@ export default function EventDetail() {
 
     const loadTasks = useCallback(async () => {
         try {
-            const r = await getTasksByEvent(id);
+            const r = await api.get(`/tasks/event/${id}?t=${Date.now()}`);
             setTasks(r.data || []);
         } catch (err) {
             console.error("loadTasks error:", err);
@@ -143,13 +156,28 @@ export default function EventDetail() {
         finally { setLoading(false); }
     }, [id]);
 
-    useEffect(() => { loadAll(); loadTasks(); fetchUsers(); }, [loadAll, loadTasks, fetchUsers]);
+    const refreshData = useCallback(async () => {
+        await Promise.all([loadAll(), loadTasks()]);
+    }, [loadAll, loadTasks]);
+
+    useEffect(() => { refreshData(); fetchUsers(); }, [refreshData, fetchUsers]);
 
     const fmtVND = n => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
     const fmtDT = d => d ? new Date(d).toLocaleString("vi-VN") : "—";
 
     const doneCount = deadlines.filter(d => d.status === 'done').length;
     const dlProgress = deadlines.length > 0 ? Math.round((doneCount / deadlines.length) * 100) : 0;
+    
+    // Tiến độ dựa trên nhiệm vụ (Task Progress)
+    const taskDoneCount = tasks.filter(t => t.status === 'done').length;
+    const taskScore = tasks.reduce((acc, t) => {
+        if (t.status === "done") return acc + 100;
+        if (t.status === "review" || t.status === "in_progress") return acc + 50;
+        return acc;
+    }, 0);
+    const taskProgress = tasks.length > 0 ? Math.round(taskScore / tasks.length) : 0;
+    const isAllTasksDone = tasks.length > 0 && taskDoneCount === tasks.length;
+
     const totalParticipants = guests.length + attendees.length;
     const checkedIn = guests.filter(g => g.checked_in).length + attendees.filter(a => a.checked_in).length;
     const checkinPct = totalParticipants > 0 ? Math.round((checkedIn / totalParticipants) * 100) : 0;
@@ -202,6 +230,34 @@ export default function EventDetail() {
         finally { setDlSaving(false); }
     };
 
+    const handleAssignStaff = async (e) => {
+        e.preventDefault();
+        if (!staffForm.user_id) return alert("Vui lòng chọn nhân viên");
+        setStaffSaving(true);
+        try {
+            await api.post("/staff", { ...staffForm, event_id: id });
+            setStaffModal(false); setStaffForm({ user_id: "", role: "support" });
+            loadAll();
+        } catch (err) { alert(err.response?.data?.message || "Gán nhân sự thất bại"); }
+        finally { setStaffSaving(false); }
+    };
+
+    const handleRemoveStaff = async (staffId) => {
+        if (!window.confirm("Loại bỏ nhân sự này khỏi sự kiện?")) return;
+        try {
+            await api.delete(`/staff/${staffId}`);
+            loadAll();
+        } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
+    };
+
+    const handleCompleteEvent = async () => {
+        if (!window.confirm("Bạn có chắc chắn muốn kết thúc sự kiện này? Tất cả công việc đã hoàn thành.")) return;
+        try {
+            await changeStatus(id, "completed");
+            loadAll();
+        } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
+    };
+
     const handleBulkInvite = async (e) => {
         e.preventDefault();
         setBulkSending(true);
@@ -244,7 +300,6 @@ export default function EventDetail() {
     const TABS = [
         { key: "overview", label: "📋 Tổng quan" },
         { key: "tasks", label: `✅ Công việc (${tasks.length})` },
-        { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})` },
         { key: "participants", label: `🎟️ Người tham gia (${totalParticipants})` },
         { key: "staff", label: `👥 Staff (${staff.length})` },
         { key: "timeline", label: `🗓️ Timeline (${timeline.length})` },
@@ -336,25 +391,7 @@ export default function EventDetail() {
                 </div>
             </div>
 
-            {/* Quick Stats Grid */}
-            <div className="grid-4" style={{ marginBottom: 32 }}>
-                <div className="card-stat">
-                    <div className="card-stat-icon indigo">📡</div>
-                    <div className="card-stat-info"><h3>{dlProgress}%</h3><p>Tiến độ dự án</p></div>
-                </div>
-                <div className="card-stat">
-                    <div className="card-stat-icon emerald">✅</div>
-                    <div className="card-stat-info"><h3>{checkinPct}%</h3><p>Tỷ lệ Check-in</p></div>
-                </div>
-                <div className="card-stat">
-                    <div className="card-stat-icon amber">⏳</div>
-                    <div className="card-stat-info"><h3>{deadlines.length - doneCount}</h3><p>Việc còn lại</p></div>
-                </div>
-                <div className="card-stat">
-                    <div className="card-stat-icon rose">⚠️</div>
-                    <div className="card-stat-info"><h3>{deadlines.filter(d => d.status === 'problem').length}</h3><p>Đang có vấn đề</p></div>
-                </div>
-            </div>
+
 
             {/* ── Tabs ── */}
             <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
@@ -369,7 +406,69 @@ export default function EventDetail() {
 
             {/* ════ TAB: OVERVIEW ════ */}
             {tab === "overview" && (
-                <div className="grid-3" style={{ alignItems: "start" }}>
+                <div style={{ marginBottom: 32 }}>
+                    {/* Quick Stats Grid */}
+                    <div className="grid-4" style={{ marginBottom: 32 }}>
+                        <div className="card-stat">
+                            <div className="card-stat-icon indigo">📡</div>
+                            <div className="card-stat-info"><h3>{dlProgress}%</h3><p>Tiến độ dự án</p></div>
+                        </div>
+                        <div className="card-stat">
+                            <div className="card-stat-icon emerald">✅</div>
+                            <div className="card-stat-info"><h3>{checkinPct}%</h3><p>Tỷ lệ Check-in</p></div>
+                        </div>
+                        <div className="card-stat">
+                            <div className="card-stat-icon amber">⏳</div>
+                            <div className="card-stat-info"><h3>{deadlines.length - doneCount}</h3><p>Việc còn lại</p></div>
+                        </div>
+                        <div className="card-stat">
+                            <div className="card-stat-icon rose">⚠️</div>
+                            <div className="card-stat-info"><h3>{deadlines.filter(d => d.status === 'problem').length}</h3><p>Đang có vấn đề</p></div>
+                        </div>
+                    </div>
+                    {/* Nút hoàn tất sự kiện tự động khi xong việc */}
+                    {canManage && event.status !== 'completed' && (
+                        <div style={{ 
+                            marginBottom: 24, padding: 24, borderRadius: 24, 
+                            background: isAllTasksDone ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : "white",
+                            color: isAllTasksDone ? "white" : "inherit",
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                            border: isAllTasksDone ? "none" : "1px solid var(--border-color)"
+                        }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                                <div style={{ 
+                                    width: 56, height: 56, borderRadius: 16, 
+                                    background: isAllTasksDone ? "rgba(255,255,255,0.2)" : "rgba(16,185,129,0.1)",
+                                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24
+                                }}>
+                                    {isAllTasksDone ? "🎉" : "📋"}
+                                </div>
+                                <div>
+                                    <h4 style={{ fontWeight: 800, fontSize: 18, marginBottom: 4 }}>Trạng thái vận hành sự kiện</h4>
+                                    <p style={{ fontSize: 14, opacity: 0.8 }}>
+                                        {isAllTasksDone 
+                                            ? "Tất cả nhiệm vụ đã hoàn thành! Bạn có thể đóng hồ sơ sự kiện ngay bây giờ."
+                                            : `Tiến độ công việc: ${taskProgress}%. Hoàn thành tất cả ${tasks.length} nhiệm vụ để kết thúc sự kiện.`}
+                                    </p>
+                                </div>
+                            </div>
+                            <button className="btn" 
+                                disabled={!isAllTasksDone}
+                                onClick={handleCompleteEvent}
+                                style={{ 
+                                    background: isAllTasksDone ? "white" : "#f1f5f9", 
+                                    color: isAllTasksDone ? "#059669" : "#94a3b8",
+                                    fontWeight: 800, padding: "14px 28px", borderRadius: 16, border: "none", 
+                                    cursor: isAllTasksDone ? "pointer" : "not-allowed",
+                                    boxShadow: isAllTasksDone ? "0 4px 12px rgba(0,0,0,0.1)" : "none"
+                                }}>
+                                {isAllTasksDone ? "XÁC NHẬN HOÀN TẤT" : "CHƯA THỂ KẾT THÚC"}
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="grid-3" style={{ alignItems: "start" }}>
                     <div className="card">
                         <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 20 }}>📋</span> Thông tin chung
@@ -463,179 +562,25 @@ export default function EventDetail() {
                                     onClick={() => setBulkModal(true)}>
                                     💌 Mời khách hàng loạt
                                 </button>
-                                <button className="btn btn-primary w-full" style={{ background: "rgba(255,255,255,0.1)", border: "none" }}
-                                    onClick={() => setDlModal(true)}>
-                                    ➕ Thêm Deadline mới
-                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* ════ TAB: DEADLINES ════ */}
-            {tab === "deadlines" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <div>
-                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🔥 Deadlines nội bộ</h3>
-                            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                                Các mốc quan trọng trước ngày diễn ra sự kiện
-                            </p>
-                        </div>
-                        {canManage && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setDlModal(true)}>+ Thêm deadline</button>
-                        )}
-                    </div>
-                    {deadlines.length === 0 ? (
-                        <div className="empty-state"><span>🔥</span><p>Chưa có deadline nào</p></div>
-                    ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr><th>Hạng mục</th><th>Hạn chót</th><th>Người thực hiện</th><th>Ghi chú</th><th>Trạng thái</th>
-                                    {canManage && <th>Thao tác</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {deadlines.map(dl => {
-                                    const dueObj = new Date(dl.due_date);
-                                    const nowObj = new Date();
-                                    const isToday = dueObj.toDateString() === nowObj.toDateString();
-                                    const isOverdue = dl.status !== 'done' && dl.status !== 'completed' && dueObj < nowObj && !isToday;
-                                    const st = DL_STATUS_CFG[dl.status] || DL_STATUS_CFG.pending;
-
-                                    return (
-                                    <>
-                                        <tr key={dl.id}>
-                                            <td style={{ fontWeight: 800 }}>
-                                                <button 
-                                                    onClick={() => setExpandedDlId(expandedDlId === dl.id ? null : dl.id)}
-                                                    style={{ 
-                                                        background: "none", border: "none", padding: 0, 
-                                                        color: "var(--color-primary)", fontWeight: 800, 
-                                                        cursor: "pointer", textDecoration: "none",
-                                                        textAlign: "left", display: "flex", alignItems: "center", gap: 6
-                                                    }}>
-                                                    <span>{expandedDlId === dl.id ? "▼" : "▶"}</span>
-                                                    {dl.title}
-                                                </button>
-                                            </td>
-                                            <td style={{ color: isOverdue ? "#dc2626" : "var(--text-primary)", fontWeight: isOverdue ? 700 : 400 }}>
-                                                {fmtDT(dl.due_date)} {isOverdue && "⚠️"}
-                                            </td>
-                                            <td style={{ fontSize: 13, fontWeight: 600 }}>👤 {dl.assigned_name || "—"}</td>
-                                            <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{dl.note || "—"}</td>
-                                            <td>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <span style={{
-                                                        display: "inline-flex", padding: "3px 10px", borderRadius: 4,
-                                                        fontSize: 11, fontWeight: 700, background: st.bg, color: st.color
-                                                    }}>
-                                                        {isOverdue && dl.status === 'pending' ? "🔴 Trễ hạn" : st.label}
-                                                    </span>
-                                                    {dl.status === 'problem' && (
-                                                        <button className="btn btn-sm btn-outline" 
-                                                            style={{ padding: "0 6px", fontSize: 10, height: 22 }}
-                                                            onClick={() => handleOpenViewProb(dl)}
-                                                            title="Xem chi tiết vấn đề">👁</button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            {canManage && (
-                                                <td>
-                                                    <div className="actions" style={{ gap: 4 }}>
-                                                        {/* Nút dành riêng cho Organizer (Người thực hiện) */}
-                                                        {isOrganizer && (
-                                                            <>
-                                                                {dl.status === 'pending' && (
-                                                                    <button className="btn btn-sm btn-outline"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'working')}>▶ Bắt đầu</button>
-                                                                )}
-                                                                {(dl.status === 'working' || dl.status === 'problem' || dl.status === 'pending') && (
-                                                                    <button className="btn btn-sm btn-success"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'completed')}>✓ Hoàn thành</button>
-                                                                )}
-                                                                {dl.status !== 'done' && dl.status !== 'problem' && (
-                                                                    <button className="btn btn-sm btn-warning"
-                                                                        onClick={() => handleOpenProbModal(dl)}>⚠️ Báo lỗi</button>
-                                                                )}
-                                                            </>
-                                                        )}
-
-                                                        {/* Nút dành riêng cho Admin (Người phê duyệt) */}
-                                                        {isAdmin && (
-                                                            <>
-                                                                {dl.status === 'completed' && (
-                                                                    <button className="btn btn-sm btn-primary"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'done')}>⭐ Phê duyệt</button>
-                                                                )}
-                                                                {dl.status === 'done' && (
-                                                                    <button className="btn btn-sm btn-outline"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'working')}>↩ Hoàn tác</button>
-                                                                )}
-                                                            </>
-                                                        )}
-
-                                                        <button className="btn btn-danger btn-sm"
-                                                            onClick={() => handleDeleteDl(dl.id)} title="Xóa">🗑</button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                        {expandedDlId === dl.id && (
-                                            <tr key={`expanded-${dl.id}`} style={{ background: "#f8fafc" }}>
-                                                <td colSpan={canManage ? 6 : 5} style={{ padding: "0 40px 16px" }}>
-                                                    <div style={{
-                                                        border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden",
-                                                        background: "white", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
-                                                    }}>
-                                                        <div style={{ padding: "10px 16px", background: "#f1f5f9", fontSize: 13, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                                                            <span>📋 Công việc liên quan ({tasks.filter(t => t.deadline_id === dl.id).length})</span>
-                                                            <button className="btn btn-sm" onClick={() => setTab("tasks")} style={{ fontSize: 11, height: 24, padding: "0 10px" }}>👉 Xem trên bảng</button>
-                                                        </div>
-                                                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                                                            <thead>
-                                                                <tr style={{ background: "white", borderBottom: "1px solid #f1f5f9" }}>
-                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Nội dung</th>
-                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Phân công</th>
-                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Trạng thái</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {tasks.filter(t => t.deadline_id === dl.id).map(t => (
-                                                                    <tr key={t.id} style={{ borderBottom: "1px dashed #f1f5f9" }}>
-                                                                        <td style={{ padding: "8px 16px", fontWeight: 600 }}>{t.title}</td>
-                                                                        <td style={{ padding: "8px 16px" }}>👤 {t.assigned_name || "—"}</td>
-                                                                        <td style={{ padding: "8px 16px" }}>
-                                                                            {(() => {
-                                                                                const s = TASK_STATUS_CFG[t.status] || { label: t.status, color: "#64748b" };
-                                                                                return (
-                                                                                    <span style={{ 
-                                                                                        fontSize: 11, padding: "2px 10px", borderRadius: 999,
-                                                                                        background: s.color + "20", color: s.color, fontWeight: 700
-                                                                                    }}>{s.label}</span>
-                                                                                );
-                                                                            })()}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                                {tasks.filter(t => t.deadline_id === dl.id).length === 0 && (
-                                                                    <tr><td colSpan={3} style={{ textAlign: "center", padding: 12, color: "var(--text-muted)" }}>Chưa có nhiệm vụ nào được liên kết</td></tr>
-                                                                )}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
             </div>
         )}
+
+            {/* ════ TAB: TASKS ════ */}
+            {tab === "tasks" && (
+                <TaskBoard 
+                    eventId={id} 
+                    staffList={staff} 
+                    canManage={canManage}
+                    deadlines={deadlines}
+                    externalFilterDeadlineId={taskFilterDeadlineId}
+                    onClearExternalFilter={() => setTaskFilterDeadlineId(null)}
+                    onRefreshParent={refreshData}
+                />
+            )}
 
             {/* ════ TAB: PARTICIPANTS (GUESTS & ATTENDEES) ════ */}
             {tab === "participants" && (
@@ -702,31 +647,84 @@ export default function EventDetail() {
             {/* ════ TAB: STAFF ════ */}
             {tab === "staff" && (
                 <div className="card">
-                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>👥 Nhân sự phụ trách</h3>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 800 }}>👥 Nhân sự tham gia dự án</h3>
+                        {canManage && (
+                            <button className="btn btn-primary btn-sm" onClick={() => setStaffModal(true)}>+ Thêm nhân sự</button>
+                        )}
+                    </div>
+                    
                     {staff.length === 0
-                        ? <div className="empty-state"><span>👥</span><p>Chưa có nhân sự</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Vai trò</th></tr></thead>
-                            <tbody>
-                                {staff.map((s, i) => {
-                                    const roleColor = {
-                                        manager: "badge-admin",
-                                        marketing: "badge-warning",
-                                        technical: "badge-organizer",
-                                        support: "badge-default",
-                                        volunteer: "badge-default",
-                                    }[s.role] || "badge-default";
-                                    return (
-                                        <tr key={s.id}>
-                                            <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                            <td style={{ fontWeight: 600 }}>👤 {s.user_name || "—"}</td>
-                                            <td style={{ color: "var(--text-secondary)" }}>{s.user_email || "—"}</td>
-                                            <td><span className={`badge ${roleColor}`}>{s.role || "—"}</span></td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                        ? <div className="empty-state"><span>👥</span><p>Chưa có nhân sự được gán vào sự kiện này</p></div>
+                        : <div className="data-table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th><th>Nhân viên</th><th>Vai trò</th><th>Công việc (Xong/Tổng)</th><th>Tiến độ</th>
+                                        {canManage && <th>Thao tác</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {staff.map((s, i) => {
+                                        const sId = s.user_id || s.id;
+                                        const sTasks = tasks.filter(t => String(t.assigned_to) === String(sId));
+                                        
+                                        const sScore = sTasks.reduce((acc, t) => {
+                                            if (t.status === "done") return acc + 100;
+                                            if (t.status === "review" || t.status === "in_progress") return acc + 50;
+                                            return acc;
+                                        }, 0);
+                                        
+                                        const sDone = sTasks.filter(t => t.status === "done").length;
+                                        const sPct = sTasks.length > 0 ? Math.round(sScore / sTasks.length) : 0;
+                                        const roleColor = {
+                                            manager: "badge-admin",
+                                            marketing: "badge-warning",
+                                            technical: "badge-organizer",
+                                            volunteer: "badge-success",
+                                        }[s.role] || "badge-default";
+
+                                        return (
+                                            <tr key={s.id}>
+                                                <td>{i + 1}</td>
+                                                <td>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--color-primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>
+                                                            {s.user_name?.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 700 }}>{s.user_name}</div>
+                                                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.user_email}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td><span className={`badge ${roleColor}`}>{s.role}</span></td>
+                                                <td style={{ textAlign: "center", fontWeight: 700 }}>
+                                                    <span style={{ color: sDone === sTasks.length && sTasks.length > 0 ? "#10b981" : "inherit" }}>
+                                                        {sDone} / {sTasks.length}
+                                                    </span>
+                                                </td>
+                                                <td style={{ minWidth: 120 }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                        <div style={{ flex: 1, height: 6, background: "var(--border-color)", borderRadius: 3, overflow: "hidden" }}>
+                                                            <div style={{ height: "100%", width: `${sPct}%`, background: sPct === 100 ? "#10b981" : "var(--color-primary)" }} />
+                                                        </div>
+                                                        <span style={{ fontSize: 11, fontWeight: 800, width: 35 }}>{sPct}%</span>
+                                                    </div>
+                                                </td>
+                                                {canManage && (
+                                                    <td>
+                                                        <button className="btn btn-outline btn-sm" onClick={() => handleRemoveStaff(s.id)} style={{ color: "#dc2626", borderColor: "#fee2e2" }}>
+                                                            Loại bỏ
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     }
                 </div>
             )}
@@ -821,18 +819,6 @@ export default function EventDetail() {
             )}
 
 
-            {/* ════ TAB: TASKS (Kanban) ════ */}
-            {tab === "tasks" && (
-                <TaskBoard 
-                    eventId={id} 
-                    staffList={staff} 
-                    canManage={canManage} 
-                    deadlines={deadlines} 
-                    externalFilterDeadlineId={taskFilterDeadlineId}
-                    onClearExternalFilter={() => setTaskFilterDeadlineId(null)}
-                    onRefreshParent={loadAll}
-                />
-            )}
             {/* ── Modal thêm deadline ── */}
             <Modal title="Thêm Deadline" isOpen={dlModal} onClose={() => setDlModal(false)}>
                 <form onSubmit={handleAddDeadline}>
@@ -937,6 +923,38 @@ export default function EventDetail() {
                         </button>
                     </div>
                 )}
+            </Modal>
+            {/* ── Modal Thêm nhân sự ── */}
+            <Modal title="👥 Thêm nhân sự vào dự án" isOpen={staffModal} onClose={() => setStaffModal(false)}>
+                <form onSubmit={handleAssignStaff}>
+                    <div className="form-group">
+                        <label>Chọn nhân viên *</label>
+                        <select className="form-control" 
+                            value={staffForm.user_id} 
+                            onChange={e => setStaffForm({ ...staffForm, user_id: e.target.value })} 
+                            required>
+                            <option value="">-- Chọn tài khoản --</option>
+                            {users.filter(u => !staff.find(s => s.user_id === u.id)).map(u => (
+                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>Vai trò trong dự án *</label>
+                        <select className="form-control" 
+                            value={staffForm.role} 
+                            onChange={e => setStaffForm({ ...staffForm, role: e.target.value })} 
+                            required>
+                            <option value="manager">Manager (Quản lý)</option>
+                            <option value="marketing">Marketing (Truyền thông)</option>
+                            <option value="technical">Technical (Kỹ thuật)</option>
+                            <option value="support">Support (Hỗ trợ)</option>
+                        </select>
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 10 }} disabled={staffSaving}>
+                        {staffSaving ? "Đang xử lý..." : "Xác nhận thêm"}
+                    </button>
+                </form>
             </Modal>
         </Layout>
     );
