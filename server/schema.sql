@@ -1,3 +1,6 @@
+CREATE DATABASE IF NOT EXISTS event_management;
+USE event_management;
+
 -- MySQL dump 10.13  Distrib 8.0.43, for Win64 (x86_64)
 --
 -- Host: 127.0.0.1    Database: event_management
@@ -264,8 +267,8 @@ CREATE TABLE `event_timeline` (
   `id` int NOT NULL AUTO_INCREMENT,
   `event_id` int NOT NULL,
   `title` varchar(255) DEFAULT NULL,
-  `start_time` time DEFAULT NULL,
-  `end_time` time DEFAULT NULL,
+  `start_time` datetime DEFAULT NULL,
+  `end_time` datetime DEFAULT NULL,
   `description` text,
   PRIMARY KEY (`id`),
   KEY `event_id` (`event_id`),
@@ -680,3 +683,4 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-03-26 21:38:17
+

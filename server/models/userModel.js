@@ -14,7 +14,12 @@ const User = {
         return result.insertId;
     },
     async getAllUsers() {
-        const [rows] = await db.query("SELECT id, name, email, role, created_at FROM users ORDER BY id DESC");
+        const [rows] = await db.query(`
+            SELECT u.id, u.name, u.email, u.role, u.department_id, d.name AS department_name, u.created_at
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+            ORDER BY u.id DESC
+        `);
         return rows;
     },
     async findById(id) {
