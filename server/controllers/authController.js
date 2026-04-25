@@ -20,6 +20,16 @@ exports.login = async (req, res) => {
     }
 };
 
+exports.logout = async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(" ")[1];
+        await authService.blacklistToken(token);
+        res.json({ message: "Logged out successfully" });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
+
 exports.verifyToken = async (req, res) => {
     res.json({ message: "Token valid", user: req.user });
 };

@@ -359,3 +359,12 @@ CALL add_col_v3('users', 'avatar',     "VARCHAR(300) DEFAULT NULL AFTER position
 CALL add_col_v3('users', 'phone',      "VARCHAR(20)  DEFAULT NULL AFTER avatar");
 
 DROP PROCEDURE IF EXISTS add_col_v3;
+
+-- ─── TOKEN_BLACKLIST (Lưu trữ token đã đăng xuất) ───────────────────────────
+CREATE TABLE IF NOT EXISTS token_blacklist (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    token      VARCHAR(500) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_token (token)
+);

@@ -53,4 +53,28 @@ const resetPassword = async (userId, { oldPassword, newPassword }) => {
     await User.updatePassword(userId, hashed);
 };
 
-module.exports = { register, login, resetPassword };
+const blacklistToken = async (token) => {
+    if (!token) throw { status: 400, message: "Token required" };
+    
+    // Decode token to get expiration time
+    const decoded = jwt.decode(token);
+    const expiresAt = decoded && decoded.exp 
+        ? new Date(decoded.exp * 1000) 
+        : new Date(Date.now() + 2 * 60 * 60 * 1000); // Default 2h if no exp
+
+    await require("../config/database").query(
+        "INSERT INTO token_blacklist (token, expires_at) VALUES (?, ?)",
+        [token, expiresAt]
+    );
+};
+
+const isTokenBlacklisted = async (token) => {
+    if (!token) return false;
+    const [[row]] = await require("../config/database").query(
+        "SELECT id FROM token_blacklist WHERE token = ? LIMIT 1",
+        [token]
+    );
+    return !!row;
+};
+
+module.exports = { register, login, resetPassword, blacklistToken, isTokenBlacklisted };

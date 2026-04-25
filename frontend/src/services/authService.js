@@ -15,3 +15,7 @@ export const verifyToken = () => {
 export const resetPassword = (data) => {
     return api.put("/auth/reset-password", data);
 };
+
+export const logout = () => {
+    return api.post("/auth/logout");
+};

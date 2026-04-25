@@ -1,4 +1,6 @@
 import { createContext, useContext, useState } from "react";
+import { logout } from "../services/authService";
+
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext();
@@ -31,10 +33,16 @@ export const AuthProvider = ({ children }) => {
     // GHI CHÚ BẢO MẬT: Token vẫn hợp lệ trên server cho đến khi hết hạn (2 giờ).
     // Logout chỉ xóa token khỏi localStorage — không vô hiệu hóa token trên server.
     // Để thu hồi token ngay lập tức cần implement server-side blacklist hoặc dùng refresh token.
-    const logoutUser = () => {
-        localStorage.removeItem("token");
-        setToken(null);
-        setUser(null);
+    const logoutUser = async () => {
+        try {
+            await logout();
+        } catch (err) {
+            console.error("Logout error:", err);
+        } finally {
+            localStorage.removeItem("token");
+            setToken(null);
+            setUser(null);
+        }
     };
 
     return (
