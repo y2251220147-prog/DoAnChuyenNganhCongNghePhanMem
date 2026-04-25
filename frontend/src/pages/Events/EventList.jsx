@@ -7,6 +7,7 @@ import {
     changeStatus, createEvent, deleteEvent,
     getEvents, updateEvent
 } from "../../services/eventService";
+import { getDepartments } from "../../services/departmentService";
 import "../../styles/global.css";
 
 // ── Workflow config ───────────────────────────────────────────
@@ -37,7 +38,7 @@ const EMPTY_FORM = {
     name: "", description: "", event_type: "",
     start_date: "", end_date: "",
     venue_type: "offline", location: "", capacity: "",
-    total_budget: "", status: "draft",
+    total_budget: "", status: "draft", department_ids: [],
 };
 
 export default function EventList() {
@@ -45,6 +46,7 @@ export default function EventList() {
     const navigate = useNavigate();
 
     const [events, setEvents] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -59,7 +61,10 @@ export default function EventList() {
 
     const load = async () => {
         setLoading(true);
-        try { const r = await getEvents(); setEvents(r.data || []); }
+        try { 
+            const r = await getEvents(); setEvents(r.data || []); 
+            const d = await getDepartments(); setDepartments(d || []);
+        }
         catch {/**/ }
         finally { setLoading(false); }
     };
@@ -90,6 +95,7 @@ export default function EventList() {
             capacity: ev.capacity || "",
             total_budget: ev.total_budget || "",
             status: ev.status || "draft",
+            department_ids: ev.department_ids || [],
         });
         setEditingId(ev.id); setError(""); setModalOpen(true);
     };
@@ -272,10 +278,32 @@ export default function EventList() {
                         letterSpacing: "0.08em", marginBottom: 10
                     }}>🧾 Thông tin cơ bản</div>
 
-                    <div className="form-group">
-                        <label>Tên sự kiện <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control" placeholder="VD: Hội thảo AI 2026"
-                            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                    <div className="grid-2">
+                        <div className="form-group">
+                            <label>Tên sự kiện <span style={{ color: "red" }}>*</span></label>
+                            <input className="form-control" placeholder="VD: Hội thảo AI 2026"
+                                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Phòng ban tham gia</label>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "150px", overflowY: "auto", border: "1px solid var(--border-color)", padding: "10px", borderRadius: "8px" }}>
+                                {departments.map(d => (
+                                    <label key={d.id} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={form.department_ids.includes(d.id)}
+                                            onChange={(e) => {
+                                                const newIds = e.target.checked 
+                                                    ? [...form.department_ids, d.id]
+                                                    : form.department_ids.filter(id => id !== d.id);
+                                                setForm({ ...form, department_ids: newIds });
+                                            }}
+                                        />
+                                        <span>{d.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="grid-2">

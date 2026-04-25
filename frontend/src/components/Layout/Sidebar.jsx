@@ -29,6 +29,7 @@ const NAV = {
         {
             label: "Hệ thống", items: [
                 { to: "/admin/users", icon: "🔧", text: "Quản lý tài khoản", badge: "Admin" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]

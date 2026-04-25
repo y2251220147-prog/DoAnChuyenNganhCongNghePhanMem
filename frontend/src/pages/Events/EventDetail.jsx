@@ -275,6 +275,7 @@ export default function EventDetail() {
                         {[
                             { label: "Tên sự kiện", value: event.name },
                             { label: "Loại", value: event.event_type || "—" },
+                            { label: "Phòng ban tham gia", value: event.department_name || "—" },
                             { label: "Người phụ trách", value: event.owner_name || "—" },
                             { label: "Bắt đầu", value: fmtDT(event.start_date) },
                             { label: "Kết thúc", value: fmtDT(event.end_date) },

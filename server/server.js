@@ -23,7 +23,7 @@ app.use("/api/tasks", require("./routes/taskRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/attendees", require("./routes/attendeeRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
-
+app.use("/api/departments", require("./routes/departmentRoutes"));
 app.get("/", (req, res) => res.json({ message: "EventCore API", version: "3.0" }));
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ message: "Internal error" }); });
