@@ -10,6 +10,11 @@ exports.getEventById = async (req, res) => {
     catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 
+exports.getEventDetails = async (req, res) => {
+    try { res.json(await eventService.getEventDetails(req.params.id)); }
+    catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
 exports.createEvent = async (req, res) => {
     try {
         const result = await eventService.createEvent(req.body, req.user.id);

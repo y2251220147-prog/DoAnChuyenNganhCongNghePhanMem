@@ -4,13 +4,16 @@ import Layout from "../../components/Layout/Layout";
 import Modal from "../../components/UI/Modal";
 import { AuthContext } from "../../context/AuthContext";
 import api from "../../services/api";
-import { getTasksByEvent, createTask, updateTaskStatus, deleteTask } from "../../services/taskService";
-import {
-    changeStatus,
-    createDeadline, deleteDeadline, getDeadlines, toggleDeadline
-} from "../../services/eventService";
+import { getTasksByEvent } from "../../services/taskService";
+import { changeStatus, createDeadline, deleteDeadline, toggleDeadline } from "../../services/eventService";
 import "../../styles/global.css";
 import TaskBoard from "../Tasks/TaskBoard";
+import EventOverview from "./components/EventOverview";
+import EventDeadlines from "./components/EventDeadlines";
+import EventGuests from "./components/EventGuests";
+import EventStaff from "./components/EventStaff";
+import EventTimeline from "./components/EventTimeline";
+import EventBudget from "./components/EventBudget";
 
 const STATUS_CFG = {
     draft: { label: "Bản nháp", bg: "#f1f5f9", color: "#64748b" },
@@ -78,28 +81,20 @@ export default function EventDetail() {
     const loadAll = async () => {
         setLoading(true); setError("");
         try {
-            const [evR, guR, stR, tlR, buR, dlR] = await Promise.allSettled([
-                api.get(`/events/${id}`),
-                api.get(`/guests/event/${id}`),
-                api.get(`/staff/event/${id}`),
-                api.get(`/timeline/event/${id}`),
-                api.get(`/budgets/event/${id}`),
-                api.get(`/events/${id}/deadlines`),
-                api.get(`/tasks/event/${id}`),
-            ]);
-            if (evR.status === "rejected") { setError("Không tìm thấy sự kiện."); setLoading(false); return; }
-            setEvent(evR.value.data);
-            setGuests(guR.status === "fulfilled" ? (guR.value.data || []) : []);
-            setStaff(stR.status === "fulfilled" ? (stR.value.data || []) : []);
-            setTimeline(tlR.status === "fulfilled" ? (tlR.value.data || []) : []);
-            setBudget(buR.status === "fulfilled"
-                ? { items: buR.value.data.items || [], total: buR.value.data.total || 0 }
-                : { items: [], total: 0 });
-            setDeadlines(dlR.status === "fulfilled" ? (dlR.value.data || []) : []);
-            const taskR = arguments[6]; // handled below
-            setTasks([]);
-        } catch { setError("Lỗi khi tải dữ liệu."); }
-        finally { setLoading(false); }
+            const r = await api.get(`/events/${id}/details`);
+            const data = r.data;
+            setEvent(data.event);
+            setGuests(data.guests || []);
+            setStaff(data.staff || []);
+            setTimeline(data.timeline || []);
+            setBudget(data.budget || { items: [], total: 0 });
+            setDeadlines(data.deadlines || []);
+            setTasks(data.tasks || []);
+        } catch (err) { 
+            setError("Lỗi khi tải dữ liệu."); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const fmtVND = n => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
@@ -160,6 +155,7 @@ export default function EventDetail() {
         { key: "staff", label: `👥 Staff (${staff.length})` },
         { key: "timeline", label: `🗓️ Timeline (${timeline.length})` },
         { key: "budget", label: "💰 Ngân sách" },
+        { key: "tasks", label: "📁 Nhiệm vụ" },
     ];
 
     return (
@@ -266,305 +262,34 @@ export default function EventDetail() {
             </div>
 
             {/* ════ TAB: OVERVIEW ════ */}
-            {tab === "overview" && (
-                <div className="grid-2" style={{ alignItems: "start" }}>
-                    <div className="card">
-                        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>📋 Thông tin chung</h3>
-                        {[
-                            { label: "Tên sự kiện", value: event.name },
-                            { label: "Loại", value: event.event_type || "—" },
-                            { label: "Người phụ trách", value: event.owner_name || "—" },
-                            { label: "Bắt đầu", value: fmtDT(event.start_date) },
-                            { label: "Kết thúc", value: fmtDT(event.end_date) },
-                            { label: "Hình thức", value: event.venue_type === "online" ? "🌐 Online" : "🏢 Offline" },
-                            { label: "Địa điểm", value: event.location || "—" },
-                            { label: "Sức chứa", value: event.capacity ? `${event.capacity} người` : "—" },
-                            { label: "Ngân sách dự kiến", value: fmtVND(event.total_budget || 0) },
-                            { label: "Trạng thái", value: <StatusBadge status={event.status} /> },
-                            { label: "Người duyệt", value: event.approver_name || "—" },
-                            { label: "Ngày duyệt", value: fmtDate(event.approved_at) },
-                            { label: "Ngày tạo", value: fmtDate(event.created_at) },
-                        ].map(row => (
-                            <div key={row.label} style={{
-                                display: "flex", justifyContent: "space-between",
-                                alignItems: "flex-start", padding: "9px 0",
-                                borderBottom: "1px solid var(--border-color)", gap: 12
-                            }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>{row.label}</span>
-                                <span style={{ fontSize: 13, color: "var(--text-primary)", textAlign: "right" }}>{row.value}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        {/* Tiến độ deadline */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🔥 Tiến độ Deadline nội bộ</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{doneCount}/{deadlines.length} hoàn thành</span>
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{dlProgress}%</span>
-                            </div>
-                            <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", width: `${dlProgress}%`,
-                                    background: "linear-gradient(90deg, #f59e0b, #ef4444)",
-                                    borderRadius: 5, transition: "width 0.6s ease"
-                                }} />
-                            </div>
-                            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-                                {deadlines.map(dl => {
-                                    const overdue = !dl.done && new Date(dl.due_date) < new Date();
-                                    return (
-                                        <div key={dl.id} style={{
-                                            display: "flex", alignItems: "center", gap: 8,
-                                            padding: "6px 10px", borderRadius: 8,
-                                            background: dl.done ? "rgba(16,185,129,0.07)" : overdue ? "rgba(239,68,68,0.07)" : "var(--bg-main)"
-                                        }}>
-                                            <span style={{ fontSize: 14 }}>{dl.done ? "✅" : overdue ? "🔴" : "⏳"}</span>
-                                            <span style={{
-                                                flex: 1, fontSize: 13, fontWeight: dl.done ? 400 : 600,
-                                                textDecoration: dl.done ? "line-through" : "none",
-                                                color: dl.done ? "var(--text-muted)" : "var(--text-primary)"
-                                            }}>
-                                                {dl.title}
-                                            </span>
-                                            <span style={{ fontSize: 11, color: overdue ? "#dc2626" : "var(--text-muted)" }}>
-                                                {fmtDate(dl.due_date)}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                        {/* Check-in */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>✅ Tỷ lệ Check-in</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} khách</span>
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{checkinPct}%</span>
-                            </div>
-                            <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", width: `${checkinPct}%`,
-                                    background: "linear-gradient(90deg, var(--color-primary), #818cf8)",
-                                    borderRadius: 5, transition: "width 0.6s ease"
-                                }} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {tab === "overview" && <EventOverview event={event} deadlines={deadlines} guests={guests} />}
 
             {/* ════ TAB: DEADLINES ════ */}
             {tab === "deadlines" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <div>
-                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🔥 Deadlines nội bộ</h3>
-                            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                                Các mốc quan trọng trước ngày diễn ra sự kiện
-                            </p>
-                        </div>
-                        {canManage && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setDlModal(true)}>+ Thêm deadline</button>
-                        )}
-                    </div>
-                    {deadlines.length === 0 ? (
-                        <div className="empty-state"><span>🔥</span><p>Chưa có deadline nào</p></div>
-                    ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr><th>Hạng mục</th><th>Hạn chót</th><th>Ghi chú</th><th>Trạng thái</th>
-                                    {canManage && <th>Thao tác</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {deadlines.map(dl => {
-                                    const overdue = !dl.done && new Date(dl.due_date) < new Date();
-                                    return (
-                                        <tr key={dl.id}>
-                                            <td style={{ fontWeight: 600 }}>{dl.title}</td>
-                                            <td style={{ color: overdue ? "#dc2626" : "var(--text-primary)", fontWeight: overdue ? 700 : 400 }}>
-                                                {fmtDT(dl.due_date)} {overdue && "⚠️"}
-                                            </td>
-                                            <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{dl.note || "—"}</td>
-                                            <td>
-                                                {dl.done
-                                                    ? <span className="badge badge-success">✅ Hoàn thành</span>
-                                                    : overdue
-                                                        ? <span className="badge badge-danger">🔴 Trễ hạn</span>
-                                                        : <span className="badge badge-default">⏳ Chờ</span>
-                                                }
-                                            </td>
-                                            {canManage && (
-                                                <td>
-                                                    <div className="actions">
-                                                        <button className={`btn btn-sm ${dl.done ? "btn-outline" : "btn-success"}`}
-                                                            onClick={() => handleToggleDl(dl.id, dl.done)}>
-                                                            {dl.done ? "↩ Hoàn tác" : "✓ Xong"}
-                                                        </button>
-                                                        <button className="btn btn-danger btn-sm"
-                                                            onClick={() => handleDeleteDl(dl.id)}>🗑</button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                <EventDeadlines 
+                    deadlines={deadlines} 
+                    canManage={canManage} 
+                    handleToggleDl={handleToggleDl} 
+                    handleDeleteDl={handleDeleteDl} 
+                    setDlModal={setDlModal} 
+                />
             )}
 
             {/* ════ TAB: GUESTS ════ */}
-            {tab === "guests" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>🎟️ Danh sách khách mời</h3>
-                        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} đã check-in</span>
-                    </div>
-                    {guests.length === 0
-                        ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th></tr></thead>
-                            <tbody>
-                                {guests.map((g, i) => (
-                                    <tr key={g.id}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 600 }}>{g.checked_in ? "✅" : "⏳"} {g.name}</td>
-                                        <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
-                                        <td>{g.phone || "—"}</td>
-                                        <td>{g.checked_in
-                                            ? <span className="badge badge-success">Đã check-in</span>
-                                            : <span className="badge badge-default">Chờ</span>}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    }
-                </div>
-            )}
+            {tab === "guests" && <EventGuests guests={guests} />}
 
             {/* ════ TAB: STAFF ════ */}
-            {tab === "staff" && (
-                <div className="card">
-                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>👥 Nhân sự phụ trách</h3>
-                    {staff.length === 0
-                        ? <div className="empty-state"><span>👥</span><p>Chưa có nhân sự</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Vai trò</th></tr></thead>
-                            <tbody>
-                                {staff.map((s, i) => {
-                                    const roleColor = {
-                                        manager: "badge-admin",
-                                        marketing: "badge-warning",
-                                        technical: "badge-organizer",
-                                        support: "badge-default",
-                                        volunteer: "badge-default",
-                                    }[s.role] || "badge-default";
-                                    return (
-                                        <tr key={s.id}>
-                                            <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                            <td style={{ fontWeight: 600 }}>👤 {s.user_name || "—"}</td>
-                                            <td style={{ color: "var(--text-secondary)" }}>{s.user_email || "—"}</td>
-                                            <td><span className={`badge ${roleColor}`}>{s.role || "—"}</span></td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    }
-                </div>
-            )}
+            {tab === "staff" && <EventStaff staff={staff} />}
 
             {/* ════ TAB: TIMELINE ════ */}
-            {tab === "timeline" && (
-                <div className="card">
-                    <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>🗓️ Lịch trình trong ngày</h3>
-                    {timeline.length === 0
-                        ? <div className="empty-state"><span>🗓️</span><p>Chưa có lịch trình</p></div>
-                        : <div style={{ position: "relative", paddingLeft: 28 }}>
-                            <div style={{
-                                position: "absolute", left: 9, top: 4, bottom: 4,
-                                width: 2, background: "var(--border-color)", borderRadius: 2
-                            }} />
-                            {timeline.map((item, i) => (
-                                <div key={item.id} style={{ position: "relative", marginBottom: i < timeline.length - 1 ? 20 : 0 }}>
-                                    <div style={{
-                                        position: "absolute", left: -24, top: 4, width: 12, height: 12,
-                                        borderRadius: "50%", background: "var(--color-primary)",
-                                        border: "2px solid white", boxShadow: "0 0 0 2px var(--color-primary)"
-                                    }} />
-                                    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 10, padding: "12px 16px" }}>
-                                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                                            <span style={{ fontWeight: 700, fontSize: 14 }}>{item.title}</span>
-                                            <span style={{ fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                                                {fmtDT(item.start_time)}{item.end_time && ` → ${fmtDT(item.end_time)}`}
-                                            </span>
-                                        </div>
-                                        {item.description && <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>{item.description}</p>}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    }
-                </div>
-            )}
+            {tab === "timeline" && <EventTimeline timeline={timeline} />}
 
             {/* ════ TAB: BUDGET ════ */}
-            {tab === "budget" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>💰 Ngân sách sự kiện</h3>
-                        <div style={{ textAlign: "right" }}>
-                            <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Dự kiến</p>
-                            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-secondary)" }}>{fmtVND(event.total_budget || 0)}</p>
-                            <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", marginTop: 6 }}>Thực tế</p>
-                            <p style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)" }}>{fmtVND(budget.total)}</p>
-                        </div>
-                    </div>
-                    {/* So sánh ngân sách */}
-                    {(event.total_budget || 0) > 0 && (
-                        <div style={{
-                            marginBottom: 20, padding: "10px 14px", borderRadius: 8,
-                            background: budget.total > event.total_budget ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)"
-                        }}>
-                            <span style={{
-                                fontSize: 13, fontWeight: 600,
-                                color: budget.total > event.total_budget ? "#dc2626" : "#059669"
-                            }}>
-                                {budget.total > event.total_budget
-                                    ? `⚠️ Vượt ngân sách ${fmtVND(budget.total - event.total_budget)}`
-                                    : `✅ Còn lại ${fmtVND(event.total_budget - budget.total)}`}
-                            </span>
-                        </div>
-                    )}
-                    {budget.items.length === 0
-                        ? <div className="empty-state"><span>💰</span><p>Chưa có khoản chi</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Khoản mục</th><th>Ghi chú</th><th style={{ textAlign: "right" }}>Chi phí</th></tr></thead>
-                            <tbody>
-                                {budget.items.map((b, i) => (
-                                    <tr key={b.id}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 600 }}>{b.item}</td>
-                                        <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{b.note || "—"}</td>
-                                        <td style={{ textAlign: "right", fontWeight: 700, color: "var(--color-primary)" }}>{fmtVND(b.cost)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr style={{ borderTop: "2px solid var(--border-color)" }}>
-                                    <td colSpan={3} style={{ fontWeight: 700, fontSize: 13, padding: "12px 16px" }}>Tổng cộng</td>
-                                    <td style={{ textAlign: "right", fontWeight: 800, fontSize: 15, color: "var(--color-primary)", padding: "12px 16px" }}>
-                                        {fmtVND(budget.total)}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    }
-                </div>
+            {tab === "budget" && <EventBudget budget={budget} event={event} />}
+
+            {/* ════ TAB: TASKS (Kanban) ════ */}
+            {tab === "tasks" && (
+                <TaskBoard eventId={id} staffList={staff} canManage={canManage} />
             )}
 
 

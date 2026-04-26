@@ -7,6 +7,7 @@ const authorize = require("../middlewares/authorize");
 // ── Events CRUD ──────────────────────────────
 router.get("/", auth, c.getAllEvents);
 router.get("/:id", auth, c.getEventById);
+router.get("/:id/details", auth, c.getEventDetails);
 router.post("/", auth, authorize(["admin", "organizer"]), c.createEvent);
 router.put("/:id", auth, authorize(["admin", "organizer"]), c.updateEvent);
 router.delete("/:id", auth, authorize(["admin", "organizer"]), c.deleteEvent);

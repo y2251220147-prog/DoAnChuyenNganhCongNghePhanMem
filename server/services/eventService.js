@@ -1,5 +1,10 @@
 const Event = require("../models/eventModel");
 const Deadline = require("../models/deadlineModel");
+const Guest = require("../models/guestModel");
+const Staff = require("../models/staffModel");
+const Timeline = require("../models/timelineModel");
+const Budget = require("../models/budgetModel");
+const Task = require("../models/taskModel");
 
 // Workflow hợp lệ: chỉ cho phép chuyển trạng thái theo chiều này
 const WORKFLOW = {
@@ -135,8 +140,32 @@ const deleteDeadline = async (deadlineId) => {
     await Deadline.delete(deadlineId);
 };
 
+const getEventDetails = async (eventId) => {
+    const event = await getEventById(eventId);
+    const [deadlines, guests, staff, timeline, budgetItems, tasks] = await Promise.all([
+        Deadline.getByEvent(eventId),
+        Guest.getByEvent(eventId),
+        Staff.getByEvent(eventId),
+        Timeline.getByEvent(eventId),
+        Budget.getByEvent(eventId),
+        Task.getByEvent(eventId)
+    ]);
+
+    const totalBudget = budgetItems.reduce((sum, b) => sum + parseFloat(b.cost || 0), 0);
+
+    return {
+        event,
+        deadlines,
+        guests,
+        staff,
+        timeline,
+        budget: { items: budgetItems, total: totalBudget },
+        tasks
+    };
+};
+
 module.exports = {
-    getAllEvents, getEventById,
+    getAllEvents, getEventById, getEventDetails,
     createEvent, updateEvent, changeStatus, deleteEvent,
     getDeadlines, createDeadline, toggleDeadline, deleteDeadline,
 };
