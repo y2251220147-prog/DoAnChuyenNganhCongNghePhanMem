@@ -144,6 +144,50 @@ export default function EventDetail() {
         finally { setDlSaving(false); }
     };
 
+    const handleExportCSV = () => {
+        const combined = [
+            ...guests.map(g => ({ type: "Khách ngoài", name: g.name, email: g.email, phone: g.phone || "", checked_in: g.checked_in ? "Đã check-in" : "Chờ" })),
+            ...attendees.map(a => ({ type: "Nhân viên", name: a.name, email: a.email, phone: a.phone || "", checked_in: a.checked_in ? "Đã check-in" : "Chờ" }))
+        ];
+
+        if (combined.length === 0) {
+            alert("Không có dữ liệu để xuất.");
+            return;
+        }
+
+        const headers = ["Loại", "Họ tên", "Email", "Số điện thoại", "Trạng thái"];
+        const rows = combined.map(c => [
+            `"${c.type}"`,
+            `"${c.name}"`,
+            `"${c.email}"`,
+            `"${c.phone}"`,
+            `"${c.checked_in}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,\uFEFF"
+            + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Danh_sach_tham_gia_${id}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleRemoveAttendee = async (attendeeId) => {
+        if (!window.confirm("Xóa người tham gia này khỏi sự kiện?")) return;
+        try {
+            await api.delete(`/attendees/${attendeeId}`);
+            alert("Đã xóa thành công");
+            const atR = await api.get(`/attendees/event/${id}`);
+            setAttendees(atR.data || []);
+        } catch (err) {
+            alert(err.response?.data?.message || "Xóa thất bại");
+        }
+    };
+
     if (loading) return <Layout><div className="empty-state"><span>⏳</span><p>Đang tải...</p></div></Layout>;
     if (error || !event) return (
         <Layout>
@@ -420,6 +464,9 @@ export default function EventDetail() {
             {/* ════ TAB: PARTICIPANTS (GUESTS & ATTENDEES) ════ */}
             {tab === "participants" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <button className="btn btn-success btn-sm" onClick={handleExportCSV}>📊 Xuất CSV</button>
+                    </div>
                     <div className="card">
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                             <h3 style={{ fontSize: 15, fontWeight: 700 }}>🎟️ Khách mời bên ngoài</h3>
@@ -453,7 +500,7 @@ export default function EventDetail() {
                         {attendees.length === 0
                             ? <div className="empty-state"><span>🏢</span><p>Chưa có nhân viên tham gia</p></div>
                             : <table className="data-table">
-                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban</th><th>Trạng thái</th></tr></thead>
+                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban</th><th>Trạng thái</th>{canManage && <th>Thao tác</th>}</tr></thead>
                                 <tbody>
                                     {attendees.map((a, i) => (
                                         <tr key={a.id}>
@@ -465,6 +512,11 @@ export default function EventDetail() {
                                                 ? <span className="badge badge-success">Đã check-in</span>
                                                 : <span className="badge badge-default">Chờ</span>}
                                             </td>
+                                            {canManage && (
+                                                <td>
+                                                    <button className="btn btn-danger btn-sm" onClick={() => handleRemoveAttendee(a.id)} title="Xóa người tham gia">🗑</button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
                                 </tbody>

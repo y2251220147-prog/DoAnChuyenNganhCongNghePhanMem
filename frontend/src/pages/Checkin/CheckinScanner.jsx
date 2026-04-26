@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Html5QrcodeScanner } from "html5-qrcode";
 import Layout from "../../components/Layout/Layout";
 import api from "../../services/api";
 import { getEvents } from "../../services/eventService";
@@ -47,23 +48,21 @@ export default function CheckinScanner() {
         finally { setLoadingList(false); }
     };
 
-    const checkin = async (e) => {
-        e.preventDefault();
-        if (!qr.trim()) return;
+    const processCheckin = async (qrCode) => {
+        if (!qrCode.trim()) return;
         if (!selectedEvent) {
             setMessage({ type: "error", text: "❌ Vui lòng chọn sự kiện trước khi check-in." });
             return;
         }
         setLoading(true); setMessage(null);
         try {
-            const res = await api.post("/checkin", { qr_code: qr, event_id: selectedEvent });
-            // Backend trả về result.person (không phải result.guest)
+            const res = await api.post("/checkin", { qr_code: qrCode, event_id: selectedEvent });
             const person = res.data.person;
             const isEmployee = person.attendee_type === "internal";
             const src = isEmployee ? "Nhân viên" : "Khách ngoài";
             setMessage({ type: "success", text: `✅ Chào mừng ${person.name}! (${src} — ${person.event_name})` });
             setHistory(p => [{
-                qr, name: person.name, event: person.event_name, source: src,
+                qr: qrCode, name: person.name, event: person.event_name, source: src,
                 time: new Date().toLocaleTimeString(), ok: true
             }, ...p.slice(0, 19)]);
             setQr("");
@@ -78,13 +77,64 @@ export default function CheckinScanner() {
             const errMsg = err.response?.data?.message || "Check-in thất bại";
             setMessage({ type: "error", text: "❌ " + errMsg });
             setHistory(p => [{
-                qr, name: qr, event: "—", source: "—",
+                qr: qrCode, name: qrCode, event: "—", source: "—",
                 time: new Date().toLocaleTimeString(), ok: false, error: errMsg
             }, ...p.slice(0, 19)]);
         } finally {
             setLoading(false);
             setTimeout(() => inputRef.current?.focus(), 100);
         }
+    };
+
+    const checkin = async (e) => {
+        e.preventDefault();
+        await processCheckin(qr);
+    };
+
+    useEffect(() => {
+        if (tab !== "scanner" || !selectedEvent) return;
+        
+        const scanner = new Html5QrcodeScanner("reader", { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
+        });
+        
+        scanner.render((decodedText) => {
+            processCheckin(decodedText);
+        }, (error) => {
+            // ignore error
+        });
+        
+        return () => {
+            scanner.clear().catch(err => console.error("Failed to clear scanner", err));
+        };
+    }, [tab, selectedEvent]);
+
+    const handleExportCSV = () => {
+        if (guestList.length === 0) {
+            alert("Không có dữ liệu để xuất.");
+            return;
+        }
+
+        const headers = ["Họ tên", "Email", "Loại", "Trạng thái"];
+        const rows = guestList.map(c => [
+            `"${c.name}"`,
+            `"${c.email}"`,
+            `"${c.type === "internal" ? "Nhân viên" : "Khách ngoài"}"`,
+            `"${c.checked_in ? "Đã check-in" : "Chờ"}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,\uFEFF"
+            + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Danh_sach_checkin_${selectedEvent}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const pct = stats ? Math.round((stats.checkedIn / (stats.total || 1)) * 100) : 0;
@@ -175,6 +225,9 @@ export default function CheckinScanner() {
                                 ⚠️ Vui lòng chọn sự kiện trước khi quét QR.
                             </div>
                         )}
+                        {selectedEvent && (
+                            <div id="reader" style={{ width: "100%", maxWidth: "400px", margin: "0 auto 16px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-color)" }}></div>
+                        )}
                         <form onSubmit={checkin}>
                             <div className="form-group">
                                 <label style={{ fontWeight: 600 }}>Mã QR (nhân viên hoặc khách mời)</label>
@@ -250,7 +303,10 @@ export default function CheckinScanner() {
                 <div className="card">
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                         <h3 style={{ fontSize: 15, fontWeight: 700 }}>Danh sách người tham dự — {currentEvent?.name || "Chọn sự kiện"}</h3>
-                        <button className="btn btn-outline btn-sm" onClick={loadGuestList}>↻ Làm mới</button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn btn-success btn-sm" onClick={handleExportCSV}>📊 Xuất CSV</button>
+                            <button className="btn btn-outline btn-sm" onClick={loadGuestList}>↻ Làm mới</button>
+                        </div>
                     </div>
                     {!selectedEvent ? (
                         <div className="empty-state"><span>🎪</span><p>Chọn sự kiện để xem danh sách</p></div>

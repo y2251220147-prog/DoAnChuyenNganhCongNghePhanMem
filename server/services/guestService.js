@@ -1,4 +1,5 @@
 const Guest = require("../models/guestModel");
+const Attendee = require("../models/attendeeModel");
 const Event = require("../models/eventModel");
 const { generateQR } = require("./qrService");
 const { sendGuestInvitation } = require("./emailService");
@@ -31,8 +32,9 @@ exports.createGuest = async (data) => {
         throw { status: 400, message: `Không thể thêm khách mời vào sự kiện đã kết thúc hoặc đã huỷ` };
 
     // Kiểm tra trùng email cho cùng sự kiện
-    const dup = await Guest.findByEmailAndEvent(email, event_id);
-    if (dup) throw { status: 409, message: "Email này đã được đăng ký cho sự kiện này rồi" };
+    const dupGuest = await Guest.findByEmailAndEvent(email, event_id);
+    const dupAtt = await Attendee.findByEmailAndEvent(email, event_id);
+    if (dupGuest || dupAtt) throw { status: 409, message: "Email này đã được đăng ký cho sự kiện này rồi" };
 
     // Server tạo QR có chữ ký, bỏ qua qr_code từ client
     const qr_code = generateQR(event_id, name);

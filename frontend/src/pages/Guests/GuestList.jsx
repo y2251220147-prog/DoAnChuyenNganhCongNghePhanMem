@@ -90,6 +90,33 @@ export default function GuestList() {
         return ms && me;
     });
 
+    const handleExportCSV = () => {
+        if (filtered.length === 0) {
+            alert("Không có dữ liệu để xuất.");
+            return;
+        }
+
+        const headers = ["Họ tên", "Email", "Số điện thoại", "Sự kiện", "Trạng thái"];
+        const rows = filtered.map(c => [
+            `"${c.name}"`,
+            `"${c.email}"`,
+            `"${c.phone || ""}"`,
+            `"${getEventName(c.event_id)}"`,
+            `"${c.checked_in ? "Đã check-in" : "Chờ"}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,\uFEFF"
+            + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Danh_sach_khach_moi.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <Layout>
             <div className="page-header">
@@ -99,11 +126,14 @@ export default function GuestList() {
                         {guests.length} khách · {guests.filter(g => g.checked_in).length} đã check-in
                     </p>
                 </div>
-                {canManage && (
-                    <button className="btn btn-primary" onClick={() => { setForm({ event_id: "", name: "", email: "", phone: "" }); setError(""); setModal(true); }}>
-                        + Thêm khách mời
-                    </button>
-                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-success" onClick={handleExportCSV}>📊 Xuất CSV</button>
+                    {canManage && (
+                        <button className="btn btn-primary" onClick={() => { setForm({ event_id: "", name: "", email: "", phone: "" }); setError(""); setModal(true); }}>
+                            + Thêm khách mời
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Summary */}

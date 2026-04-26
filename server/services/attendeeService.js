@@ -1,4 +1,5 @@
 const Attendee = require("../models/attendeeModel");
+const Guest = require("../models/guestModel");
 const Event = require("../models/eventModel");
 const User = require("../models/userModel");
 const Notification = require("../models/notificationModel");
@@ -24,8 +25,9 @@ exports.addExternal = async (data, registeredBy) => {
     if (!event) throw { status: 404, message: "Không tìm thấy sự kiện" };
     if (['completed', 'cancelled'].includes(event.status))
         throw { status: 400, message: `Không thể thêm khách vào sự kiện đã kết thúc hoặc đã huỷ` };
-    const dup = await Attendee.findByEmailAndEvent(email, event_id);
-    if (dup) throw { status: 409, message: "Email này đã đăng ký sự kiện rồi" };
+    const dupAtt = await Attendee.findByEmailAndEvent(email, event_id);
+    const dupGuest = await Guest.findByEmailAndEvent(email, event_id);
+    if (dupAtt || dupGuest) throw { status: 409, message: "Email này đã được đăng ký cho sự kiện này rồi" };
     const qr_code = generateQR(event_id, name);
     const id = await Attendee.create({
         event_id, user_id: null, name, email, phone,
@@ -43,10 +45,14 @@ exports.selfRegister = async (eventId, userId) => {
         const stats = await Attendee.getStats(eventId);
         if (stats.total >= event.capacity) throw { status: 400, message: "Đã đủ số lượng người tham gia" };
     }
-    const dup = await Attendee.findByUserAndEvent(userId, eventId);
-    if (dup) throw { status: 409, message: "Bạn đã đăng ký sự kiện này rồi" };
     const user = await User.findById(userId);
     if (!user) throw { status: 404, message: "Không tìm thấy user" };
+
+    const dupAttId = await Attendee.findByUserAndEvent(userId, eventId);
+    const dupAttEmail = await Attendee.findByEmailAndEvent(user.email, eventId);
+    const dupGuest = await Guest.findByEmailAndEvent(user.email, eventId);
+    
+    if (dupAttId || dupAttEmail || dupGuest) throw { status: 409, message: "Bạn đã đăng ký sự kiện này rồi" };
     const qr_code = generateQR(eventId, user.name);
     const id = await Attendee.create({
         event_id: eventId, user_id: userId, name: user.name, email: user.email,
