@@ -26,7 +26,8 @@
     gap: 20px;
 }
 
-.page-header h1, .page-header h2 {
+.page-header h1,
+.page-header h2 {
     font-size: 28px;
     font-weight: 800;
     color: var(--text-primary);
@@ -66,9 +67,13 @@
 .card-stat::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; width: 4px; height: 100%;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
     background: var(--color-primary);
-    opacity: 0; transition: var(--transition);
+    opacity: 0;
+    transition: var(--transition);
 }
 
 .card-stat:hover {
@@ -76,13 +81,19 @@
     box-shadow: var(--shadow-lg);
 }
 
-.card-stat:hover::before { opacity: 1; }
+.card-stat:hover::before {
+    opacity: 1;
+}
 
 .card-stat-icon {
-    width: 60px; height: 60px;
+    width: 60px;
+    height: 60px;
     border-radius: 18px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    flex-shrink: 0;
 }
 
 .card-stat-info h3 {
@@ -103,15 +114,22 @@
    BUTTONS (MODERN)
    ═══════════════════════════════════════════════ */
 .btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    gap: 8px; padding: 10px 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 22px;
     border-radius: var(--border-radius-sm);
-    font-size: 14px; font-weight: 600;
-    border: none; cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
     transition: var(--transition);
 }
 
-.btn:active { transform: scale(0.97); }
+.btn:active {
+    transform: scale(0.97);
+}
 
 .btn-primary {
     background: var(--color-primary);
@@ -138,17 +156,23 @@
 /* ═══════════════════════════════════════════════
    FORMS (WIDE & TIDY)
    ═══════════════════════════════════════════════ */
-.form-group { margin-bottom: 20px; }
+.form-group {
+    margin-bottom: 20px;
+}
+
 .form-group label {
-    font-size: 13px; font-weight: 700;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--text-secondary);
-    margin-bottom: 8px; display: block;
+    margin-bottom: 8px;
+    display: block;
 }
 
 .form-control {
     width: 100%;
     padding: 12px 16px;
-    border: 1px solid var(--border-color); /* Stronger border */
+    border: 1px solid var(--border-color);
+    /* Stronger border */
     border-radius: var(--border-radius-sm);
     font-size: 15px;
     transition: var(--transition);
@@ -170,9 +194,14 @@
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
     overflow: hidden;
+    padding: 6px;
 }
 
-.data-table { width: 100%; border-collapse: collapse; }
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
 .data-table th {
     background: #f8fafc;
     padding: 16px 24px;
@@ -190,20 +219,26 @@
     border-bottom: 1px solid #f1f5f9;
 }
 
-.data-table tbody tr:hover { background: rgba(79, 70, 229, 0.02); }
+.data-table tbody tr:hover {
+    background: rgba(79, 70, 229, 0.02);
+}
 
 /* ═══════════════════════════════════════════════
    MODAL (WIDE & CENTERED)
    ═══════════════════════════════════════════════ */
 .modal-overlay {
-    position: fixed; /* FIXED: MUST BE FIXED TO FLOAT */
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    position: fixed;
+    /* FIXED: MUST BE FIXED TO FLOAT */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
     background: rgba(15, 23, 42, 0.65);
     z-index: 9999;
-    display: flex; /* Flex to center */
+    display: flex;
+    /* Flex to center */
     align-items: center;
     justify-content: center;
     padding: 20px;
@@ -211,9 +246,11 @@
 
 .modal-box {
     width: 100%;
-    max-width: 800px; 
-    max-height: 96vh; /* Don't exceed screen height */
-    overflow-y: auto; /* Scroll inside modal if too long */
+    max-width: 800px;
+    max-height: 96vh;
+    /* Don't exceed screen height */
+    overflow-y: auto;
+    /* Scroll inside modal if too long */
     background: white !important;
     border-radius: var(--border-radius-lg);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -223,13 +260,20 @@
 }
 
 @keyframes modal-pop {
-    from { transform: scale(0.9) translateY(20px); opacity: 0; }
-    to { transform: scale(1) translateY(0); opacity: 1; }
+    from {
+        transform: scale(0.9) translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
 }
 
-.modal-header { 
-    padding: 16px 32px; 
-    border-bottom: 1px solid var(--border-color); 
+.modal-header {
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -243,13 +287,18 @@
 }
 
 .modal-close {
-    width: 36px; height: 36px;
-    display: flex; align-items: center; justify-content: center;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 50%;
     background: #f1f5f9;
     color: var(--text-secondary);
-    border: none; cursor: pointer;
-    font-size: 18px; transition: var(--transition);
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    transition: var(--transition);
 }
 
 .modal-close:hover {
@@ -258,15 +307,49 @@
     transform: rotate(90deg);
 }
 
-.modal-body { padding: 24px 32px; background: white; }
+.modal-body {
+    padding: 24px 32px;
+    background: white;
+}
 
 /* ═══════════════════════════════════════════════
    GRID (ULTRA-WIDE)
    ═══════════════════════════════════════════════ */
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+}
 
-@media (max-width: 1400px) { .grid-4 { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 1000px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 700px) { .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+}
+
+@media (max-width: 1400px) {
+    .grid-4 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1000px) {
+    .grid-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+
+    .grid-4,
+    .grid-3,
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+}

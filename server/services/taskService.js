@@ -1,5 +1,4 @@
 const Task = require("../models/taskModel");
-const Deadline = require("../models/deadlineModel");
 const Notification = require("../models/notificationModel");
 
 const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done', 'cancelled'];
@@ -8,28 +7,7 @@ const STATUS_LABEL = {
     review: 'Chờ duyệt', done: 'Hoàn thành', cancelled: 'Đã hủy'
 };
 
-// ── Sync Logic ────────────────────────────────────────────────
-const syncDeadlineStatus = async (deadlineId) => {
-    if (!deadlineId) return;
-    try {
-        const tasks = await Task.getByDeadline(deadlineId);
-        if (tasks.length === 0) return;
 
-        const hasWorking = tasks.some(t => ['in_progress', 'review'].includes(t.status));
-        const allDone = tasks.every(t => t.status === 'done' || t.status === 'cancelled') && tasks.some(t => t.status === 'done');
-        const allTodo = tasks.every(t => t.status === 'todo' || t.status === 'cancelled');
-
-        if (hasWorking) {
-            await Deadline.updateStatus(deadlineId, 'working');
-        } else if (allDone) {
-            await Deadline.updateStatus(deadlineId, 'completed');
-        } else if (allTodo) {
-            await Deadline.updateStatus(deadlineId, 'pending');
-        }
-    } catch (err) {
-        console.error("Sync deadline error:", err);
-    }
-};
 
 // ── Phases ────────────────────────────────────────────────────
 exports.getPhases = async (eid) => await Task.getPhases(eid);
@@ -68,7 +46,6 @@ exports.create = async (data, creatorId) => {
             link: `/events/${data.event_id}?tab=tasks`
         });
     }
-    if (data.deadline_id) await syncDeadlineStatus(data.deadline_id);
     return { id };
 };
 
@@ -92,9 +69,9 @@ exports.update = async (id, data, userId) => {
     }
 
     // Theo dõi thay đổi người phụ trách
-    if (data.assigned_to && String(data.assigned_to) !== String(task.assigned_to)) {
+    if (data.assigned_to !== undefined && String(data.assigned_to || '') !== String(task.assigned_to || '')) {
         changes.push({ action: 'assign', old_value: task.assigned_name || '', new_value: data.assigned_to });
-        if (String(data.assigned_to) !== String(userId)) {
+        if (data.assigned_to && String(data.assigned_to) !== String(userId)) {
             await Notification.create({
                 user_id: data.assigned_to,
                 type: 'task_assigned',
@@ -103,6 +80,12 @@ exports.update = async (id, data, userId) => {
                 link: `/events/${task.event_id}?tab=tasks`
             });
         }
+    }
+
+    // Theo dõi thay đổi phòng ban phụ trách
+    if (data.assigned_dept_id !== undefined && String(data.assigned_dept_id || '') !== String(task.assigned_dept_id || '')) {
+        changes.push({ action: 'assign_dept', old_value: task.assigned_dept_name || '', new_value: data.assigned_dept_id });
+        // Optionally notify department heads
     }
 
     // Theo dõi thay đổi deadline
@@ -115,13 +98,6 @@ exports.update = async (id, data, userId) => {
     // Ghi tất cả history
     for (const ch of changes) {
         await Task.addHistory({ task_id: id, user_id: userId, ...ch });
-    }
-    // SYNC DEADLINE
-    if (data.status || data.deadline_id) {
-        await syncDeadlineStatus(task.deadline_id);
-        if (data.deadline_id && data.deadline_id !== task.deadline_id) {
-            await syncDeadlineStatus(data.deadline_id);
-        }
     }
 };
 
@@ -150,11 +126,6 @@ exports.updateStatus = async (id, status, userId) => {
             message: `"${task.title}" đã được đánh dấu hoàn thành`,
             link: `/events/${task.event_id}?tab=tasks`
         });
-    }
-
-    // SYNC DEADLINE
-    if (task.deadline_id) {
-        await syncDeadlineStatus(task.deadline_id);
     }
 };
 
@@ -197,11 +168,6 @@ exports.delete = async (id) => {
     const task = await Task.getById(id);
     if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
     await Task.delete(id);
-    
-    // SYNC DEADLINE
-    if (task.deadline_id) {
-        await syncDeadlineStatus(task.deadline_id);
-    }
 };
 
 // ── Comments ──────────────────────────────────────────────────

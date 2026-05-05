@@ -22,8 +22,10 @@ const Attendee = {
     },
     getByEvent: async (eventId) => {
         const [r] = await db.query(`
-            SELECT a.*, u.role AS user_role, u.department
-            FROM attendees a LEFT JOIN users u ON a.user_id = u.id
+            SELECT a.*, u.role AS user_role, d.name AS department
+            FROM attendees a 
+            LEFT JOIN users u ON a.user_id = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
             WHERE a.event_id=? ORDER BY a.checked_in DESC, a.name ASC
         `, [eventId]);
         return r;
@@ -53,6 +55,14 @@ const Attendee = {
             "SELECT id FROM attendees WHERE email=? AND event_id=? AND user_id IS NULL", [email, eventId]
         );
         return r[0] || null;
+    },
+    findByEmail: async (email) => {
+        const [r] = await db.query(`
+            SELECT a.*, e.name AS event_name, e.status AS event_status, e.start_date, e.end_date, e.location 
+            FROM attendees a LEFT JOIN events e ON a.event_id=e.id 
+            WHERE a.email=? ORDER BY a.created_at DESC
+        `, [email]);
+        return r;
     },
     create: async (d) => {
         const [r] = await db.query(`

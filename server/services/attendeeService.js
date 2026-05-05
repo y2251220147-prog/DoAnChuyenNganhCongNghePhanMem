@@ -3,6 +3,7 @@ const Event = require("../models/eventModel");
 const User = require("../models/userModel");
 const Notification = require("../models/notificationModel");
 const { generateQR } = require("./qrService");
+const { sendGuestInvitation } = require("./emailService");
 
 const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
@@ -31,7 +32,51 @@ exports.addExternal = async (data, registeredBy) => {
         event_id, user_id: null, name, email, phone,
         attendee_type: 'external', qr_code, registered_by: registeredBy
     });
-    return { id, qr_code };
+    
+    let emailSent = false;
+    try {
+        await sendGuestInvitation({
+            name, email, qr_code,
+            custom_message: data.content,
+            event: {
+                name: event.name,
+                start_date: event.start_date,
+                end_date: event.end_date,
+                location: event.location,
+                venue_type: event.venue_type,
+                event_type: event.event_type,
+                description: event.description,
+            }
+        });
+        emailSent = true;
+    } catch (err) {
+        console.error(`Lỗi gửi email cho ${email}:`, err.message);
+    }
+    
+    return { id, qr_code, emailSent };
+};
+
+exports.addBulkExternal = async (dataList, registeredBy) => {
+    if (!Array.isArray(dataList) || dataList.length === 0) {
+        throw { status: 400, message: "Danh sách khách mời không hợp lệ" };
+    }
+    
+    let successCount = 0;
+    let errors = [];
+    
+    for (const [index, data] of dataList.entries()) {
+        try {
+            await exports.addExternal(data, registeredBy);
+            successCount++;
+        } catch (e) {
+            errors.push({ line: index + 1, email: data.email, error: e.message });
+        }
+    }
+    
+    return { 
+        stats: { success: successCount, failed: errors.length },
+        errors 
+    };
 };
 
 exports.selfRegister = async (eventId, userId) => {
@@ -75,4 +120,29 @@ exports.remove = async (attendeeId, requesterId, requesterRole) => {
     if (att.checked_in && requesterRole === 'user')
         throw { status: 400, message: "Không thể huỷ sau khi đã check-in" };
     await Attendee.delete(attendeeId);
+};
+
+exports.lookupByEmail = async (email) => {
+    if (!email || !isEmail(email)) throw { status: 400, message: "Email không hợp lệ" };
+    const rows = await Attendee.findByEmail(email);
+    if (!rows.length) throw { status: 404, message: "Không tìm thấy khách mời với email này" };
+    return rows.map(r => ({
+        guest: {
+            id: r.id,
+            name: r.name,
+            email: r.email,
+            phone: r.phone,
+            qr_code: r.qr_code,
+            checked_in: r.checked_in,
+            event_id: r.event_id,
+        },
+        event: {
+            id: r.event_id,
+            name: r.event_name,
+            status: r.event_status,
+            start_date: r.start_date,
+            end_date: r.end_date,
+            location: r.location,
+        }
+    }));
 };

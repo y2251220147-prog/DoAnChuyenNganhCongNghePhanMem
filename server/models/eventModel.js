@@ -38,6 +38,14 @@ const Event = {
         return rows[0] || null;
     },
 
+    async checkDuplicate(name, start_date) {
+        const [rows] = await db.query(`
+            SELECT id FROM events 
+            WHERE name = ? AND DATE(start_date) = DATE(?)
+        `, [name, start_date]);
+        return rows.length > 0;
+    },
+
     async create(data) {
         const {
             name, description, event_type, owner_id,

@@ -47,6 +47,11 @@ const createEvent = async (data, userId) => {
     if (!end_date) throw { status: 400, message: "Ngày kết thúc là bắt buộc" };
     if (new Date(end_date) <= new Date(start_date))
         throw { status: 400, message: "Ngày kết thúc phải sau ngày bắt đầu" };
+    if (!data.organizer_id) throw { status: 400, message: "Người tổ chức (Organizer) là bắt buộc" };
+    
+    // Check trùng lặp sự kiện
+    const isDuplicate = await Event.checkDuplicate(name, start_date);
+    if (isDuplicate) throw { status: 409, message: "Đã tồn tại sự kiện có cùng tên và cùng ngày bắt đầu!" };
 
     // Người tạo = owner nếu không truyền owner_id
     const payload = { 
@@ -57,42 +62,15 @@ const createEvent = async (data, userId) => {
     };
     const id = await Event.create(payload);
 
-    // Tự động đặt địa điểm nếu chọn từ danh mục
-    if (payload.venue_id && payload.venue_type === 'offline') {
-        try {
-            await Venue.createBooking({
-                event_id: id,
-                venue_id: payload.venue_id,
-                start_time: start_date,
-                end_time: end_date,
-                note: `Đặt chỗ tự động từ sự kiện: ${name}`,
-                status: 'confirmed'
-            });
-        } catch (e) {
-            console.error("Lỗi tự động đặt địa điểm:", e);
-        }
-    }
+    // (Venue và Resource được quản lý trực tiếp qua venue_id trên bảng events theo schema mới, 
+    // không còn bảng event_venue_bookings hay event_resource_bookings)
 
-    // Tự động đặt tài nguyên (nếu có danh sách resources truyền lên)
-    if (data.resources && Array.isArray(data.resources)) {
-        for (const res of data.resources) {
-            try {
-                await Resource.createBooking({
-                    event_id: id,
-                    resource_id: res.resource_id || res.id,
-                    quantity: res.quantity || 1,
-                    status: 'confirmed'
-                });
-            } catch (e) {
-                console.error("Lỗi tự động đặt tài nguyên:", e);
-            }
-        }
-    }
-
-    // Tự động tạo deadlines mặc định dựa vào start_date
+    // Tự động tạo Task mặc định (thay thế cho Deadlines rời rạc)
     const assigneeId = data.organizer_id || userId;
     const start = new Date(start_date);
     const now = new Date();
+
+    const Task = require("../models/taskModel");
 
     for (const dl of DEFAULT_DEADLINES) {
         let due = new Date(start);
@@ -104,11 +82,13 @@ const createEvent = async (data, userId) => {
             due.setHours(23, 59, 59, 999);
         }
 
-        await Deadline.create({
+        await Task.create({
             event_id: id,
             title: dl.title,
             due_date: due,
-            assigned_to: assigneeId
+            assigned_to: assigneeId,
+            status: 'todo',
+            is_milestone: 1
         });
     }
 
@@ -163,17 +143,10 @@ const updateEvent = async (id, data) => {
 
     if (newVenueId && (data.venue_id || data.start_date || data.end_date)) {
         try {
-            const db = require("../config/database");
-            // Xóa booking cũ của venue này cho event này và tạo cái mới
-            await db.query("DELETE FROM event_venue_bookings WHERE event_id = ?", [id]);
-            await Venue.createBooking({
-                event_id: id,
-                venue_id: newVenueId,
-                start_time: newStart,
-                end_time: newEnd,
-                status: 'confirmed'
-            });
-        } catch (e) { console.error("Lỗi cập nhật booking địa điểm:", e); }
+            // venue_id được lưu trực tiếp trong events.venue_id (không có bảng event_venue_bookings riêng)
+            // Đã được update trong Event.update() ở trên — không cần thêm thác tác.
+            console.log(`[Event ${id}] Venue cập nhật thành venue_id=${newVenueId}`);
+        } catch (e) { console.error("Lỗi cập nhật địa điểm:", e); }
     }
 
     // Thông báo cho những người đã đăng ký (có user_id nội bộ) biết sự kiện đã có sự thay đổi (US-016)

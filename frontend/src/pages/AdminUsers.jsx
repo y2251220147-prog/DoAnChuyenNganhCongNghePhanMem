@@ -2,7 +2,8 @@ import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import Layout from "../components/Layout/Layout";
 import Modal from "../components/UI/Modal";
-import { changeRole, createUser, deleteUser, getUsers } from "../services/userService";
+import { changeRole, changeDepartment, createUser, deleteUser, getUsers } from "../services/userService";
+import { getDepartments } from "../services/departmentService";
 import "../styles/global.css";
 
 const ROLES = ["user", "organizer", "admin"];
@@ -22,14 +23,19 @@ export default function AdminUsers() {
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(null);
     const [isModalOpen, setModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "user" });
+    const [departments, setDepartments] = useState([]);
+    const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "user", department_id: "" });
     const [submitting, setSubmitting] = useState(false);
     const [search, setSearch] = useState("");
     const [formError, setFormError] = useState("");
 
     const loadUsers = async () => {
         setLoading(true);
-        try { const res = await getUsers(); setUsers(res.data || []); }
+        try { 
+            const [uRes, dRes] = await Promise.all([getUsers(), getDepartments()]);
+            setUsers(uRes.data || []); 
+            setDepartments(dRes.data || []);
+        }
         catch {/***/ }
         finally { setLoading(false); }
     };
@@ -45,12 +51,22 @@ export default function AdminUsers() {
         finally { setUpdating(null); }
     };
 
+    const handleDepartmentChange = async (id, newDeptId) => {
+        setUpdating(id);
+        try {
+            await changeDepartment(id, newDeptId);
+            const dept = departments.find(d => String(d.id) === String(newDeptId));
+            setUsers(prev => prev.map(u => u.id === id ? { ...u, department_id: newDeptId, department_name: dept ? dept.name : null } : u));
+        } catch {/***/ }
+        finally { setUpdating(null); }
+    };
+
     const handleCreate = async (e) => {
         e.preventDefault(); setFormError(""); setSubmitting(true);
         try {
             await createUser(formData);
             setModalOpen(false);
-            setFormData({ name: "", email: "", password: "", role: "user" });
+            setFormData({ name: "", email: "", password: "", role: "user", department_id: "" });
             loadUsers();
         } catch (err) { setFormError(err.response?.data?.message || "Create failed"); }
         finally { setSubmitting(false); }
@@ -105,9 +121,11 @@ export default function AdminUsers() {
                             <tr>
                                 <th style={{ paddingLeft: 24 }}>Thành viên</th>
                                 <th>Địa chỉ Email</th>
+                                <th>Phòng ban</th>
                                 <th>Ngày tham gia</th>
                                 <th>Vai trò</th>
-                                <th>Điều chỉnh quyền</th>
+                                <th>Điều chỉnh vai trò</th>
+                                <th>Điều chỉnh phòng ban</th>
                                 <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>
                             </tr>
                         </thead>
@@ -136,6 +154,7 @@ export default function AdminUsers() {
                                         </div>
                                     </td>
                                     <td style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{u.email}</td>
+                                    <td style={{ color: "var(--color-primary)", fontWeight: 600 }}>{u.department_name ? `🏢 ${u.department_name}` : "—"}</td>
                                     <td style={{ color: "var(--text-secondary)", fontSize: 13 }}>
                                         📅 {u.created_at ? new Date(u.created_at).toLocaleDateString("vi-VN") : "—"}
                                     </td>
@@ -152,6 +171,20 @@ export default function AdminUsers() {
                                                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                                             </select>
                                             {updating === u.id && <span className="loader-sm" style={{ width: 16, height: 16 }}></span>}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <select
+                                                value={u.department_id || ""}
+                                                onChange={e => handleDepartmentChange(u.id, e.target.value || null)}
+                                                disabled={updating === u.id}
+                                                className="form-control"
+                                                style={{ width: 160, padding: "8px 12px", fontSize: 13, borderRadius: 10, border: "1px solid #e2e8f0" }}
+                                            >
+                                                <option value="">-- Không phòng ban --</option>
+                                                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                            </select>
                                         </div>
                                     </td>
                                     <td style={{ textAlign: "right", paddingRight: 24 }}>
@@ -185,6 +218,13 @@ export default function AdminUsers() {
                             <option value="user">Người dùng (User)</option>
                             <option value="organizer">Người tổ chức (Organizer)</option>
                             <option value="admin">Quản trị viên (Admin)</option>
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Phòng ban trực thuộc</label>
+                        <select className="form-control" value={formData.department_id} onChange={e => setFormData({ ...formData, department_id: e.target.value })}>
+                            <option value="">-- Không có phòng ban --</option>
+                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                     </div>
                     <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 12 }}>

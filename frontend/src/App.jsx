@@ -18,6 +18,7 @@ import ResetPassword from "./pages/ResetPassword";
 import StaffList from "./pages/Staff/StaffList";
 import TimelineList from "./pages/Timeline/TimelineList";
 import VenueList from "./pages/Venues/VenueList";
+import DepartmentList from "./pages/Departments/DepartmentList";
 import NotificationCenter from "./pages/Notifications/NotificationCenter";
 import UserEventPortal from "./pages/Portal/UserEventPortal";
 import GuestPublicPortal from "./pages/Portal/GuestPublicPortal";
@@ -112,6 +113,7 @@ export default function App() {
         <Route path="/checkin" element={<RoleRoute roles={["admin","organizer"]}><CheckinScanner /></RoleRoute>} />
         <Route path="/reports" element={<RoleRoute roles={["admin","organizer"]}><Reports /></RoleRoute>} />
         <Route path="/venues" element={<RoleRoute roles={["admin","organizer"]}><VenueList /></RoleRoute>} />
+        <Route path="/departments" element={<RoleRoute roles={["admin","organizer"]}><DepartmentList /></RoleRoute>} />
         <Route path="/admin/users" element={<RoleRoute roles={["admin"]}><AdminUsers /></RoleRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
 

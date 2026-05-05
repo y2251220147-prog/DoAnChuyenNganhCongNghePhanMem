@@ -2,14 +2,14 @@ const db = require("../config/database");
 
 exports.getAll = async () => {
     const [rows] = await db.query(
-        "SELECT es.*, u.name AS user_name, u.email AS user_email FROM event_staff es LEFT JOIN users u ON es.user_id = u.id ORDER BY es.id DESC"
+        "SELECT es.*, u.name AS user_name, u.email AS user_email, d.name AS department_name FROM event_staff es LEFT JOIN users u ON es.user_id = u.id LEFT JOIN departments d ON u.department_id = d.id ORDER BY es.id DESC"
     );
     return rows;
 };
 
 exports.getByEvent = async (eventId) => {
     const [rows] = await db.query(
-        "SELECT es.*, u.name AS user_name, u.email AS user_email FROM event_staff es LEFT JOIN users u ON es.user_id = u.id WHERE es.event_id = ? ORDER BY es.id DESC",
+        "SELECT es.*, u.name AS user_name, u.email AS user_email, d.name AS department_name FROM event_staff es LEFT JOIN users u ON es.user_id = u.id LEFT JOIN departments d ON u.department_id = d.id WHERE es.event_id = ? ORDER BY es.id DESC",
         [eventId]
     );
     return rows;

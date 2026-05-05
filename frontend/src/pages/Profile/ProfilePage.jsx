@@ -112,7 +112,7 @@ export default function ProfilePage() {
                             </div>
                             <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
                                 <span className="emp-badge emp-badge-green" style={{ padding: "6px 14px", borderRadius: 10 }}>● Đang hoạt động</span>
-                                {user?.department && <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10 }}>🏢 {user.department}</span>}
+                                {user?.department_name && <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10 }}>🏢 {user.department_name}</span>}
                             </div>
                         </div>
                     </div>

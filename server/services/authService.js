@@ -5,7 +5,7 @@ const User = require("../models/userModel");
 const JWT_SECRET = process.env.JWT_SECRET || "change_this_secret";
 const SALT_ROUNDS = 10;
 
-const register = async ({ name, email, password }) => {
+const register = async ({ name, email, password, department_id }) => {
     if (!name || !email || !password)
         throw { status: 400, message: "Name, email and password are required" };
     if (password.length < 6)
@@ -15,7 +15,7 @@ const register = async ({ name, email, password }) => {
     if (existing) throw { status: 400, message: "Email already exists" };
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const id = await User.createUser({ name, email, password: hashedPassword, role: "user" });
+    const id = await User.createUser({ name, email, password: hashedPassword, role: "user", department_id });
 
     // Thông báo cho toàn bộ admin
     const { notifyAdmins } = require("./notificationUtils");

@@ -5,80 +5,95 @@ import { getUnreadCount } from "../../services/notificationService";
 import "../../styles/layout.css";
 
 const NAV = {
-    // Admin = Quản trị hệ thống: phê duyệt, thống kê, kiểm soát toàn bộ
     admin: [
         {
             label: "Tổng quan", items: [
                 { to: "/dashboard", icon: "📊", text: "Dashboard" },
-                { to: "/reports", icon: "📈", text: "Báo cáo" },
-            ]
-        },
-        {
-            label: "Quản lý sự kiện", items: [
-                { to: "/events", icon: "🎪", text: "Tất cả sự kiện" },
-                { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Khách mời" },
-                { to: "/venues", icon: "🏢", text: "Địa điểm" },
-                { to: "/budget", icon: "💰", text: "Ngân sách" },
-                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
-                { to: "/checkin", icon: "✅", text: "Check-in" },
-                { to: "/feedback", icon: "💬", text: "Phản hồi" },
-            ]
-        },
-        {
-            label: "Hệ thống", items: [
-                { to: "/admin/users", icon: "🔧", text: "Quản lý tài khoản", badge: "Admin" },
-                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
-                { to: "/notifications", icon: "🔔", text: "Thông báo" },
-                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
-            ]
-        },
-    ],
-    organizer: [
-        {
-            label: "Tổng quan", items: [
-                { to: "/dashboard", icon: "📊", text: "Dashboard" },
-                { to: "/reports", icon: "📈", text: "Báo cáo" },
-            ]
-        },
-        {
-            label: "Tổ chức sự kiện", items: [
-                { to: "/events", icon: "🎪", text: "Quản lý sự kiện" },
-                { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Khách mời" },
-                { to: "/venues", icon: "🏢", text: "Địa điểm" },
-                { to: "/budget", icon: "💰", text: "Ngân sách" },
-                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
-                { to: "/checkin", icon: "✅", text: "Check-in" },
-                { to: "/feedback", icon: "💬", text: "Phản hồi" },
-            ]
-        },
-        {
-            label: "Cá nhân", items: [
-                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
-                { to: "/my-portal", icon: "🙋", text: "Sự kiện của tôi" },
-                { to: "/notifications", icon: "🔔", text: "Thông báo" },
-                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
-            ]
-        },
-    ],
-    user: [
-        {
-            label: "Trang chủ", items: [
-                { to: "/dashboard", icon: "🏠", text: "Trang chủ" },
-                { to: "/calendar", icon: "📅", text: "Lịch sự kiện" },
+                { to: "/reports",   icon: "📈", text: "Báo cáo & Thống kê" },
             ]
         },
         {
             label: "Sự kiện", items: [
-                { to: "/events", icon: "🎪", text: "Khám phá sự kiện" },
+                { to: "/events",   icon: "🎪", text: "Quản lý sự kiện" },
+                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
+                { to: "/budget",   icon: "💰", text: "Ngân sách" },
+                { to: "/venues",   icon: "📍", text: "Địa điểm" },
+            ]
+        },
+        {
+            // Nhân sự tổ chức = vai trò trong từng sự kiện (event_staff)
+            // Phòng ban       = cơ cấu tổ chức công ty  (departments)
+            // → 2 khái niệm khác nhau, cần cả 2
+            label: "Nhân sự & Tham dự", items: [
+                { to: "/staff",       icon: "🎭", text: "Nhân sự sự kiện" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
+                { to: "/guests",      icon: "🎟️", text: "DS người tham gia sự kiện" },
+                { to: "/checkin",     icon: "✅", text: "Check-in" },
+                { to: "/feedback",    icon: "💬", text: "Phản hồi" },
+            ]
+        },
+        {
+            label: "Hệ thống", items: [
+                { to: "/admin/users",    icon: "🔧", text: "Tài khoản", badge: "Admin" },
+                { to: "/notifications",  icon: "🔔", text: "Thông báo" },
+                { to: "/profile",        icon: "👤", text: "Hồ sơ cá nhân" },
+                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
+            ]
+        },
+    ],
+
+    organizer: [
+        {
+            label: "Tổng quan", items: [
+                { to: "/dashboard", icon: "📊", text: "Dashboard" },
+                { to: "/reports",   icon: "📈", text: "Báo cáo" },
+            ]
+        },
+        {
+            label: "Sự kiện", items: [
+                { to: "/events",   icon: "🎪", text: "Quản lý sự kiện" },
+                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
+                { to: "/budget",   icon: "💰", text: "Ngân sách" },
+                { to: "/venues",   icon: "📍", text: "Địa điểm" },
+            ]
+        },
+        {
+            label: "Nhân sự & Tham dự", items: [
+                { to: "/staff",       icon: "🎭", text: "Nhân sự sự kiện" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
+                { to: "/guests",      icon: "🎟️", text: "DS người tham gia sự kiện" },
+                { to: "/checkin",     icon: "✅", text: "Check-in" },
+                { to: "/feedback",    icon: "💬", text: "Phản hồi" },
+            ]
+        },
+        {
+            label: "Cá nhân", items: [
+                { to: "/my-portal",      icon: "🙋", text: "Sự kiện của tôi" },
+                { to: "/notifications",  icon: "🔔", text: "Thông báo" },
+                { to: "/profile",        icon: "👤", text: "Hồ sơ cá nhân" },
+                { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
+            ]
+        },
+    ],
+
+    user: [
+        {
+            label: "Trang chủ", items: [
+                { to: "/dashboard", icon: "🏠", text: "Trang chủ" },
+                { to: "/calendar",  icon: "📅", text: "Lịch sự kiện" },
+            ]
+        },
+        {
+            label: "Sự kiện", items: [
+                { to: "/events",    icon: "🎪", text: "Khám phá sự kiện" },
                 { to: "/my-portal", icon: "🙋", text: "Sự kiện của tôi" },
             ]
         },
         {
             label: "Cá nhân", items: [
-                { to: "/notifications", icon: "🔔", text: "Thông báo" },
-                { to: "/feedback", icon: "💬", text: "Gửi phản hồi" },
+                { to: "/notifications",  icon: "🔔", text: "Thông báo" },
+                { to: "/feedback",       icon: "💬", text: "Gửi phản hồi" },
+                { to: "/profile",        icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
         },

@@ -9,11 +9,9 @@ import {
 
 // ─── Hằng số ─────────────────────────────────────────────────
 const STATUSES = [
-    { key: "todo", label: "Chưa bắt đầu", color: "#94a3b8" },
+    { key: "todo", label: "Chuẩn bị", color: "#94a3b8" },
     { key: "in_progress", label: "Đang làm", color: "#f59e0b" },
-    { key: "review", label: "Chờ duyệt", color: "#6366f1" },
     { key: "done", label: "Hoàn thành", color: "#10b981" },
-    { key: "cancelled", label: "Đã hủy", color: "#ef4444" },
 ];
 const PRIORITY_CFG = {
     high: { label: "Cao", color: "#ef4444", bg: "#fef2f2" },
@@ -24,8 +22,8 @@ const STATUS_BADGE = Object.fromEntries(STATUSES.map(s => [s.key, s]));
 
 const PHASE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
 const EMPTY_TASK = {
-    title: "", description: "", phase_id: "", parent_id: "", deadline_id: "",
-    assigned_to: "", priority: "medium", status: "todo",
+    title: "", description: "", phase_id: "", parent_id: "",
+    assigned_to: "", assigned_dept_id: "", priority: "medium", status: "todo",
     start_date: "", due_date: "", is_milestone: false,
     estimated_h: "", progress: 0,
     estimated_budget: "", feedback_status: 'none', feedback_note: ""
@@ -136,7 +134,16 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Avatar name={task.assigned_name} />
+                    {task.assigned_dept_name ? (
+                        <div style={{
+                            fontSize: 10, padding: "2px 6px", background: "rgba(99,102,241,0.1)",
+                            color: "var(--color-primary)", borderRadius: 4, fontWeight: 600
+                        }}>
+                            🏢 {task.assigned_dept_name}
+                        </div>
+                    ) : (
+                        <Avatar name={task.assigned_name} />
+                    )}
                     {task.comment_count > 0 && (
                         <span style={{ fontSize: 10, color: "var(--text-muted)" }}>💬 {task.comment_count}</span>
                     )}
@@ -162,13 +169,13 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
 
 // ─── Main Component ──────────────────────────────────────────
 export default function TaskBoard({ 
-    eventId, staffList = [], canManage, deadlines = [], 
-    externalFilterDeadlineId, onClearExternalFilter 
+    eventId, staffList = [], canManage, onRefreshParent
 }) {
     const { user } = useContext(AuthContext);
 
     const [phases, setPhases] = useState([]);
     const [tasks, setTasks] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState("kanban"); // kanban | list | gantt
@@ -203,14 +210,16 @@ export default function TaskBoard({
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [ph, tk, st] = await Promise.all([
+            const [ph, tk, st, dp] = await Promise.all([
                 getPhases(eventId),
                 import("../../services/taskService").then(m => m.getTasksByEvent(eventId)),
                 import("../../services/taskService").then(m => m.getTaskStats(eventId)),
+                import("../../services/departmentService").then(m => m.getDepartments()),
             ]);
             setPhases(ph.data || []);
             setTasks(tk.data || []);
             setStats(st.data || null);
+            setDepartments(dp.data || []);
         } catch {/**/ }
         finally { setLoading(false); }
     };
@@ -295,8 +304,9 @@ export default function TaskBoard({
             description: task.description || "",
             phase_id: task.phase_id || "",
             parent_id: task.parent_id || "",
-            deadline_id: task.deadline_id || "",
+
             assigned_to: task.assigned_to || "",
+            assigned_dept_id: task.assigned_dept_id || "",
             priority: task.priority || "medium",
             status: task.status || "todo",
             start_date: task.start_date?.slice(0, 16) || "",
@@ -348,7 +358,7 @@ export default function TaskBoard({
 
     // ── Filter ───────────────────────────────────────────────
     const applyFilters = (t) => {
-        if (externalFilterDeadlineId && t.deadline_id !== externalFilterDeadlineId) return false;
+
         if (filterStatus !== "all" && t.status !== filterStatus) return false;
         if (filterPriority !== "all" && t.priority !== filterPriority) return false;
         if (filterAssignee !== "all" && String(t.assigned_to) !== String(filterAssignee)) return false;
@@ -396,29 +406,7 @@ export default function TaskBoard({
                 </div>
             )}
 
-            {/* ── Active Filter Chip ── */}
-            {externalFilterDeadlineId && (
-                <div style={{ 
-                    display: "flex", alignItems: "center", gap: 12, marginBottom: 16, 
-                    padding: "10px 16px", background: "var(--color-primary)", color: "white", 
-                    borderRadius: 12, boxShadow: "0 4px 12px rgba(99,102,241,0.3)" 
-                }}>
-                    <span style={{ fontSize: 18 }}>🔍</span>
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>
-                        Đang lọc công việc cho: {deadlines.find(d => d.id === externalFilterDeadlineId)?.title || "Deadline"}
-                    </span>
-                    <button 
-                        onClick={onClearExternalFilter}
-                        style={{ 
-                            marginLeft: "auto", background: "rgba(255,255,255,0.2)", border: "none", 
-                            color: "white", width: 24, height: 24, borderRadius: 12, 
-                            display: "flex", alignItems: "center", justifyContent: "center", 
-                            cursor: "pointer", fontWeight: 900, fontSize: 10
-                        }}>
-                        ✕
-                    </button>
-                </div>
-            )}
+
 
             {/* ── Toolbar ── */}
             <div style={{ 
@@ -650,8 +638,8 @@ export default function TaskBoard({
                     {/* Info grid */}
                     <div className="grid-2" style={{ marginBottom: 16, gap: 10 }}>
                         {[
-                            { label: "Thuộc Deadline", value: openTask.deadline_title || "—", style: openTask.deadline_title ? { color: "var(--color-primary)", fontWeight: 800 } : {} },
-                            { label: "Người phụ trách", value: openTask.assigned_name || "Chưa giao" },
+
+                            { label: "Người phụ trách", value: openTask.assigned_dept_name ? `🏢 ${openTask.assigned_dept_name}` : (openTask.assigned_name || "Chưa giao") },
                             { label: "Ưu tiên", value: PRIORITY_CFG[openTask.priority]?.label || "—" },
                             { label: "Bắt đầu", value: fmtDT(openTask.start_date) || "—" },
                             {
@@ -817,8 +805,9 @@ export default function TaskBoard({
                                             <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                                                 {" "}{h.action === "status_change" ? "đổi trạng thái" :
                                                     h.action === "assign" ? "giao cho" :
-                                                        h.action === "progress" ? "cập nhật tiến độ" :
-                                                            h.action === "due_date" ? "đổi deadline" :
+                                                        h.action === "assign_dept" ? "giao cho phòng ban" :
+                                                            h.action === "progress" ? "cập nhật tiến độ" :
+                                                            h.action === "due_date" ? "đổi hạn chót" :
                                                                 h.action === "created" ? "tạo nhiệm vụ" : h.action}
                                             </span>
                                             {h.old_value && h.new_value && (
@@ -868,23 +857,34 @@ export default function TaskBoard({
                                 ))}
                             </select>
                         </div>
-                        <div className="form-group">
-                            <label>Liên kết với Deadline</label>
-                            <select className="form-control" value={form.deadline_id}
-                                onChange={e => setForm({ ...form, deadline_id: e.target.value })}>
-                                <option value="">Không liên kết</option>
-                                {deadlines.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
-                            </select>
-                        </div>
+
                     </div>
 
-                    <div className="grid-2" style={{ marginBottom: 16 }}>
+                    <div className="grid-3" style={{ marginBottom: 16 }}>
                         <div className="form-group">
-                            <label>Người phụ trách</label>
+                            <label>Phòng ban phụ trách</label>
+                            <select className="form-control" value={form.assigned_dept_id}
+                                onChange={e => setForm({ ...form, assigned_dept_id: e.target.value, assigned_to: e.target.value ? "" : form.assigned_to })}>
+                                <option value="">Không giao phòng ban</option>
+                                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Cá nhân phụ trách</label>
                             <select className="form-control" value={form.assigned_to}
-                                onChange={e => setForm({ ...form, assigned_to: e.target.value })}>
+                                onChange={e => setForm({ ...form, assigned_to: e.target.value, assigned_dept_id: e.target.value ? "" : form.assigned_dept_id })}
+                                disabled={!!form.assigned_dept_id}>
                                 <option value="">Chưa giao</option>
-                                {staffList.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.user_name || s.name}</option>)}
+                                {staffList.map(s => {
+                                    const name = s.user_name || s.name;
+                                    const dept = s.department_name ? ` · ${s.department_name}` : "";
+                                    const role = s.role ? ` [${s.role}]` : "";
+                                    return (
+                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                            {name}{dept}{role}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                         <div className="form-group">
@@ -905,9 +905,9 @@ export default function TaskBoard({
                                 onChange={e => setForm({ ...form, start_date: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>Hạn chót</label>
+                            <label>Hạn chót *</label>
                             <input type="datetime-local" className="form-control" value={form.due_date}
-                                onChange={e => setForm({ ...form, due_date: e.target.value })} />
+                                onChange={e => setForm({ ...form, due_date: e.target.value })} required />
                         </div>
                         <div className="form-group">
                             <label>Ước tính (giờ)</label>
@@ -1064,7 +1064,9 @@ function PhaseSection({ phase, tasks, canManage, onOpen, onEdit, onDelete, onAdd
                                             <td>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                                     <Avatar name={task.assigned_name} />
-                                                    <span style={{ fontSize: 12 }}>{task.assigned_name || "—"}</span>
+                                                    <span style={{ fontSize: 12 }}>
+                                                        {task.assigned_dept_name ? `🏢 ${task.assigned_dept_name}` : (task.assigned_name || "—")}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td style={{
@@ -1128,7 +1130,9 @@ function PhaseSection({ phase, tasks, canManage, onOpen, onEdit, onDelete, onAdd
                                                         fontSize: 10, color: sp.color, background: sp.bg,
                                                         padding: "1px 6px", borderRadius: 999
                                                     }}>{sp.label}</span></td>
-                                                    <td style={{ fontSize: 12 }}>{sub.assigned_name || "—"}</td>
+                                                    <td style={{ fontSize: 12 }}>
+                                                        {sub.assigned_dept_name ? `🏢 ${sub.assigned_dept_name}` : (sub.assigned_name || "—")}
+                                                    </td>
                                                     <td style={{ fontSize: 11, color: sOverdue ? "#dc2626" : "var(--text-muted)" }}>
                                                         {fmtDate(sub.due_date) || "—"}
                                                     </td>

@@ -47,12 +47,13 @@ export default function EmployeeProfile() {
                 <div style={{ flex:1 }}>
                     <div style={{ fontSize:19, fontWeight:600 }}>{user?.name || "Nhân viên"}</div>
                     <div style={{ fontSize:13, color:"var(--emp-text2)", marginTop:3 }}>
-                        {user?.department ? `${user.department} · ` : ""}{user?.email}
+                    {user?.department_name ? `🏢 ${user.department_name} · ` : ""}{user?.email}
                     </div>
                     <div style={{ display:"flex", gap:8, marginTop:10, flexWrap:"wrap" }}>
                         <span className="emp-badge emp-badge-gray">
                             {user?.role === "organizer" ? "Organizer" : "Employee"}
                         </span>
+                        {user?.department_name && <span className="emp-badge emp-badge-purple">🏢 {user.department_name}</span>}
                         <span className="emp-badge emp-badge-green">Đang hoạt động</span>
                     </div>
                 </div>
