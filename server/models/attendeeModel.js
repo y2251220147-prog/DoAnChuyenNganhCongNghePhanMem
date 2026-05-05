@@ -22,8 +22,10 @@ const Attendee = {
     },
     getByEvent: async (eventId) => {
         const [r] = await db.query(`
-            SELECT a.*, u.role AS user_role, u.department
-            FROM attendees a LEFT JOIN users u ON a.user_id = u.id
+            SELECT a.*, u.role AS user_role, d.name AS user_department, u.role_in_dept
+            FROM attendees a
+            LEFT JOIN users u ON a.user_id = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
             WHERE a.event_id=? ORDER BY a.checked_in DESC, a.name ASC
         `, [eventId]);
         return r;

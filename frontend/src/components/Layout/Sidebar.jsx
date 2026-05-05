@@ -15,9 +15,10 @@ const NAV = {
         },
         {
             label: "Quản lý sự kiện", items: [
-                { to: "/events", icon: "🎪", text: "Tất cả sự kiện" },
+                { to: "/events", icon: "🎦", text: "Tất cả sự kiện" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
                 { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Khách mời" },
+                { to: "/guests", icon: "🎟️", text: "Người tham gia" },
                 { to: "/venues", icon: "🏢", text: "Địa điểm" },
                 { to: "/budget", icon: "💰", text: "Ngân sách" },
                 { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
@@ -43,9 +44,10 @@ const NAV = {
         },
         {
             label: "Tổ chức sự kiện", items: [
-                { to: "/events", icon: "🎪", text: "Quản lý sự kiện" },
+                { to: "/events", icon: "🎦", text: "Quản lý sự kiện" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
                 { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Khách mời" },
+                { to: "/guests", icon: "🎟️", text: "Người tham gia" },
                 { to: "/venues", icon: "🏢", text: "Địa điểm" },
                 { to: "/budget", icon: "💰", text: "Ngân sách" },
                 { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },

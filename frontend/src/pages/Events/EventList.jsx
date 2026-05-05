@@ -9,6 +9,7 @@ import {
     searchEvents, updateEvent
 } from "../../services/eventService";
 import { getAllUsers } from "../../services/userService";
+import { getDepartments } from "../../services/departmentService";
 import { getVenues, getAllResources } from "../../services/venueService";
 import "../../styles/global.css";
 
@@ -41,7 +42,7 @@ const EMPTY_FORM = {
     start_date: "", end_date: "",
     venue_type: "offline", location: "", capacity: "",
     total_budget: "", status: "draft",
-    organizer_id: "", manager_id: "", tracker_id: "", coordination_unit: "",
+    organizer_id: "", department_id: "",
     venue_id: "", resources: [],
 };
 
@@ -59,6 +60,7 @@ export default function EventList() {
     const [users, setUsers] = useState([]);
     const [venues, setVenues] = useState([]);
     const [resourcesList, setResourcesList] = useState([]);
+    const [departments, setDepartments] = useState([]);
 
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -81,14 +83,16 @@ export default function EventList() {
     useEffect(() => {
         const fetchInitial = async () => {
             try {
-                const [uR, vR, rR] = await Promise.all([
+                const [uR, vR, rR, dR] = await Promise.all([
                     getAllUsers(),
                     getVenues(),
-                    getAllResources()
+                    getAllResources(),
+                    getDepartments()
                 ]);
                 setUsers(uR.data || []);
                 setVenues(vR.data || []);
                 setResourcesList(rR.data || []);
+                setDepartments(dR.data || []);
             } catch (err) { console.error("Fetch initial data error:", err); }
         };
         fetchInitial();
@@ -162,9 +166,7 @@ export default function EventList() {
             total_budget: ev.total_budget || "",
             status: ev.status || "draft",
             organizer_id: ev.organizer_id || "",
-            manager_id: ev.manager_id || "",
-            tracker_id: ev.tracker_id || "",
-            coordination_unit: ev.coordination_unit || "",
+            department_id: ev.department_id || "",
             venue_id: ev.venue_id || "",
             resources: ev.resources || [],
         });
@@ -521,7 +523,7 @@ export default function EventList() {
 
                             <div style={{ padding: 16, background: "#fff", borderRadius: 16, border: "1px solid #f1f5f9", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
                                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, color: "var(--color-primary)" }}>
-                                    <span style={{ fontSize: 20 }}>👥</span> PHÂN CÔNG & ĐIỀU PHỐI
+                                    <span style={{ fontSize: 20 }}>👥</span> PHÂN CÔNG SỰ KIỆN
                                 </div>
                                 <div className="grid-2">
                                     <div className="form-group">
@@ -533,27 +535,19 @@ export default function EventList() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>Người quản lý (Manager)</label>
-                                        <select className="form-control" value={form.manager_id}
-                                            onChange={e => setForm({ ...form, manager_id: e.target.value })}>
-                                            <option value="">-- Chọn nhân sự --</option>
-                                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                                        <label>🏢 Phòng ban đảm nhiệm <span style={{ color: "red" }}>*</span></label>
+                                        <select className="form-control" value={form.department_id}
+                                            onChange={e => setForm({ ...form, department_id: e.target.value })} required>
+                                            <option value="">-- Chọn phòng ban --</option>
+                                            {departments.map(d => (
+                                                <option key={d.id} value={d.id}>
+                                                    {d.name}{d.manager_name ? ` (TP: ${d.manager_name})` : ""}
+                                                </option>
+                                            ))}
                                         </select>
-                                    </div>
-                                </div>
-                                <div className="grid-2" style={{ marginTop: 12 }}>
-                                    <div className="form-group">
-                                        <label>Theo dõi tiến độ (Tracker)</label>
-                                        <select className="form-control" value={form.tracker_id}
-                                            onChange={e => setForm({ ...form, tracker_id: e.target.value })}>
-                                            <option value="">-- Chọn nhân sự --</option>
-                                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Đơn vị điều phối</label>
-                                        <input className="form-control" placeholder="VD: Phòng Hành chính, IT, ..."
-                                            value={form.coordination_unit} onChange={e => setForm({ ...form, coordination_unit: e.target.value })} />
+                                        <small style={{ color: "var(--text-muted)", fontSize: 11 }}>
+                                            Phòng ban này sẽ chịu trách nhiệm chính cho sự kiện
+                                        </small>
                                     </div>
                                 </div>
                             </div>

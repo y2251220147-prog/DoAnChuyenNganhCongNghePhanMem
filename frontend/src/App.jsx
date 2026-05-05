@@ -10,7 +10,8 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import EventDetail from "./pages/Events/EventDetail";
 import EventList from "./pages/Events/EventList";
 import Feedback from "./pages/Feedback/Feedback";
-import GuestList from "./pages/Guests/GuestList";
+import AttendeeList from "./pages/Attendees/AttendeeList";
+import DepartmentList from "./pages/Departments/DepartmentList";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Reports from "./pages/Reports/Reports";
@@ -105,7 +106,9 @@ export default function App() {
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
 
         {/* Admin / Organizer only */}
-        <Route path="/guests" element={<RoleRoute roles={["admin","organizer"]}><GuestList /></RoleRoute>} />
+        <Route path="/guests" element={<RoleRoute roles={["admin","organizer"]}><AttendeeList /></RoleRoute>} />
+        <Route path="/attendees" element={<RoleRoute roles={["admin","organizer"]}><AttendeeList /></RoleRoute>} />
+        <Route path="/departments" element={<RoleRoute roles={["admin","organizer"]}><DepartmentList /></RoleRoute>} />
         <Route path="/staff" element={<RoleRoute roles={["admin","organizer"]}><StaffList /></RoleRoute>} />
         <Route path="/timeline" element={<RoleRoute roles={["admin","organizer"]}><TimelineList /></RoleRoute>} />
         <Route path="/budget" element={<RoleRoute roles={["admin","organizer"]}><BudgetList /></RoleRoute>} />

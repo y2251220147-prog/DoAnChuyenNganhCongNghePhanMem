@@ -30,7 +30,16 @@ exports.assignStaff = async (req, res) => {
 exports.removeStaff = async (req, res) => {
     try {
         await staffService.removeStaff(req.params.id);
-        res.json({ message: "Staff removed" });
+        res.json({ message: "Đã xóa nhân sự khỏi sự kiện" });
+    } catch (err) {
+        res.status(err.status || 500).json({ message: err.message });
+    }
+};
+
+exports.assignByDepartment = async (req, res) => {
+    try {
+        const result = await staffService.assignByDepartment(req.body);
+        res.status(201).json(result);
     } catch (err) {
         res.status(err.status || 500).json({ message: err.message });
     }

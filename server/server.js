@@ -11,27 +11,32 @@ app.use(express.json());
 // Phục vụ các file tĩnh trong thư mục uploads
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// Routes hiện có
+// Routes Auth & Users
 app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+
+// Routes Core
 app.use("/api/events", require("./routes/eventRoutes"));
+app.use("/api/departments", require("./routes/departmentRoutes"));
+app.use("/api/event-departments", require("./routes/eventDepartmentRoutes"));
 app.use("/api/staff", require("./routes/staffRoutes"));
-app.use("/api/guests", require("./routes/guestRoutes"));
+app.use("/api/tasks", require("./routes/taskRoutes"));
+
+// Routes Attendees (hợp nhất guests)
+app.use("/api/attendees", require("./routes/attendeeRoutes"));
+
+// Routes khác
 app.use("/api/timeline", require("./routes/timelineRoutes"));
 app.use("/api/budgets", require("./routes/budgetRoutes"));
-app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/feedback", require("./routes/feedbackRoutes"));
 app.use("/api/checkin", require("./routes/checkinRoutes"));
-
-// Routes mới v3
 app.use("/api/venues", require("./routes/venueRoutes"));
-app.use("/api/tasks", require("./routes/taskRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
-app.use("/api/attendees", require("./routes/attendeeRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use("/api/search", require("./routes/searchRoutes"));
 
-app.get("/", (req, res) => res.json({ message: "EventCore API", version: "3.0" }));
+app.get("/", (req, res) => res.json({ message: "EventCore API", version: "4.0" }));
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
@@ -44,5 +49,5 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== "test")
-    app.listen(PORT, () => console.log(`✅ EventCore API v3.0 :${PORT} [DEBUG: ${new Date().toLocaleTimeString()}]`));
+    app.listen(PORT, () => console.log(`✅ EventCore API v4.0 :${PORT} [${new Date().toLocaleTimeString()}]`));
 module.exports = app;

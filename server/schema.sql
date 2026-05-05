@@ -1,12 +1,26 @@
 -- ==========================================================
 -- CƠ SỞ DỮ LIỆU: HỆ THỐNG QUẢN LÝ SỰ KIỆN (EVENTCORE)
--- TỔNG HỢP VÀ LÀM SẠCH (SYNTHESIZED & CLEANED)
+-- PHIÊN BẢN 4.0 - CẬP NHẬT 5 RÀNG BUỘC NGHIỆP VỤ
 -- ==========================================================
 
 CREATE DATABASE IF NOT EXISTS event_management;
 USE event_management;
 
 SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------------------------------------
+-- 0. BẢNG PHÒNG BAN (DEPARTMENTS) - MỚI
+-- ----------------------------------------------------------
+DROP TABLE IF EXISTS `departments`;
+CREATE TABLE `departments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `description` text,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- ----------------------------------------------------------
 -- 1. BẢNG NGƯỜI DÙNG (USERS)
@@ -18,7 +32,7 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` enum('admin','organizer','user') DEFAULT 'user',
-  `department` varchar(100) DEFAULT NULL,
+  `department_id` int DEFAULT NULL,
   `position` varchar(100) DEFAULT NULL,
   `avatar` varchar(300) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
@@ -28,7 +42,9 @@ CREATE TABLE `users` (
   `resetTokenExpire` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`)
+  UNIQUE KEY `email` (`email`),
+  KEY `department_id` (`department_id`),
+  CONSTRAINT `users_ibfk_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -54,7 +70,7 @@ CREATE TABLE `venues` (
 
 
 -- ----------------------------------------------------------
--- 3. BẢNG SỰ KIỆN (EVENTS)
+-- 3. BẢNG SỰ KIỆN (EVENTS) - Bỏ manager_id, tracker_id
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `events`;
 CREATE TABLE `events` (
@@ -64,8 +80,6 @@ CREATE TABLE `events` (
   `event_type` varchar(100) DEFAULT NULL,
   `owner_id` int DEFAULT NULL,
   `organizer_id` int DEFAULT NULL,
-  `manager_id` int DEFAULT NULL,
-  `tracker_id` int DEFAULT NULL,
   `coordination_unit` varchar(255) DEFAULT NULL,
   `venue_id` int DEFAULT NULL,
   `start_date` datetime NOT NULL,
@@ -82,41 +96,16 @@ CREATE TABLE `events` (
   KEY `owner_id` (`owner_id`),
   KEY `approved_by` (`approved_by`),
   KEY `organizer_id` (`organizer_id`),
-  KEY `manager_id` (`manager_id`),
-  KEY `tracker_id` (`tracker_id`),
   KEY `venue_id` (`venue_id`),
   CONSTRAINT `events_ibfk_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_approver` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_organizer` FOREIGN KEY (`organizer_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `events_ibfk_manager` FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `events_ibfk_tracker` FOREIGN KEY (`tracker_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_venue` FOREIGN KEY (`venue_id`) REFERENCES `venues` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- ----------------------------------------------------------
--- 4. BẢNG DEADLINE (EVENT_DEADLINES)
--- ----------------------------------------------------------
-DROP TABLE IF EXISTS `event_deadlines`;
-CREATE TABLE `event_deadlines` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `event_id` int NOT NULL,
-  `title` varchar(200) NOT NULL,
-  `due_date` datetime NOT NULL,
-  `assigned_to` int DEFAULT NULL,
-  `status` enum('pending','working','completed','done','problem') COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
-  `note` text COLLATE utf8mb4_unicode_ci,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `event_id` (`event_id`),
-  KEY `assigned_to` (`assigned_to`),
-  CONSTRAINT `event_deadlines_ibfk_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `event_deadlines_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- ----------------------------------------------------------
--- 5. BẢNG GIAI ĐOẠN NHIỆM VỤ (TASK_PHASES)
+-- 4. BẢNG GIAI ĐOẠN NHIỆM VỤ (TASK_PHASES)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `task_phases`;
 CREATE TABLE `task_phases` (
@@ -133,7 +122,10 @@ CREATE TABLE `task_phases` (
 
 
 -- ----------------------------------------------------------
--- 6. BẢNG NHIỆM VỤ CHI TIẾT (EVENT_TASKS)
+-- 5. BẢNG NHIỆM VỤ CHI TIẾT (EVENT_TASKS)
+--    - Bỏ deadline_id (gộp vào due_date bắt buộc)
+--    - Thêm assigned_department_id
+--    - Kanban 3 trạng thái: todo / in_progress / done
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `event_tasks`;
 CREATE TABLE `event_tasks` (
@@ -141,15 +133,15 @@ CREATE TABLE `event_tasks` (
   `event_id` int NOT NULL,
   `phase_id` int DEFAULT NULL,
   `parent_id` int DEFAULT NULL,
-  `deadline_id` int DEFAULT NULL,
   `title` varchar(255) NOT NULL,
   `description` text,
   `assigned_to` int DEFAULT NULL,
+  `assigned_department_id` int DEFAULT NULL,
   `supporters` json DEFAULT NULL,
-  `status` enum('todo','in_progress','review','done','cancelled') DEFAULT 'todo',
+  `status` enum('todo','in_progress','done') DEFAULT 'todo',
   `priority` enum('low','medium','high') DEFAULT 'medium',
   `start_date` datetime DEFAULT NULL,
-  `due_date` datetime DEFAULT NULL,
+  `due_date` datetime NOT NULL,
   `is_milestone` tinyint(1) DEFAULT '0',
   `position` int DEFAULT '0',
   `progress` int DEFAULT '0',
@@ -165,16 +157,17 @@ CREATE TABLE `event_tasks` (
   KEY `phase_id` (`phase_id`),
   KEY `parent_id` (`parent_id`),
   KEY `assigned_to` (`assigned_to`),
+  KEY `assigned_department_id` (`assigned_department_id`),
   CONSTRAINT `event_tasks_ibfk_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
   CONSTRAINT `event_tasks_ibfk_phase` FOREIGN KEY (`phase_id`) REFERENCES `task_phases` (`id`) ON DELETE SET NULL,
   CONSTRAINT `event_tasks_ibfk_parent` FOREIGN KEY (`parent_id`) REFERENCES `event_tasks` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `event_tasks_ibfk_deadline` FOREIGN KEY (`deadline_id`) REFERENCES `event_deadlines` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `event_tasks_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `event_tasks_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `event_tasks_ibfk_dept` FOREIGN KEY (`assigned_department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- ----------------------------------------------------------
--- 7. BẢNG BÌNH LUẬN NHIỆM VỤ (TASK_COMMENTS)
+-- 6. BẢNG BÌNH LUẬN NHIỆM VỤ (TASK_COMMENTS)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `task_comments`;
 CREATE TABLE `task_comments` (
@@ -193,7 +186,7 @@ CREATE TABLE `task_comments` (
 
 
 -- ----------------------------------------------------------
--- 8. BẢNG LỊCH SỬ NHIỆM VỤ (TASK_HISTORY)
+-- 7. BẢNG LỊCH SỬ NHIỆM VỤ (TASK_HISTORY)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `task_history`;
 CREATE TABLE `task_history` (
@@ -213,26 +206,9 @@ CREATE TABLE `task_history` (
 
 
 -- ----------------------------------------------------------
--- 9. BẢNG KHÁCH MỜI (GUESTS)
--- ----------------------------------------------------------
-DROP TABLE IF EXISTS `guests`;
-CREATE TABLE `guests` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `event_id` int NOT NULL,
-  `name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `phone` varchar(50) DEFAULT NULL,
-  `qr_code` varchar(255) DEFAULT NULL,
-  `checked_in` tinyint(1) DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `event_id` (`event_id`),
-  CONSTRAINT `guests_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- ----------------------------------------------------------
--- 10. BẢNG NGƯỜI THAM GIA ĐĂNG KÝ (ATTENDEES)
+-- 8. BẢNG NGƯỜI THAM GIA (ATTENDEES) - Hợp nhất guests vào đây
+--    attendee_type = 'internal' (nhân viên đăng ký)
+--    attendee_type = 'external' (khách mời bên ngoài)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `attendees`;
 CREATE TABLE `attendees` (
@@ -242,6 +218,7 @@ CREATE TABLE `attendees` (
   `name` varchar(100) NOT NULL,
   `email` varchar(150) NOT NULL,
   `phone` varchar(20) DEFAULT NULL,
+  `organization` varchar(200) DEFAULT NULL,
   `attendee_type` enum('internal','external') DEFAULT 'external',
   `qr_code` varchar(255) DEFAULT NULL,
   `checked_in` tinyint(1) DEFAULT '0',
@@ -258,7 +235,7 @@ CREATE TABLE `attendees` (
 
 
 -- ----------------------------------------------------------
--- 11. BẢNG CHI PHÍ SỰ KIỆN (EVENT_BUDGET)
+-- 9. BẢNG CHI PHÍ SỰ KIỆN (EVENT_BUDGET)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `event_budget`;
 CREATE TABLE `event_budget` (
@@ -275,7 +252,7 @@ CREATE TABLE `event_budget` (
 
 
 -- ----------------------------------------------------------
--- 12. BẢNG TÀI SẢN / NGUỒN LỰC (RESOURCES)
+-- 10. BẢNG TÀI SẢN / NGUỒN LỰC (RESOURCES)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `resources`;
 CREATE TABLE `resources` (
@@ -292,7 +269,7 @@ CREATE TABLE `resources` (
 
 
 -- ----------------------------------------------------------
--- 13. BẢNG ĐẶT TÀI SẢN (EVENT_RESOURCE_BOOKINGS)
+-- 11. BẢNG ĐẶT TÀI SẢN (EVENT_RESOURCE_BOOKINGS)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `event_resource_bookings`;
 CREATE TABLE `event_resource_bookings` (
@@ -312,16 +289,16 @@ CREATE TABLE `event_resource_bookings` (
 
 
 -- ----------------------------------------------------------
--- 14. BẢNG NHÂN SỰ SỰ KIỆN (EVENT_STAFF)
+-- 12. BẢNG NHÂN SỰ SỰ KIỆN (EVENT_STAFF)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `event_staff`;
 CREATE TABLE `event_staff` (
   `id` int NOT NULL AUTO_INCREMENT,
   `event_id` int NOT NULL,
   `user_id` int NOT NULL,
-  `role` enum('manager','marketing','technical','support','volunteer') DEFAULT 'volunteer',
+  `role` enum('organizer','marketing','technical','support','volunteer') DEFAULT 'volunteer',
   PRIMARY KEY (`id`),
-  KEY `event_id` (`event_id`),
+  UNIQUE KEY `unique_staff_event` (`event_id`, `user_id`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `event_staff_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
   CONSTRAINT `event_staff_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
@@ -329,7 +306,7 @@ CREATE TABLE `event_staff` (
 
 
 -- ----------------------------------------------------------
--- 15. BẢNG LỊCH TRÌNH / CHƯƠNG TRÌNH (EVENT_TIMELINE)
+-- 13. BẢNG LỊCH TRÌNH / CHƯƠNG TRÌNH (EVENT_TIMELINE)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `event_timeline`;
 CREATE TABLE `event_timeline` (
@@ -346,7 +323,7 @@ CREATE TABLE `event_timeline` (
 
 
 -- ----------------------------------------------------------
--- 16. BẢNG PHẢN HỒI (FEEDBACK)
+-- 14. BẢNG PHẢN HỒI (FEEDBACK)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `feedback`;
 CREATE TABLE `feedback` (
@@ -364,7 +341,7 @@ CREATE TABLE `feedback` (
 
 
 -- ----------------------------------------------------------
--- 17. BẢNG THÔNG BÁO (NOTIFICATIONS)
+-- 15. BẢNG THÔNG BÁO (NOTIFICATIONS)
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `notifications`;
 CREATE TABLE `notifications` (
@@ -387,12 +364,20 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- DỮ LIỆU MẪU (SEED DATA)
 -- ==========================================================
 
--- Mật khẩu mặc định đều là: admin123 / organizer123 / user123 (đã bcrypt)
-INSERT INTO `users` (`name`, `email`, `password`, `role`) VALUES 
-('Super Admin', 'admin@eventpro.com', '$2b$10$FB5o8rQZbp9tzPXMKlh/Rukfllf.i7vR1ADQe6A4C9jiQjLUdaYgC', 'admin'),
-('Organizer Demo', 'organizer@eventpro.com', '$2b$10$fYHL7uyfykAoiDEMP5SQ4epCE0am5JI4H9ABNkk6G4l5zcKQTc.rm', 'organizer'),
-('User Demo', 'user@eventpro.com', '$2b$10$.oVZIekG4HvvemwCGUEytuL3Z9iSM.NGgkFzcVJ0/OBApNaB0PRmG', 'user');
+-- Phòng ban mẫu
+INSERT INTO `departments` (`name`, `description`) VALUES
+('Ban Tổ Chức', 'Phòng ban phụ trách tổ chức sự kiện'),
+('Phòng Marketing', 'Phòng ban phụ trách truyền thông và quảng bá'),
+('Phòng Kỹ Thuật', 'Phòng ban phụ trách kỹ thuật và công nghệ'),
+('Phòng Hành Chính', 'Phòng ban hành chính nhân sự'),
+('Phòng Tài Chính', 'Phòng ban tài chính kế toán');
 
--- Thêm một địa điểm mẫu
-INSERT INTO `venues` (`name`, `type`, `location`, `capacity`, `description`, `status`) VALUES 
+-- Người dùng mẫu (password: admin123 / organizer123 / user123 đã bcrypt)
+INSERT INTO `users` (`name`, `email`, `password`, `role`, `department_id`) VALUES
+('Super Admin', 'admin@eventpro.com', '$2b$10$FB5o8rQZbp9tzPXMKlh/Rukfllf.i7vR1ADQe6A4C9jiQjLUdaYgC', 'admin', 4),
+('Organizer Demo', 'organizer@eventpro.com', '$2b$10$fYHL7uyfykAoiDEMP5SQ4epCE0am5JI4H9ABNkk6G4l5zcKQTc.rm', 'organizer', 1),
+('User Demo', 'user@eventpro.com', '$2b$10$.oVZIekG4HvvemwCGUEytuL3Z9iSM.NGgkFzcVJ0/OBApNaB0PRmG', 'user', 2);
+
+-- Địa điểm mẫu
+INSERT INTO `venues` (`name`, `type`, `location`, `capacity`, `description`, `status`) VALUES
 ('Hội trường A1', 'hall', 'Tầng 1, Tòa nhà trung tâm', 200, 'Hội trường lớn với đầy đủ thiết bị âm thanh, ánh sáng', 'available');

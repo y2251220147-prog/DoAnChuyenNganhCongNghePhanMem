@@ -1,11 +1,7 @@
 import api from "./api";
 export { api };
 
-// Phases
-export const getPhases = (eid) => api.get(`/tasks/phases/event/${eid}`);
-export const createPhase = (d) => api.post("/tasks/phases", d);
-export const updatePhase = (id, d) => api.put(`/tasks/phases/${id}`, d);
-export const deletePhase = (id) => api.delete(`/tasks/phases/${id}`);
+
 
 // Tasks
 export const getTasksByEvent = (eid) => api.get(`/tasks/event/${eid}`);

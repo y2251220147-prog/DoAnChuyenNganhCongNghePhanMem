@@ -1,44 +1,28 @@
 const Task = require("../models/taskModel");
-const Deadline = require("../models/deadlineModel");
+const Attendee = require("../models/attendeeModel");
 const Notification = require("../models/notificationModel");
 
-const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done', 'cancelled'];
+const VALID_STATUSES = ['todo', 'in_progress', 'done'];
 const STATUS_LABEL = {
-    todo: 'Chưa bắt đầu', in_progress: 'Đang làm',
-    review: 'Chờ duyệt', done: 'Hoàn thành', cancelled: 'Đã hủy'
+    todo: 'Chuẩn bị',
+    in_progress: 'Đang làm',
+    done: 'Hoàn thành'
 };
 
-// ── Sync Logic ────────────────────────────────────────────────
-const syncDeadlineStatus = async (deadlineId) => {
-    if (!deadlineId) return;
-    try {
-        const tasks = await Task.getByDeadline(deadlineId);
-        if (tasks.length === 0) return;
-
-        const hasWorking = tasks.some(t => ['in_progress', 'review'].includes(t.status));
-        const allDone = tasks.every(t => t.status === 'done' || t.status === 'cancelled') && tasks.some(t => t.status === 'done');
-        const allTodo = tasks.every(t => t.status === 'todo' || t.status === 'cancelled');
-
-        if (hasWorking) {
-            await Deadline.updateStatus(deadlineId, 'working');
-        } else if (allDone) {
-            await Deadline.updateStatus(deadlineId, 'completed');
-        } else if (allTodo) {
-            await Deadline.updateStatus(deadlineId, 'pending');
-        }
-    } catch (err) {
-        console.error("Sync deadline error:", err);
+// ── Kiểm tra attendee lock ─────────────────────────────────
+// Nếu user X đã đăng ký tham gia sự kiện đó → không được gán task
+const checkAttendeeConflict = async (eventId, userId) => {
+    if (!userId) return;
+    const att = await Attendee.findByUserAndEvent(userId, eventId);
+    if (att) {
+        throw {
+            status: 400,
+            message: "Nhân viên đã đăng ký tham gia sự kiện không thể được gán công việc"
+        };
     }
 };
 
-// ── Phases ────────────────────────────────────────────────────
-exports.getPhases = async (eid) => await Task.getPhases(eid);
-exports.createPhase = async (d) => {
-    if (!d.event_id || !d.name) throw { status: 400, message: "event_id và name là bắt buộc" };
-    return { id: await Task.createPhase(d) };
-};
-exports.updatePhase = async (id, d) => await Task.updatePhase(id, d);
-exports.deletePhase = async (id) => await Task.deletePhase(id);
+
 
 // ── Tasks ─────────────────────────────────────────────────────
 exports.getByEvent = async (eid) => await Task.getByEvent(eid);
@@ -52,6 +36,13 @@ exports.getEventStats = async (eid) => await Task.getEventStats(eid);
 exports.create = async (data, creatorId) => {
     if (!data.event_id || !data.title)
         throw { status: 400, message: "event_id và title là bắt buộc" };
+    if (!data.due_date)
+        throw { status: 400, message: "Deadline (due_date) là bắt buộc khi tạo nhiệm vụ" };
+
+    // Kiểm tra attendee conflict
+    if (data.assigned_to) {
+        await checkAttendeeConflict(data.event_id, data.assigned_to);
+    }
 
     const id = await Task.create({ ...data, created_by: creatorId });
 
@@ -68,7 +59,7 @@ exports.create = async (data, creatorId) => {
             link: `/events/${data.event_id}?tab=tasks`
         });
     }
-    if (data.deadline_id) await syncDeadlineStatus(data.deadline_id);
+
     return { id };
 };
 
@@ -81,9 +72,8 @@ exports.update = async (id, data, userId) => {
     // Theo dõi thay đổi status
     if (data.status && data.status !== task.status) {
         if (!VALID_STATUSES.includes(data.status))
-            throw { status: 400, message: "Trạng thái không hợp lệ" };
+            throw { status: 400, message: "Trạng thái không hợp lệ. Chỉ chấp nhận: todo, in_progress, done" };
         changes.push({ action: 'status_change', old_value: STATUS_LABEL[task.status], new_value: STATUS_LABEL[data.status] });
-        // Comment tự động
         await Task.addComment({
             task_id: id, user_id: userId,
             content: `Chuyển trạng thái: ${STATUS_LABEL[task.status]} → ${STATUS_LABEL[data.status]}`,
@@ -91,8 +81,9 @@ exports.update = async (id, data, userId) => {
         });
     }
 
-    // Theo dõi thay đổi người phụ trách
+    // Kiểm tra attendee conflict khi thay đổi người phụ trách
     if (data.assigned_to && String(data.assigned_to) !== String(task.assigned_to)) {
+        await checkAttendeeConflict(task.event_id, data.assigned_to);
         changes.push({ action: 'assign', old_value: task.assigned_name || '', new_value: data.assigned_to });
         if (String(data.assigned_to) !== String(userId)) {
             await Notification.create({
@@ -112,21 +103,14 @@ exports.update = async (id, data, userId) => {
 
     await Task.update(id, { ...task, ...data });
 
-    // Ghi tất cả history
     for (const ch of changes) {
         await Task.addHistory({ task_id: id, user_id: userId, ...ch });
-    }
-    // SYNC DEADLINE
-    if (data.status || data.deadline_id) {
-        await syncDeadlineStatus(task.deadline_id);
-        if (data.deadline_id && data.deadline_id !== task.deadline_id) {
-            await syncDeadlineStatus(data.deadline_id);
-        }
     }
 };
 
 exports.updateStatus = async (id, status, userId) => {
-    if (!VALID_STATUSES.includes(status)) throw { status: 400, message: "Trạng thái không hợp lệ" };
+    if (!VALID_STATUSES.includes(status))
+        throw { status: 400, message: "Trạng thái không hợp lệ. Chỉ chấp nhận: todo, in_progress, done" };
     const task = await Task.getById(id);
     if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
 
@@ -141,7 +125,7 @@ exports.updateStatus = async (id, status, userId) => {
         type: 'status_change'
     });
 
-    // 如果 done → thông báo creator
+    // Thông báo creator khi done
     if (status === 'done' && task.created_by && String(task.created_by) !== String(userId)) {
         await Notification.create({
             user_id: task.created_by,
@@ -150,11 +134,6 @@ exports.updateStatus = async (id, status, userId) => {
             message: `"${task.title}" đã được đánh dấu hoàn thành`,
             link: `/events/${task.event_id}?tab=tasks`
         });
-    }
-
-    // SYNC DEADLINE
-    if (task.deadline_id) {
-        await syncDeadlineStatus(task.deadline_id);
     }
 };
 
@@ -177,16 +156,14 @@ exports.updateFeedback = async (id, data, userId) => {
         new_value: `Trạng thái: ${data.feedback_status}, Ghi chú: ${data.feedback_note}`
     });
 
-    // Thông báo cho người được giao
     if (task.assigned_to && String(task.assigned_to) !== String(userId)) {
         let title = 'Phản hồi mới từ quản lý';
         if (data.feedback_status === 'approved') title = 'Nhiệm vụ đã được duyệt ✅';
         if (data.feedback_status === 'rejected') title = 'Nhiệm vụ cần chỉnh sửa ⚠️';
-
         await Notification.create({
             user_id: task.assigned_to,
             type: 'task_feedback',
-            title: title,
+            title,
             message: `Nhiệm vụ "${task.title}": ${data.feedback_note || 'Quản lý đã để lại nhận xét'}`,
             link: `/events/${task.event_id}?tab=tasks`
         });
@@ -197,11 +174,6 @@ exports.delete = async (id) => {
     const task = await Task.getById(id);
     if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
     await Task.delete(id);
-    
-    // SYNC DEADLINE
-    if (task.deadline_id) {
-        await syncDeadlineStatus(task.deadline_id);
-    }
 };
 
 // ── Comments ──────────────────────────────────────────────────
@@ -211,10 +183,7 @@ exports.addComment = async (taskId, content, userId) => {
     if (!content?.trim()) throw { status: 400, message: "Nội dung không được trống" };
     const task = await Task.getById(taskId);
     if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
-
     const id = await Task.addComment({ task_id: taskId, user_id: userId, content });
-
-    // Thông báo người phụ trách (nếu khác commenter)
     if (task.assigned_to && String(task.assigned_to) !== String(userId)) {
         await Notification.create({
             user_id: task.assigned_to,
@@ -231,18 +200,3 @@ exports.deleteComment = async (id) => await Task.deleteComment(id);
 
 // ── History ───────────────────────────────────────────────────
 exports.getHistory = async (taskId) => await Task.getHistory(taskId);
-
-// ── Auto reminder (gọi từ cron/scheduler) ────────────────────
-exports.sendDeadlineReminders = async () => {
-    const tasks = await Task.getUpcomingDeadlines(24);
-    for (const t of tasks) {
-        await Notification.create({
-            user_id: t.assignee_id,
-            type: 'task_deadline',
-            title: `⚠️ Nhiệm vụ sắp đến hạn`,
-            message: `"${t.title}" trong sự kiện "${t.event_name}" — hạn: ${new Date(t.due_date).toLocaleString('vi-VN')}`,
-            link: `/events/${t.event_id}?tab=tasks`
-        });
-    }
-    return tasks.length;
-};

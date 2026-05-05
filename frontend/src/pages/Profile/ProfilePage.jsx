@@ -32,7 +32,10 @@ export default function ProfilePage() {
                     name: data.name || "",
                     phone: data.phone || "",
                     gender: data.gender || "",
-                    address: data.address || ""
+                    address: data.address || "",
+                    // Department info (read-only, set by admin)
+                    department_name: data.department_name || "",
+                    role_in_dept: data.role_in_dept || "",
                 });
             } catch (err) {
                 console.error("Lỗi lấy thông tin hồ sơ:", err);
@@ -110,9 +113,18 @@ export default function ProfilePage() {
                                     {formData.address || "Chưa cập nhật địa chỉ"}
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                            <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
                                 <span className="emp-badge emp-badge-green" style={{ padding: "6px 14px", borderRadius: 10 }}>● Đang hoạt động</span>
-                                {user?.department && <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10 }}>🏢 {user.department}</span>}
+                                {formData.department_name && (
+                                    <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10, background: "rgba(99,102,241,0.12)", color: "#4338ca" }}>
+                                        🏢 {formData.department_name}
+                                    </span>
+                                )}
+                                {formData.role_in_dept && (
+                                    <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10, background: "rgba(16,185,129,0.1)", color: "#047857" }}>
+                                        💼 {formData.role_in_dept}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>

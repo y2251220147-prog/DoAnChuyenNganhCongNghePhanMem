@@ -5,8 +5,9 @@ import Modal from "../../components/UI/Modal";
 import { AuthContext } from "../../context/AuthContext";
 import api from "../../services/api";
 import { getTasksByEvent } from "../../services/taskService";
-import { changeStatus, createDeadline, deleteDeadline } from "../../services/eventService";
+import { changeStatus } from "../../services/eventService";
 import { getAllUsers } from "../../services/userService";
+import { getDepartments } from "../../services/departmentService";
 import "../../styles/global.css";
 import TaskBoard from "../Tasks/TaskBoard";
 
@@ -19,20 +20,12 @@ const STATUS_CFG = {
     cancelled: { label: "Đã hủy", bg: "#fee2e2", color: "#dc2626" },
 };
 
-const DL_STATUS_CFG = {
-    pending: { label: "Chờ", bg: "#f1f5f9", color: "#64748b" },
-    working: { label: "Đang làm", bg: "#dbeafe", color: "#2563eb" },
-    completed: { label: "Hoàn thành", bg: "#ede9fe", color: "#7c3aed" },
-    done: { label: "Đã xong", bg: "#d1fae5", color: "#059669" },
-    problem: { label: "Vấn đề", bg: "#fee2e2", color: "#dc2626" },
-};
+
 
 const TASK_STATUS_CFG = {
-    todo: { label: "Chưa bắt đầu", color: "#94a3b8" },
-    in_progress: { label: "Đang làm", color: "#f59e0b" },
-    review: { label: "Chờ duyệt", color: "#6366f1" },
-    done: { label: "Hoàn thành", color: "#10b981" },
-    cancelled: { label: "Đã hủy", color: "#ef4444" },
+    todo:        { label: "Chuẩn Bị",  color: "#6366f1" },
+    in_progress: { label: "Đang Làm",  color: "#f59e0b" },
+    done:        { label: "Hoàn Thành", color: "#10b981" },
 };
 
 const WORKFLOW_NEXT = {
@@ -66,29 +59,17 @@ export default function EventDetail() {
     const [staff, setStaff] = useState([]);
     const [timeline, setTimeline] = useState([]);
     const [budget, setBudget] = useState({ items: [], total: 0 });
-    const [deadlines, setDeadlines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [error, setError] = useState("");
     const [tab, setTab] = useState("overview");
-    const [taskFilterDeadlineId, setTaskFilterDeadlineId] = useState(null);
-    const [expandedDlId, setExpandedDlId] = useState(null);
-    const [dlModal, setDlModal] = useState(false);
-    const [dlForm, setDlForm] = useState({ title: "", due_date: "", note: "", assigned_to: "" });
-    const [dlSaving, setDlSaving] = useState(false);
-
-    // Modal Báo cáo vấn đề
-    const [dlProbModal, setDlProbModal] = useState(false);
-    const [dlProbId, setDlProbId] = useState(null);
-    const [dlProbNote, setDlProbNote] = useState("");
 
     // Modal Bulk Invite
     const [bulkModal, setBulkModal] = useState(false);
     const [bulkForm, setBulkForm] = useState({ guests: "", subject: "", content: "" });
     const [bulkSending, setBulkSending] = useState(false);
-    const [viewProbModal, setViewProbModal] = useState(false);
-    const [viewProbDl, setViewProbDl] = useState(null);
 
     const role = user?.role?.toLowerCase();
     const isAdmin = role === "admin";
@@ -105,26 +86,19 @@ export default function EventDetail() {
         }
     }, []);
 
-    const loadTasks = useCallback(async () => {
-        try {
-            const r = await getTasksByEvent(id);
-            setTasks(r.data || []);
-        } catch (err) {
-            console.error("loadTasks error:", err);
-        }
-    }, [id]);
 
     const loadAll = useCallback(async () => {
         setLoading(true); setError("");
         try {
-            const [evR, guR, stR, tlR, buR, dlR, atR] = await Promise.allSettled([
+            const [evR, guR, stR, tlR, buR, atR, deR, tkR] = await Promise.allSettled([
                 api.get(`/events/${id}`),
                 api.get(`/guests/event/${id}`),
                 api.get(`/staff/event/${id}`),
                 api.get(`/timeline/event/${id}`),
                 api.get(`/budgets/event/${id}`),
-                api.get(`/events/${id}/deadlines`),
                 api.get(`/attendees/event/${id}`),
+                getDepartments(),
+                getTasksByEvent(id),
             ]);
             if (evR.status === "rejected") { setError("Không tìm thấy sự kiện."); setLoading(false); return; }
             setEvent(evR.value.data);
@@ -134,8 +108,9 @@ export default function EventDetail() {
             setBudget(buR.status === "fulfilled"
                 ? { items: buR.value.data.items || [], total: buR.value.data.total || 0 }
                 : { items: [], total: 0 });
-            setDeadlines(dlR.status === "fulfilled" ? (dlR.value.data || []) : []);
             setAttendees(atR.status === "fulfilled" ? (atR.value.data || []) : []);
+            setDepartments(deR.status === "fulfilled" ? (deR.value.data || []) : []);
+            setTasks(tkR.status === "fulfilled" ? (tkR.value.data || []) : []);
         } catch (err) {
             console.error("loadAll error:", err);
             setError("Lỗi khi tải dữ liệu.");
@@ -143,16 +118,16 @@ export default function EventDetail() {
         finally { setLoading(false); }
     }, [id]);
 
-    useEffect(() => { loadAll(); loadTasks(); fetchUsers(); }, [loadAll, loadTasks, fetchUsers]);
+    useEffect(() => { loadAll(); fetchUsers(); }, [loadAll, fetchUsers]);
 
     const fmtVND = n => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
     const fmtDT = d => d ? new Date(d).toLocaleString("vi-VN") : "—";
 
-    const doneCount = deadlines.filter(d => d.status === 'done').length;
-    const dlProgress = deadlines.length > 0 ? Math.round((doneCount / deadlines.length) * 100) : 0;
     const totalParticipants = guests.length + attendees.length;
     const checkedIn = guests.filter(g => g.checked_in).length + attendees.filter(a => a.checked_in).length;
     const checkinPct = totalParticipants > 0 ? Math.round((checkedIn / totalParticipants) * 100) : 0;
+    const taskDone = tasks.filter(t => t.status === 'done').length;
+    const taskProgress = tasks.length > 0 ? Math.round((taskDone / tasks.length) * 100) : 0;
 
     // ── Workflow ──────────────────────────────────────────────
     const handleChangeStatus = async (newStatus) => {
@@ -164,43 +139,7 @@ export default function EventDetail() {
         } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
     };
 
-    // ── Deadlines ─────────────────────────────────────────────
-    const handleUpdateDlStatus = async (dlId, status, note) => {
-        try {
-            await api.patch(`/events/${id}/deadlines/${dlId}`, { status, note });
-            loadAll();
-            setDlProbModal(false);
-            setDlProbId(null);
-            setDlProbNote("");
-        } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
-    };
 
-    const handleOpenViewProb = (dl) => {
-        setViewProbDl(dl);
-        setViewProbModal(true);
-    };
-
-    const handleOpenProbModal = (dl) => {
-        setDlProbId(dl.id);
-        setDlProbNote(dl.note || "");
-        setDlProbModal(true);
-    };
-
-    const handleDeleteDl = async (dlId) => {
-        if (!window.confirm("Xóa deadline này?")) return;
-        try { await deleteDeadline(id, dlId); loadAll(); }
-        catch { alert("Xóa thất bại"); }
-    };
-
-    const handleAddDeadline = async (e) => {
-        e.preventDefault(); setDlSaving(true);
-        try {
-            await createDeadline(id, dlForm);
-            setDlModal(false); setDlForm({ title: "", due_date: "", note: "", assigned_to: "" });
-            loadAll();
-        } catch (err) { alert(err.response?.data?.message || "Thêm thất bại"); }
-        finally { setDlSaving(false); }
-    };
 
     const handleBulkInvite = async (e) => {
         e.preventDefault();
@@ -244,7 +183,6 @@ export default function EventDetail() {
     const TABS = [
         { key: "overview", label: "📋 Tổng quan" },
         { key: "tasks", label: `✅ Công việc (${tasks.length})` },
-        { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})` },
         { key: "participants", label: `🎟️ Người tham gia (${totalParticipants})` },
         { key: "staff", label: `👥 Staff (${staff.length})` },
         { key: "timeline", label: `🗓️ Timeline (${timeline.length})` },
@@ -269,18 +207,6 @@ export default function EventDetail() {
                         {canManage && nextStatuses.length > 0 && (
                             <div style={{ display: "flex", gap: 8 }}>
                                 {nextStatuses.map(s => {
-                                    const isApproveStatus = s === "approved";
-                                    const allDlDone = deadlines.every(d => d.status === 'done');
-                                    if (isApproveStatus && isAdmin && !allDlDone) return (
-                                        <button key={s} className="btn btn-sm" disabled style={{ opacity: 0.6, background: "rgba(255,255,255,0.1)", border: "1px dashed rgba(255,255,255,0.4)", color: "white", cursor: "not-allowed" }}>
-                                            🔒 Duyệt (chưa xong deadline)
-                                        </button>
-                                    );
-                                    if (isApproveStatus && !isAdmin) return (
-                                        <button key={s} className="btn btn-sm" disabled style={{ opacity: 0.5, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", color: "white" }}>
-                                            ✅ Duyệt (cần Admin)
-                                        </button>
-                                    );
                                     const btnCfg = {
                                         planning: { label: "→ Lên kế hoạch", cls: "" },
                                         approved: { label: "✅ Duyệt ngay", cls: "btn-primary" },
@@ -319,11 +245,10 @@ export default function EventDetail() {
                         </div>
                     </div>
                     
-                    <div className="grid-4" style={{ gap: 12, background: "rgba(0,0,0,0.1)", padding: 16, borderRadius: 24, backdropFilter: "blur(10px)" }}>
+                    <div className="grid-3" style={{ gap: 12, background: "rgba(0,0,0,0.1)", padding: 16, borderRadius: 24, backdropFilter: "blur(10px)" }}>
                         {[
-                            { icon: "🔥", label: "Deadlines", value: `${doneCount}/${deadlines.length}` },
+                            { icon: "✅", label: "Công việc", value: `${taskDone}/${tasks.length}` },
                             { icon: "🎟️", label: "Tham gia", value: totalParticipants },
-                            { icon: "👥", label: "Staff", value: staff.length },
                             { icon: "💰", label: "Ngân sách", value: fmtVND(event.total_budget || 0) },
                         ].map(c => (
                             <div key={c.label} style={{ textAlign: "center", minWidth: 90 }}>
@@ -339,20 +264,20 @@ export default function EventDetail() {
             {/* Quick Stats Grid */}
             <div className="grid-4" style={{ marginBottom: 32 }}>
                 <div className="card-stat">
-                    <div className="card-stat-icon indigo">📡</div>
-                    <div className="card-stat-info"><h3>{dlProgress}%</h3><p>Tiến độ dự án</p></div>
+                    <div className="card-stat-icon indigo">📋</div>
+                    <div className="card-stat-info"><h3>{tasks.length}</h3><p>Tổng công việc</p></div>
                 </div>
                 <div className="card-stat">
                     <div className="card-stat-icon emerald">✅</div>
+                    <div className="card-stat-info"><h3>{taskProgress}%</h3><p>Tiến độ công việc</p></div>
+                </div>
+                <div className="card-stat">
+                    <div className="card-stat-icon emerald">🎟️</div>
                     <div className="card-stat-info"><h3>{checkinPct}%</h3><p>Tỷ lệ Check-in</p></div>
                 </div>
                 <div className="card-stat">
-                    <div className="card-stat-icon amber">⏳</div>
-                    <div className="card-stat-info"><h3>{deadlines.length - doneCount}</h3><p>Việc còn lại</p></div>
-                </div>
-                <div className="card-stat">
-                    <div className="card-stat-icon rose">⚠️</div>
-                    <div className="card-stat-info"><h3>{deadlines.filter(d => d.status === 'problem').length}</h3><p>Đang có vấn đề</p></div>
+                    <div className="card-stat-icon amber">👥</div>
+                    <div className="card-stat-info"><h3>{staff.length}</h3><p>Nhân sự phụ trách</p></div>
                 </div>
             </div>
 
@@ -383,12 +308,12 @@ export default function EventDetail() {
                             { label: "Hình thức", value: event.venue_type === "online" ? "🌐 Online" : "🏢 Offline" },
                             { label: "Địa điểm", value: event.location || "—" },
                             { label: "Địa chỉ cụ thể", value: (event.venue_type === 'offline' && event.venue_id) ? (event.detailed_location || event.venue_address || "Đang cập nhật địa chỉ...") : "—" },
-                            { label: "Đơn vị điều phối", value: event.coordination_unit || "—" },
+                            { label: "Phòng ban phụ trách", value: event.department_name || "—" },
                             { label: "Sức chứa", value: event.capacity ? `${event.capacity} người` : "—" },
                             { label: "Ngân sách dự kiến", value: <strong style={{color:"var(--color-primary)"}}>{fmtVND(event.total_budget || 0)}</strong> },
                             { label: "Trạng thái", value: <StatusBadge status={event.status} /> },
                             { label: "Người tổ chức", value: event.organizer_name || "—" },
-                            { label: "Người quản lý", value: event.manager_name || "—" },
+
                             { label: "Admin duyệt", value: event.approver_name || "—" },
                         ].map(row => (
                             <div key={row.label} style={{
@@ -402,37 +327,27 @@ export default function EventDetail() {
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-                        {/* Tiến độ deadline */}
+                        {/* Tiến độ công việc */}
                         <div className="card" style={{ background: "linear-gradient(to bottom right, #ffffff, #f8fafc)" }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 18 }}>🔥 Tiến độ Deadline</h3>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 18 }}>✅ Tiến độ công việc</h3>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                                <span style={{ fontSize: 13, fontWeight: 700 }}>{doneCount}/{deadlines.length} công việc</span>
-                                <span style={{ fontSize: 18, fontWeight: 900, color: "var(--color-primary)" }}>{dlProgress}%</span>
+                                <span style={{ fontSize: 13, fontWeight: 700 }}>{taskDone}/{tasks.length} hoàn thành</span>
+                                <span style={{ fontSize: 18, fontWeight: 900, color: "var(--color-primary)" }}>{taskProgress}%</span>
                             </div>
-                            <div style={{ height: 12, background: "#e2e8f0", borderRadius: 6, overflow: "hidden", marginBottom: 20 }}>
-                                <div style={{
-                                    height: "100%", width: `${dlProgress}%`,
-                                    background: "linear-gradient(90deg, var(--color-primary), var(--color-accent))",
-                                    borderRadius: 6, transition: "width 1s ease-out"
-                                }} />
+                            <div style={{ height: 12, background: "#e2e8f0", borderRadius: 6, overflow: "hidden", marginBottom: 16 }}>
+                                <div style={{ height: "100%", width: `${taskProgress}%`, background: "linear-gradient(90deg, var(--color-primary), var(--color-accent))", borderRadius: 6, transition: "width 1s ease-out" }} />
                             </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                {deadlines.slice(0, 5).map(dl => {
-                                    const due = new Date(dl.due_date);
-                                    const now = new Date();
-                                    const isToday = due.toDateString() === now.toDateString();
-                                    const isOverdue = dl.status !== 'done' && dl.status !== 'completed' && due < now && !isToday;
-                                    return (
-                                        <div key={dl.id} style={{
-                                            display: "flex", alignItems: "center", gap: 10,
-                                            padding: "10px 14px", borderRadius: 12, border: "1px solid #f1f5f9",
-                                            background: "white"
-                                        }}>
-                                            <span style={{ fontSize: 14 }}>{dl.status === 'done' ? "✅" : isOverdue ? "🔴" : "⏳"}</span>
-                                            <span className="truncate" style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{dl.title}</span>
-                                        </div>
-                                    );
-                                })}
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                {[
+                                    { label: "📋 Chuẩn Bị",  count: tasks.filter(t => t.status === 'todo').length,        color: "#6366f1" },
+                                    { label: "⚡ Đang Làm",  count: tasks.filter(t => t.status === 'in_progress').length,  color: "#f59e0b" },
+                                    { label: "✅ Hoàn Thành", count: tasks.filter(t => t.status === 'done').length,         color: "#10b981" },
+                                ].map(s => (
+                                    <div key={s.label} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: 8, background: s.color + "12" }}>
+                                        <div style={{ fontWeight: 800, fontSize: 18, color: s.color }}>{s.count}</div>
+                                        <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>{s.label}</div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -464,8 +379,8 @@ export default function EventDetail() {
                                     💌 Mời khách hàng loạt
                                 </button>
                                 <button className="btn btn-primary w-full" style={{ background: "rgba(255,255,255,0.1)", border: "none" }}
-                                    onClick={() => setDlModal(true)}>
-                                    ➕ Thêm Deadline mới
+                                    onClick={() => setTab("tasks")}>
+                                    ✅ Xem công việc
                                 </button>
                             </div>
                         </div>
@@ -473,169 +388,6 @@ export default function EventDetail() {
                 </div>
             )}
 
-            {/* ════ TAB: DEADLINES ════ */}
-            {tab === "deadlines" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <div>
-                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🔥 Deadlines nội bộ</h3>
-                            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                                Các mốc quan trọng trước ngày diễn ra sự kiện
-                            </p>
-                        </div>
-                        {canManage && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setDlModal(true)}>+ Thêm deadline</button>
-                        )}
-                    </div>
-                    {deadlines.length === 0 ? (
-                        <div className="empty-state"><span>🔥</span><p>Chưa có deadline nào</p></div>
-                    ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr><th>Hạng mục</th><th>Hạn chót</th><th>Người thực hiện</th><th>Ghi chú</th><th>Trạng thái</th>
-                                    {canManage && <th>Thao tác</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {deadlines.map(dl => {
-                                    const dueObj = new Date(dl.due_date);
-                                    const nowObj = new Date();
-                                    const isToday = dueObj.toDateString() === nowObj.toDateString();
-                                    const isOverdue = dl.status !== 'done' && dl.status !== 'completed' && dueObj < nowObj && !isToday;
-                                    const st = DL_STATUS_CFG[dl.status] || DL_STATUS_CFG.pending;
-
-                                    return (
-                                    <>
-                                        <tr key={dl.id}>
-                                            <td style={{ fontWeight: 800 }}>
-                                                <button 
-                                                    onClick={() => setExpandedDlId(expandedDlId === dl.id ? null : dl.id)}
-                                                    style={{ 
-                                                        background: "none", border: "none", padding: 0, 
-                                                        color: "var(--color-primary)", fontWeight: 800, 
-                                                        cursor: "pointer", textDecoration: "none",
-                                                        textAlign: "left", display: "flex", alignItems: "center", gap: 6
-                                                    }}>
-                                                    <span>{expandedDlId === dl.id ? "▼" : "▶"}</span>
-                                                    {dl.title}
-                                                </button>
-                                            </td>
-                                            <td style={{ color: isOverdue ? "#dc2626" : "var(--text-primary)", fontWeight: isOverdue ? 700 : 400 }}>
-                                                {fmtDT(dl.due_date)} {isOverdue && "⚠️"}
-                                            </td>
-                                            <td style={{ fontSize: 13, fontWeight: 600 }}>👤 {dl.assigned_name || "—"}</td>
-                                            <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{dl.note || "—"}</td>
-                                            <td>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <span style={{
-                                                        display: "inline-flex", padding: "3px 10px", borderRadius: 4,
-                                                        fontSize: 11, fontWeight: 700, background: st.bg, color: st.color
-                                                    }}>
-                                                        {isOverdue && dl.status === 'pending' ? "🔴 Trễ hạn" : st.label}
-                                                    </span>
-                                                    {dl.status === 'problem' && (
-                                                        <button className="btn btn-sm btn-outline" 
-                                                            style={{ padding: "0 6px", fontSize: 10, height: 22 }}
-                                                            onClick={() => handleOpenViewProb(dl)}
-                                                            title="Xem chi tiết vấn đề">👁</button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            {canManage && (
-                                                <td>
-                                                    <div className="actions" style={{ gap: 4 }}>
-                                                        {/* Nút dành riêng cho Organizer (Người thực hiện) */}
-                                                        {isOrganizer && (
-                                                            <>
-                                                                {dl.status === 'pending' && (
-                                                                    <button className="btn btn-sm btn-outline"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'working')}>▶ Bắt đầu</button>
-                                                                )}
-                                                                {(dl.status === 'working' || dl.status === 'problem' || dl.status === 'pending') && (
-                                                                    <button className="btn btn-sm btn-success"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'completed')}>✓ Hoàn thành</button>
-                                                                )}
-                                                                {dl.status !== 'done' && dl.status !== 'problem' && (
-                                                                    <button className="btn btn-sm btn-warning"
-                                                                        onClick={() => handleOpenProbModal(dl)}>⚠️ Báo lỗi</button>
-                                                                )}
-                                                            </>
-                                                        )}
-
-                                                        {/* Nút dành riêng cho Admin (Người phê duyệt) */}
-                                                        {isAdmin && (
-                                                            <>
-                                                                {dl.status === 'completed' && (
-                                                                    <button className="btn btn-sm btn-primary"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'done')}>⭐ Phê duyệt</button>
-                                                                )}
-                                                                {dl.status === 'done' && (
-                                                                    <button className="btn btn-sm btn-outline"
-                                                                        onClick={() => handleUpdateDlStatus(dl.id, 'working')}>↩ Hoàn tác</button>
-                                                                )}
-                                                            </>
-                                                        )}
-
-                                                        <button className="btn btn-danger btn-sm"
-                                                            onClick={() => handleDeleteDl(dl.id)} title="Xóa">🗑</button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                        {expandedDlId === dl.id && (
-                                            <tr key={`expanded-${dl.id}`} style={{ background: "#f8fafc" }}>
-                                                <td colSpan={canManage ? 6 : 5} style={{ padding: "0 40px 16px" }}>
-                                                    <div style={{
-                                                        border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden",
-                                                        background: "white", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)"
-                                                    }}>
-                                                        <div style={{ padding: "10px 16px", background: "#f1f5f9", fontSize: 13, fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                                                            <span>📋 Công việc liên quan ({tasks.filter(t => t.deadline_id === dl.id).length})</span>
-                                                            <button className="btn btn-sm" onClick={() => setTab("tasks")} style={{ fontSize: 11, height: 24, padding: "0 10px" }}>👉 Xem trên bảng</button>
-                                                        </div>
-                                                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                                                            <thead>
-                                                                <tr style={{ background: "white", borderBottom: "1px solid #f1f5f9" }}>
-                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Nội dung</th>
-                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Phân công</th>
-                                                                    <th style={{ textAlign: "left", padding: "8px 16px" }}>Trạng thái</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {tasks.filter(t => t.deadline_id === dl.id).map(t => (
-                                                                    <tr key={t.id} style={{ borderBottom: "1px dashed #f1f5f9" }}>
-                                                                        <td style={{ padding: "8px 16px", fontWeight: 600 }}>{t.title}</td>
-                                                                        <td style={{ padding: "8px 16px" }}>👤 {t.assigned_name || "—"}</td>
-                                                                        <td style={{ padding: "8px 16px" }}>
-                                                                            {(() => {
-                                                                                const s = TASK_STATUS_CFG[t.status] || { label: t.status, color: "#64748b" };
-                                                                                return (
-                                                                                    <span style={{ 
-                                                                                        fontSize: 11, padding: "2px 10px", borderRadius: 999,
-                                                                                        background: s.color + "20", color: s.color, fontWeight: 700
-                                                                                    }}>{s.label}</span>
-                                                                                );
-                                                                            })()}
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                                {tasks.filter(t => t.deadline_id === dl.id).length === 0 && (
-                                                                    <tr><td colSpan={3} style={{ textAlign: "center", padding: 12, color: "var(--text-muted)" }}>Chưa có nhiệm vụ nào được liên kết</td></tr>
-                                                                )}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-            </div>
-        )}
 
             {/* ════ TAB: PARTICIPANTS (GUESTS & ATTENDEES) ════ */}
             {tab === "participants" && (
@@ -826,44 +578,11 @@ export default function EventDetail() {
                 <TaskBoard 
                     eventId={id} 
                     staffList={staff} 
+                    departments={departments}
                     canManage={canManage} 
-                    deadlines={deadlines} 
-                    externalFilterDeadlineId={taskFilterDeadlineId}
-                    onClearExternalFilter={() => setTaskFilterDeadlineId(null)}
                     onRefreshParent={loadAll}
                 />
             )}
-            {/* ── Modal thêm deadline ── */}
-            <Modal title="Thêm Deadline" isOpen={dlModal} onClose={() => setDlModal(false)}>
-                <form onSubmit={handleAddDeadline}>
-                    <div className="form-group">
-                        <label>Tiêu đề <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control" placeholder="VD: Chốt danh sách khách mời"
-                            value={dlForm.title} onChange={e => setDlForm({ ...dlForm, title: e.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                        <label>Hạn chót <span style={{ color: "red" }}>*</span></label>
-                        <input type="datetime-local" className="form-control"
-                            value={dlForm.due_date} onChange={e => setDlForm({ ...dlForm, due_date: e.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                        <label>Người thực hiện <span style={{ color: "red" }}>*</span></label>
-                        <select className="form-control" value={dlForm.assigned_to}
-                            onChange={e => setDlForm({ ...dlForm, assigned_to: e.target.value })} required>
-                            <option value="">-- Chọn nhân sự --</option>
-                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                        </select>
-                    </div>
-                    <div className="form-group">
-                        <label>Ghi chú</label>
-                        <textarea className="form-control" rows="2"
-                            value={dlForm.note} onChange={e => setDlForm({ ...dlForm, note: e.target.value })} />
-                    </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={dlSaving}>
-                        {dlSaving ? "Đang lưu..." : "Thêm deadline"}
-                    </button>
-                </form>
-            </Modal>
 
             {/* ── Modal Bulk Invite ── */}
             <Modal title="💌 Mời khách hàng loạt" isOpen={bulkModal} onClose={() => setBulkModal(false)} maxWidth="800px">
@@ -875,68 +594,26 @@ export default function EventDetail() {
                                 Nhập mỗi dòng: <strong>Tên, Email</strong> (ngăn cách bởi dấu phẩy)
                             </p>
                             <textarea className="form-control" rows="6"
-                                placeholder="Nguyễn Văn A, anguyen@gmail.com&#10;Trần Thị B, btran@gmail.com"
+                                placeholder={"Nguyễn Văn A, anguyen@gmail.com\nTrần Thị B, btran@gmail.com"}
                                 value={bulkForm.guests}
                                 onChange={e => setBulkForm({ ...bulkForm, guests: e.target.value })}
                                 required />
                         </div>
-                        
                         <div className="form-group">
                             <label>Lời nhắn trong thư mời</label>
                             <textarea className="form-control" style={{ height: "calc(100% - 28px)" }}
-                                placeholder="VD: Trân trọng kính mời bạn đến tham dự buổi lễ ra mắt sản phẩm mới của chúng tôi..."
+                                placeholder="VD: Trân trọng kính mời bạn đến tham dự buổi lễ ra mắt sản phẩm mới..."
                                 value={bulkForm.content}
                                 onChange={e => setBulkForm({ ...bulkForm, content: e.target.value })} />
                         </div>
                     </div>
-
                     <div style={{ background: "rgba(99,102,241,0.07)", padding: 12, borderRadius: 8, fontSize: 12, marginBottom: 16 }}>
                         💡 Hệ thống sẽ tự động tạo mã QR Check-in duy nhất cho từng khách mời và gửi kèm trong email.
                     </div>
-
                     <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={bulkSending}>
-                        {bulkSending ? " đang gửi email... (vui lòng đợi)" : "🚀 Gửi lời mời hàng loạt"}
+                        {bulkSending ? "Đang gửi email..." : "🚀 Gửi lời mời hàng loạt"}
                     </button>
                 </form>
-            </Modal>
-
-            {/* ── Modal Báo cáo vấn đề ── */}
-            <Modal title="⚠️ Báo cáo vấn đề / Thiếu kinh phí" isOpen={dlProbModal} onClose={() => setDlProbModal(false)}>
-                <div className="form-group">
-                    <label>Lý do / Tình trạng chi tiết</label>
-                    <textarea className="form-control" rows="4"
-                        placeholder="VD: Hiện tại đang thiếu khoảng 5 triệu kinh phí cho hạng mục này..."
-                        value={dlProbNote} onChange={e => setDlProbNote(e.target.value)} />
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                    <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setDlProbModal(false)}>Hủy</button>
-                    <button className="btn btn-danger" style={{ flex: 1 }}
-                        onClick={() => handleUpdateDlStatus(dlProbId, 'problem', dlProbNote)}>
-                        Gửi báo cáo
-                    </button>
-                </div>
-            </Modal>
-            {/* ── Modal Xem chi tiết vấn đề ── */}
-            <Modal title="📝 Chi tiết vấn đề" isOpen={viewProbModal} onClose={() => setViewProbModal(false)}>
-                {viewProbDl && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        <div style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 10, padding: 16 }}>
-                            <p style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                                ⚠️ Hạng mục: {viewProbDl.title}
-                            </p>
-                            <p style={{ fontSize: 14, color: "var(--text-primary)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                                {viewProbDl.note || "Không có nội dung mô tả chi tiết."}
-                            </p>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-muted)" }}>
-                            <span>👤 Người báo cáo: <strong>{viewProbDl.assigned_name}</strong></span>
-                            <span>⏰ Hạn gốc: {fmtDT(viewProbDl.due_date)}</span>
-                        </div>
-                        <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={() => setViewProbModal(false)}>
-                            Đã hiểu
-                        </button>
-                    </div>
-                )}
             </Modal>
         </Layout>
     );

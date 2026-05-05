@@ -2,11 +2,7 @@ const svc = require("../services/taskService");
 const ok = (res, d, s = 200) => res.status(s).json(d);
 const err = (res, e) => res.status(e.status || 500).json({ message: e.message });
 
-// Phases
-exports.getPhases = async (q, s) => { try { ok(s, await svc.getPhases(q.params.eventId)); } catch (e) { err(s, e); } };
-exports.createPhase = async (q, s) => { try { ok(s, await svc.createPhase(q.body), 201); } catch (e) { err(s, e); } };
-exports.updatePhase = async (q, s) => { try { await svc.updatePhase(q.params.id, q.body); ok(s, { message: "OK" }); } catch (e) { err(s, e); } };
-exports.deletePhase = async (q, s) => { try { await svc.deletePhase(q.params.id); ok(s, { message: "Đã xóa" }); } catch (e) { err(s, e); } };
+
 
 // Tasks
 exports.getByEvent = async (q, s) => { try { ok(s, await svc.getByEvent(q.params.eventId)); } catch (e) { err(s, e); } };
@@ -26,6 +22,3 @@ exports.deleteComment = async (q, s) => { try { await svc.deleteComment(q.params
 
 // History
 exports.getHistory = async (q, s) => { try { ok(s, await svc.getHistory(q.params.taskId)); } catch (e) { err(s, e); } };
-
-// Reminders
-exports.triggerReminders = async (q, s) => { try { ok(s, { sent: await svc.sendDeadlineReminders() }); } catch (e) { err(s, e); } };
