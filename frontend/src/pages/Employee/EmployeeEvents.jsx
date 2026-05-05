@@ -1,11 +1,11 @@
 import { useCallback, useContext, useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import EmployeeLayout from "../../components/Layout/EmployeeLayout";
+import Layout from "../../components/Layout/Layout";
 import { AuthContext } from "../../context/AuthContext";
 import { getEvents } from "../../services/eventService";
 import { getMyRegistrations, selfRegister, removeAttendee } from "../../services/attendeeService";
 import { getNotifications } from "../../services/notificationService";
-import "../../styles/employee-theme.css";
+import "../../styles/global.css";
 
 const STATUS_MAP = {
     draft:     { label: "Chưa mở",      cls: "emp-badge-gray" },
@@ -51,37 +51,31 @@ function QRModal({ reg, onClose }) {
     };
 
     return (
-        <div className="emp-modal-overlay" onClick={onClose}>
-            <div className="emp-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 360 }}>
-                {/* Header */}
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18 }}>
-                    <div style={{ fontSize:15, fontWeight:700 }}>🎟&nbsp; Vé check-in</div>
-                    <button className="emp-btn-ghost" style={{ fontSize:16 }} onClick={onClose}>✕</button>
+        <div className="modal-overlay" onClick={onClose} style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}>
+            <div className="card" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, width: "90%", padding: 32, borderRadius: 28, textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+                    <h3 style={{ fontSize: 20, fontWeight: 800 }}>🎫 Vé Check-in</h3>
+                    <button className="btn btn-outline" style={{ width: 36, height: 36, padding: 0, borderRadius: 10 }} onClick={onClose}>✕</button>
                 </div>
 
-                {/* QR Image */}
-                <div style={{ textAlign:"center", marginBottom:16 }}>
-                    <div style={{ display:"inline-block", background:"#fff", padding:14, borderRadius:14, border:"2px solid var(--emp-border2)", boxShadow:"0 4px 20px rgba(0,0,0,0.2)" }}>
-                        <QRImage value={reg.qr_code} size={200} />
-                    </div>
+                <div style={{ background: "#fff", padding: 20, borderRadius: 24, border: "2px solid #f1f5f9", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05)", display: "inline-block", marginBottom: 24 }}>
+                    <QRImage value={reg.qr_code} size={220} />
                 </div>
 
-                {/* Info */}
-                <div style={{ background:"var(--emp-surface2)", borderRadius:"var(--emp-radius-sm)", padding:"12px 14px", marginBottom:14 }}>
-                    <div style={{ fontWeight:700, fontSize:14, marginBottom:4 }}>{reg.event_name}</div>
-                    <div style={{ fontSize:12, color:"var(--emp-text3)", fontFamily:"var(--emp-mono)", wordBreak:"break-all" }}>
+                <div style={{ background: "var(--bg-main)", borderRadius: 16, padding: 20, marginBottom: 24 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 8, color: "var(--text-primary)" }}>{reg.event_name}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", fontFamily: "monospace", letterSpacing: "0.05em", background: "#fff", padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
                         {reg.qr_code}
                     </div>
                 </div>
 
-                <p style={{ fontSize:12, color:"var(--emp-text3)", textAlign:"center", margin:"0 0 14px" }}>
-                    📋 Xuất trình mã này khi check-in. Không chia sẻ với người khác.
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 24, lineHeight: 1.5 }}>
+                    📌 Vui lòng xuất trình mã này tại quầy đón tiếp để thực hiện check-in vào sự kiện.
                 </p>
 
-                {/* Buttons */}
-                <div style={{ display:"flex", gap:8 }}>
-                    <button className="emp-btn emp-btn-outline" style={{ flex:1, justifyContent:"center" }} onClick={downloadQR}>⬇ Tải QR</button>
-                    <button className="emp-btn emp-btn-primary" style={{ flex:1, justifyContent:"center" }} onClick={onClose}>Đóng</button>
+                <div style={{ display: "flex", gap: 12 }}>
+                    <button className="btn btn-outline" style={{ flex: 1, height: 52, borderRadius: 14, fontWeight: 700 }} onClick={downloadQR}>⬇ Tải về máy</button>
+                    <button className="btn btn-primary" style={{ flex: 1, height: 52, borderRadius: 14, fontWeight: 800 }} onClick={onClose}>Hoàn tất</button>
                 </div>
             </div>
         </div>
@@ -93,11 +87,11 @@ function Toast({ msg, color, onHide }) {
     useEffect(() => { if (msg) { const t = setTimeout(onHide, 3000); return () => clearTimeout(t); } }, [msg]);
     if (!msg) return null;
     return (
-        <div className="emp-toast" style={{ borderColor:color, color }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.5 8l2 2 3-3"/>
-            </svg>
-            <span>{msg}</span>
+        <div className="toast-container" style={{ position: "fixed", bottom: 32, right: 32, zIndex: 1000, animation: "slideIn 0.3s ease-out" }}>
+            <div className="card" style={{ padding: "16px 24px", borderRadius: 16, border: `1px solid ${color}`, background: "#fff", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 20 }}>✅</span>
+                <span style={{ fontWeight: 700, color: "var(--text-primary)" }}>{msg}</span>
+            </div>
         </div>
     );
 }
@@ -107,75 +101,63 @@ function EventCard({ ev, reg, attRow, busy, onRegister, onCancel, onQR }) {
     const navigate = useNavigate();
     const s = STATUS_MAP[ev.status] || STATUS_MAP.draft;
     const pct = ev.capacity > 0 ? Math.round((ev.registered_count || 0) / ev.capacity * 100) : 0;
-    const capColor = pct > 90 ? "var(--emp-red)" : pct > 70 ? "var(--emp-amber)" : "var(--emp-green)";
+    const capColor = pct > 90 ? "#ef4444" : pct > 70 ? "#f59e0b" : "#10b981";
     const canReg = ["approved","running"].includes(ev.status);
 
     return (
-        <div className={`emp-event-card${reg ? " registered" : ""}`}>
-            <div className="emp-ec-header">
-                <div className="emp-ec-icon" style={{ background:emojiBg(ev) }}>{eventEmoji(ev)}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
-                        <span style={{ fontSize:10, fontWeight:600, color:"var(--emp-text3)", textTransform:"uppercase", letterSpacing:"0.06em" }}>
-                            {TYPE_LABELS[ev.event_type] || ev.event_type || "Sự kiện"}
-                        </span>
-                        <span className={`emp-badge ${s.cls}`}>{s.label}</span>
-                        {reg && <span style={{ fontSize:11, color:"var(--emp-accent)", fontWeight:600 }}>✓ Đã đăng ký</span>}
+        <div className="card" style={{ padding: 24, borderRadius: 24, border: "1px solid var(--border-color)", transition: "all 0.3s" }}>
+            <div style={{ display: "flex", gap: 20, marginBottom: 20 }}>
+                <div style={{ width: 64, height: 64, borderRadius: 18, background: "var(--bg-main)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>{eventEmoji(ev)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>{TYPE_LABELS[ev.event_type] || ev.event_type}</span>
+                        <span className={`badge ${ev.status === 'approved' ? 'badge-admin' : ev.status === 'running' ? 'badge-success' : 'badge-default'}`} style={{ fontSize: 10 }}>{s.label}</span>
                     </div>
-                    <div className="emp-ec-title">{ev.name}</div>
-                    <div className="emp-ec-meta">
-                        <div className="emp-ec-meta-item">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                                <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 1v4M11 1v4M2 7h12"/>
-                            </svg>
-                            {fmtDate(ev.start_date)}
+                    <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 6 }}>{ev.name}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
+                        <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <span>📅</span> {fmtDate(ev.start_date)}
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
+                            <span>🕒</span> {fmtTime(ev.start_date)}
                         </div>
                         {ev.location && (
-                            <div className="emp-ec-meta-item">
-                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                                    <circle cx="8" cy="6" r="2.5"/><path d="M8 1C5.2 1 3 3.3 3 6c0 4 5 9 5 9s5-5 5-9c0-2.7-2.2-5-5-5z"/>
-                                </svg>
-                                {ev.location}
+                            <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
+                                <span>📍</span> {ev.location}
                             </div>
                         )}
-                        <div className="emp-ec-meta-item">
-                            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-                                <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.5"/>
-                            </svg>
-                            {fmtTime(ev.start_date)}
-                        </div>
                     </div>
                 </div>
             </div>
-            <div className="emp-ec-footer">
-                {ev.capacity > 0 ? (
-                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <span style={{ fontSize:12, color:"var(--emp-text2)" }}>{ev.registered_count || 0}/{ev.capacity}</span>
-                        <div className="emp-cap-bar">
-                            <div className="emp-cap-fill" style={{ width:`${pct}%`, background:capColor }} />
-                        </div>
-                        <span style={{ fontSize:11, color:capColor, fontWeight:600 }}>{pct}%</span>
-                    </div>
-                ) : <div />}
-                <div style={{ display:"flex", gap:8 }}>
-                    {reg && attRow && (
-                        <button className="emp-btn emp-btn-outline emp-btn-sm" onClick={() => onQR(attRow)}>📱 QR</button>
-                    )}
-                    {reg ? (
-                        <button className="emp-btn emp-btn-cancel emp-btn-sm" disabled={busy} onClick={() => onCancel(ev)}>
-                            {busy ? "..." : "Huỷ đăng ký"}
-                        </button>
-                    ) : canReg ? (
-                        <button className="emp-btn emp-btn-primary emp-btn-sm" disabled={busy} onClick={() => onRegister(ev)}>
-                            {busy ? "..." : "Đăng ký ngay"}
-                        </button>
-                    ) : (
-                        <button className="emp-btn emp-btn-outline emp-btn-sm" disabled style={{ opacity:0.4, cursor:"not-allowed" }}>
-                            {ev.status === "completed" ? "Đã kết thúc" : ev.status === "cancelled" ? "Đã huỷ" : "Chưa mở"}
-                        </button>
-                    )}
-                    <button className="emp-btn emp-btn-outline emp-btn-sm" onClick={() => navigate(`/events/${ev.id}`)}>Chi tiết</button>
+
+            <div style={{ background: "var(--bg-main)", padding: 16, borderRadius: 16, marginBottom: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700 }}>Chỗ ngồi còn lại</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: capColor }}>{ev.registered_count || 0}/{ev.capacity} ({pct}%)</span>
                 </div>
+                <div style={{ height: 6, background: "#e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: capColor, borderRadius: 10 }} />
+                </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+                {reg && attRow && (
+                    <button className="btn btn-outline" style={{ height: 48, padding: "0 16px", borderRadius: 12 }} onClick={() => onQR(attRow)}>📱 Vé QR</button>
+                )}
+                {reg ? (
+                    <button className="btn btn-outline" style={{ flex: 1, height: 48, borderRadius: 12, color: "#ef4444", borderColor: "#fecaca" }} disabled={busy} onClick={() => onCancel(ev)}>
+                        {busy ? "..." : "Huỷ đăng ký"}
+                    </button>
+                ) : canReg ? (
+                    <button className="btn btn-primary" style={{ flex: 1, height: 48, borderRadius: 12, fontWeight: 800 }} disabled={busy} onClick={() => onRegister(ev)}>
+                        {busy ? "..." : "Đăng ký tham gia"}
+                    </button>
+                ) : (
+                    <button className="btn btn-outline" style={{ flex: 1, height: 48, borderRadius: 12, opacity: 0.5 }} disabled>
+                        {ev.status === "completed" ? "Đã kết thúc" : "Chưa mở"}
+                    </button>
+                )}
+                <button className="btn btn-outline" style={{ height: 48, padding: "0 20px", borderRadius: 12, fontWeight: 700 }} onClick={() => navigate(`/events/${ev.id}`)}>Chi tiết</button>
             </div>
         </div>
     );
@@ -189,7 +171,7 @@ export function EmployeeExplore() {
     const [myRegIds, setMyRegIds]   = useState({});
     const [busy, setBusy]           = useState({});
     const [qrReg, setQrReg]         = useState(null);
-    const [toast, setToast]         = useState({ msg:"", color:"var(--emp-green)" });
+    const [toast, setToast]         = useState({ msg:"", color:"#10b981" });
     const [filterType, setFilterType] = useState("");
     const [sort, setSort]           = useState("");
     const [search, setSearch]       = useState("");
@@ -197,7 +179,7 @@ export function EmployeeExplore() {
     const searchRef                 = useRef(null);
     const [sp]                      = useSearchParams();
 
-    const showToast = (msg, color = "var(--emp-green)") => setToast({ msg, color });
+    const showToast = (msg, color = "#10b981") => setToast({ msg, color });
 
     useEffect(() => {
         const q = sp.get("q") || "";
@@ -224,7 +206,7 @@ export function EmployeeExplore() {
     const handleRegister = async (ev) => {
         if (busy[ev.id]) return;
         if (!["approved","running"].includes(ev.status)) {
-            showToast("Sự kiện chưa mở đăng ký.", "var(--emp-amber)"); return;
+            showToast("Sự kiện chưa mở đăng ký.", "#f59e0b"); return;
         }
         setBusy(b => ({ ...b, [ev.id]: true }));
         try {
@@ -232,7 +214,7 @@ export function EmployeeExplore() {
             const newAtt = { event_id:ev.id, event_name:ev.name, qr_code:res.data?.qr_code, ...res.data };
             setMyRegIds(m => ({ ...m, [ev.id]: newAtt }));
             showToast(`✓ Đăng ký thành công: ${ev.name}`);
-        } catch (err) { showToast(err?.response?.data?.message || "Đăng ký thất bại", "var(--emp-red)"); }
+        } catch (err) { showToast(err?.response?.data?.message || "Đăng ký thất bại", "#ef4444"); }
         finally { setBusy(b => ({ ...b, [ev.id]: false })); }
     };
 
@@ -244,8 +226,8 @@ export function EmployeeExplore() {
         try {
             await removeAttendee(att.id);
             setMyRegIds(m => { const n = { ...m }; delete n[ev.id]; return n; });
-            showToast(`Đã huỷ đăng ký: ${ev.name}`, "var(--emp-red)");
-        } catch (err) { showToast(err?.response?.data?.message || "Huỷ thất bại", "var(--emp-red)"); }
+            showToast(`Đã huỷ đăng ký: ${ev.name}`, "#ef4444");
+        } catch (err) { showToast(err?.response?.data?.message || "Huỷ thất bại", "#ef4444"); }
         finally { setBusy(b => ({ ...b, [ev.id]: false })); }
     };
 
@@ -269,24 +251,47 @@ export function EmployeeExplore() {
     if (sort === "cap-desc") displayed = [...displayed].sort((a,b) => (b.registered_count||0)/b.capacity - (a.registered_count||0)/a.capacity);
 
     return (
-        <EmployeeLayout title="Tất cả sự kiện" unreadCount={unread}>
-            <div className="emp-pill-row">
-                {TYPES.map(t => (
-                    <button key={t.val} className={`emp-pill${filterType===t.val?" active":""}`} onClick={() => setFilterType(t.val)}>{t.label}</button>
-                ))}
-                <div style={{ marginLeft:"auto" }}>
-                    <select className="emp-sort-select" value={sort} onChange={e => setSort(e.target.value)}>
-                        <option value="">Gần nhất</option>
-                        <option value="cap-asc">Còn nhiều chỗ</option>
-                        <option value="cap-desc">Sắp đầy</option>
+        <Layout>
+            <div className="page-header" style={{ marginBottom: 32 }}>
+                <div>
+                    <h2 style={{ fontSize: 28, fontWeight: 800 }}>Khám phá Sự kiện</h2>
+                    <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Tìm kiếm và đăng ký tham gia các hoạt động nội bộ công ty</p>
+                </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, background: "#f1f5f9", padding: 6, borderRadius: 14 }}>
+                    {TYPES.map(t => (
+                        <button key={t.val} 
+                            onClick={() => setFilterType(t.val)}
+                            style={{ 
+                                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer",
+                                background: filterType === t.val ? "#fff" : "transparent",
+                                color: filterType === t.val ? "var(--color-primary)" : "var(--text-muted)",
+                                boxShadow: filterType === t.val ? "0 4px 12px rgba(0,0,0,0.05)" : "none",
+                                transition: "all 0.2s"
+                            }}>
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+                
+                <div style={{ marginLeft: "auto", display: "flex", gap: 12 }}>
+                    <select className="form-control" style={{ width: 180, borderRadius: 12, height: 44 }} value={sort} onChange={e => setSort(e.target.value)}>
+                        <option value="">Mặc định (Gần nhất)</option>
+                        <option value="cap-asc">Còn nhiều chỗ trống</option>
+                        <option value="cap-desc">Sắp hết chỗ (Hot)</option>
                     </select>
                 </div>
             </div>
 
             {displayed.length === 0 ? (
-                <div className="emp-empty"><div className="emp-empty-icon">🔍</div><p>Không tìm thấy sự kiện nào.</p></div>
+                <div className="card" style={{ padding: 80, textAlign: "center", border: "1px dashed #cbd5e1", background: "transparent" }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: "var(--text-secondary)" }}>Không tìm thấy sự kiện nào phù hợp.</p>
+                </div>
             ) : (
-                <div className="emp-event-feed">
+                <div className="grid-3" style={{ gap: 24 }}>
                     {displayed.map(ev => (
                         <EventCard key={ev.id} ev={ev} reg={!!myRegIds[ev.id]} attRow={myRegIds[ev.id]}
                             busy={busy[ev.id]} onRegister={handleRegister} onCancel={handleCancel} onQR={setQrReg} />
@@ -296,25 +301,22 @@ export function EmployeeExplore() {
 
             {qrReg && <QRModal reg={qrReg} onClose={() => setQrReg(null)} />}
             <Toast msg={toast.msg} color={toast.color} onHide={() => setToast(t => ({ ...t, msg:"" }))} />
-        </EmployeeLayout>
+        </Layout>
     );
 }
 
-// ══════════════════════════════════════════════════════════
-// MY EVENTS PAGE
-// ══════════════════════════════════════════════════════════
 export function EmployeeMyEvents() {
     const [allEvents, setAllEvents] = useState([]);
     const [myRegIds, setMyRegIds]   = useState({});
     const [myRegs, setMyRegs]       = useState([]);
     const [busy, setBusy]           = useState({});
     const [qrReg, setQrReg]         = useState(null);
-    const [toast, setToast]         = useState({ msg:"", color:"var(--emp-green)" });
+    const [toast, setToast]         = useState({ msg:"", color:"#10b981" });
     const [tab, setTab]             = useState("all");
     const [unread, setUnread]       = useState(0);
     const [sp]                      = useSearchParams();
 
-    const showToast = (msg, color = "var(--emp-green)") => setToast({ msg, color });
+    const showToast = (msg, color = "#10b981") => setToast({ msg, color });
 
     useEffect(() => {
         const t = sp.get("tab");
@@ -345,19 +347,18 @@ export function EmployeeMyEvents() {
             await removeAttendee(att.id);
             setMyRegIds(m => { const n = { ...m }; delete n[ev.id]; return n; });
             setMyRegs(r => r.filter(x => x.event_id !== ev.id));
-            showToast(`Đã huỷ đăng ký: ${ev.name}`, "var(--emp-red)");
-        } catch (err) { showToast(err?.response?.data?.message || "Huỷ thất bại", "var(--emp-red)"); }
+            showToast(`Đã huỷ đăng ký: ${ev.name}`, "#ef4444");
+        } catch (err) { showToast(err?.response?.data?.message || "Huỷ thất bại", "#ef4444"); }
         finally { setBusy(b => ({ ...b, [ev.id]: false })); }
     };
 
-    // Filter events I registered for
     const now = new Date();
     const regEventIds = new Set(myRegs.map(r => r.event_id));
     const myEvents = allEvents.filter(ev => regEventIds.has(ev.id));
 
     const TABS = [
-        { val:"all",     label:"Tất cả" },
-        { val:"upcoming",label:"Sắp tới" },
+        { val:"all",     label:"Tất cả sự kiện" },
+        { val:"upcoming",label:"Sắp diễn ra" },
         { val:"done",    label:"Đã tham dự" },
         { val:"cancelled", label:"Đã huỷ" },
     ];
@@ -371,20 +372,38 @@ export function EmployeeMyEvents() {
     });
 
     return (
-        <EmployeeLayout title="Sự kiện của tôi" unreadCount={unread}>
-            <div className="emp-pill-row">
+        <Layout>
+            <div className="page-header" style={{ marginBottom: 32 }}>
+                <div>
+                    <h2 style={{ fontSize: 28, fontWeight: 800 }}>Sự kiện của tôi</h2>
+                    <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Quản lý vé mời và các hoạt động bạn đã đăng ký tham gia</p>
+                </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginBottom: 32, background: "#f1f5f9", padding: 6, borderRadius: 14, alignSelf: "flex-start", width: "fit-content" }}>
                 {TABS.map(t => (
-                    <button key={t.val} className={`emp-pill${tab===t.val?" active":""}`} onClick={() => setTab(t.val)}>{t.label}</button>
+                    <button key={t.val} 
+                        onClick={() => setTab(t.val)}
+                        style={{ 
+                            padding: "10px 24px", borderRadius: 10, fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer",
+                            background: tab === t.val ? "#fff" : "transparent",
+                            color: tab === t.val ? "var(--color-primary)" : "var(--text-muted)",
+                            boxShadow: tab === t.val ? "0 4px 12px rgba(0,0,0,0.05)" : "none",
+                            transition: "all 0.2s"
+                        }}>
+                        {t.label}
+                    </button>
                 ))}
             </div>
 
             {filtered.length === 0 ? (
-                <div className="emp-empty">
-                    <div className="emp-empty-icon">🎪</div>
-                    <p>{tab === "all" ? "Bạn chưa đăng ký sự kiện nào." : "Không có sự kiện trong mục này."}</p>
+                <div className="card" style={{ padding: 80, textAlign: "center", border: "1px dashed #cbd5e1", background: "transparent" }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>🎪</div>
+                    <p style={{ fontSize: 16, fontWeight: 600, color: "var(--text-secondary)" }}>{tab === "all" ? "Bạn chưa đăng ký sự kiện nào." : "Không có sự kiện nào trong mục này."}</p>
+                    <button className="btn btn-primary" style={{ marginTop: 24, borderRadius: 12 }} onClick={() => setTab("all")}>Quay lại tất cả</button>
                 </div>
             ) : (
-                <div className="emp-event-feed">
+                <div className="grid-3" style={{ gap: 24 }}>
                     {filtered.map(ev => (
                         <EventCard key={ev.id} ev={ev} reg={!!myRegIds[ev.id]} attRow={myRegIds[ev.id]}
                             busy={busy[ev.id]} onRegister={() => {}} onCancel={handleCancel} onQR={setQrReg} />
@@ -394,6 +413,6 @@ export function EmployeeMyEvents() {
 
             {qrReg && <QRModal reg={qrReg} onClose={() => setQrReg(null)} />}
             <Toast msg={toast.msg} color={toast.color} onHide={() => setToast(t => ({ ...t, msg:"" }))} />
-        </EmployeeLayout>
+        </Layout>
     );
 }

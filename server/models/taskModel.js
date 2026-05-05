@@ -49,11 +49,27 @@ const Task = {
         return r;
     },
 
+    getMyTasks: async (userId) => {
+        const [r] = await db.query(`
+            SELECT t.*, e.name AS event_name, p.name AS phase_name, p.color AS phase_color,
+                   d.name AS assigned_dept_name
+            FROM event_tasks t
+            JOIN events e ON t.event_id = e.id
+            LEFT JOIN task_phases p ON t.phase_id = p.id
+            LEFT JOIN departments d ON t.assigned_department_id = d.id
+            WHERE t.assigned_to = ?
+            ORDER BY t.due_date ASC
+        `, [userId]);
+        return r;
+    },
+
     getById: async (id) => {
         const [r] = await db.query(`
             SELECT t.*, u.name AS assigned_name, c.name AS creator_name,
-                   p.name AS phase_name, d.name AS assigned_dept_name
+                   p.name AS phase_name, d.name AS assigned_dept_name,
+                   e.owner_id AS event_owner_id
             FROM event_tasks t
+            JOIN events e ON t.event_id = e.id
             LEFT JOIN users       u ON t.assigned_to            = u.id
             LEFT JOIN users       c ON t.created_by             = c.id
             LEFT JOIN task_phases p ON t.phase_id               = p.id

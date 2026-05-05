@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import { getUnreadCount } from "../../services/notificationService";
@@ -18,7 +18,7 @@ const NAV = {
                 { to: "/events", icon: "🎦", text: "Tất cả sự kiện" },
                 { to: "/departments", icon: "🏢", text: "Phòng ban" },
                 { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Người tham gia" },
+                { to: "/attendees", icon: "🎟️", text: "Người tham gia" },
                 { to: "/venues", icon: "🏢", text: "Địa điểm" },
                 { to: "/budget", icon: "💰", text: "Ngân sách" },
                 { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
@@ -58,7 +58,6 @@ const NAV = {
         {
             label: "Cá nhân", items: [
                 { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
-                { to: "/my-portal", icon: "🙋", text: "Sự kiện của tôi" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
             ]
@@ -79,6 +78,7 @@ const NAV = {
         },
         {
             label: "Cá nhân", items: [
+                { to: "/profile", icon: "👤", text: "Hồ sơ cá nhân" },
                 { to: "/notifications", icon: "🔔", text: "Thông báo" },
                 { to: "/feedback", icon: "💬", text: "Gửi phản hồi" },
                 { to: "/reset-password", icon: "🔒", text: "Đổi mật khẩu" },
@@ -97,14 +97,27 @@ export default function Sidebar() {
         : "U";
 
     const [unread, setUnread] = useState(0);
+    const navRef = useRef(null);
+
     useEffect(() => {
         const fetch = async () => {
             try { const r = await getUnreadCount(); setUnread(r.data?.count ?? 0); } catch { /**/ }
         };
         fetch();
         const iv = setInterval(fetch, 60000);
+
+        // Khôi phục vị trí cuộn
+        const savedScroll = sessionStorage.getItem("sidebar_scroll");
+        if (savedScroll && navRef.current) {
+            navRef.current.scrollTop = parseInt(savedScroll, 10);
+        }
+
         return () => clearInterval(iv);
     }, []);
+
+    const handleScroll = (e) => {
+        sessionStorage.setItem("sidebar_scroll", e.target.scrollTop);
+    };
 
     return (
         <div className="sidebar">
@@ -112,7 +125,7 @@ export default function Sidebar() {
                 <h2><span className="logo-icon">🎯</span>EventPro</h2>
                 <p>Management System</p>
             </div>
-            <nav className="sidebar-nav">
+            <nav className="sidebar-nav" ref={navRef} onScroll={handleScroll}>
                 {sections.map(s => (
                     <div key={s.label} className="sidebar-nav-section">
                         <div className="sidebar-nav-label">{s.label}</div>

@@ -3,23 +3,16 @@ import Layout from "../../components/Layout/Layout";
 import Modal from "../../components/UI/Modal";
 import { AuthContext } from "../../context/AuthContext";
 import { getEvents } from "../../services/eventService";
-import { getDepartments } from "../../services/departmentService";
-import {
-    getEventDepartments,
-    assignDepartmentToEvent,
-    removeEventDepartment,
-    updateEventDepartment
-} from "../../services/eventDepartmentService";
+import { getUsers } from "../../services/userService";
+import { getStaff, assignStaff, removeStaff } from "../../services/staffService";
 import "../../styles/global.css";
 
 const ROLE_OPTIONS = [
-    "Đảm nhiệm tổ chức",
-    "Hỗ trợ kỹ thuật",
-    "Truyền thông & Marketing",
-    "Hậu cần",
-    "An ninh",
-    "Lễ tân & Tiếp khách",
-    "Tài chính",
+    { value: "manager", label: "Quản lý (Manager)" },
+    { value: "marketing", label: "Marketing" },
+    { value: "technical", label: "Kỹ thuật (Technical)" },
+    { value: "support", label: "Hỗ trợ (Support)" },
+    { value: "volunteer", label: "Tình nguyện viên (Volunteer)" },
 ];
 
 const STATUS_COLORS = {
@@ -30,37 +23,36 @@ const STATUS_COLORS = {
 };
 
 export default function StaffList() {
-    const [assignments, setAssignments] = useState([]);
-    const [events, setEvents]           = useState([]);
-    const [departments, setDepartments] = useState([]);
-    const [loading, setLoading]         = useState(true);
+    const [staffList, setStaffList] = useState([]);
+    const [events, setEvents]       = useState([]);
+    const [allUsers, setAllUsers]   = useState([]);
+    const [loading, setLoading]     = useState(true);
 
     // Modal phân công
     const [modalOpen, setModalOpen]     = useState(false);
-    const [editTarget, setEditTarget]   = useState(null);  // null = thêm mới
-    const [form, setForm]               = useState({ event_id: "", department_id: "", role: "Đảm nhiệm tổ chức", note: "" });
+    const [form, setForm]               = useState({ event_id: "", user_id: "", role: "support" });
     const [submitting, setSubmitting]   = useState(false);
     const [formError, setFormError]     = useState("");
     const [formSuccess, setFormSuccess] = useState("");
 
     // Bộ lọc
     const [filterEvent, setFilterEvent] = useState("");
-    const [filterDept,  setFilterDept]  = useState("");
+    const [filterUser,  setFilterUser]  = useState("");
 
-    const { user } = useContext(AuthContext);
-    const canManage = user?.role === "admin" || user?.role === "organizer";
+    const { user: currentUser } = useContext(AuthContext);
+    const canManage = currentUser?.role === "admin" || currentUser?.role === "organizer";
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const [aR, eR, dR] = await Promise.all([
-                getEventDepartments(),
+            const [sR, eR, uR] = await Promise.all([
+                getStaff(),
                 getEvents(),
-                getDepartments()
+                getUsers()
             ]);
-            setAssignments(aR.data || []);
-            setEvents(eR.data      || []);
-            setDepartments(dR.data || []);
+            setStaffList(sR.data || []);
+            setEvents(eR.data    || []);
+            setAllUsers(uR.data  || []);
         } catch (err) {
             console.error("Load error:", err);
         } finally {
@@ -71,15 +63,7 @@ export default function StaffList() {
     useEffect(() => { loadData(); }, []);
 
     const openAdd = () => {
-        setEditTarget(null);
-        setForm({ event_id: "", department_id: "", role: "Đảm nhiệm tổ chức", note: "" });
-        setFormError(""); setFormSuccess("");
-        setModalOpen(true);
-    };
-
-    const openEdit = (a) => {
-        setEditTarget(a);
-        setForm({ event_id: a.event_id, department_id: a.department_id, role: a.role, note: a.note || "" });
+        setForm({ event_id: "", user_id: "", role: "support" });
         setFormError(""); setFormSuccess("");
         setModalOpen(true);
     };
@@ -88,14 +72,9 @@ export default function StaffList() {
         e.preventDefault();
         setFormError(""); setFormSuccess(""); setSubmitting(true);
         try {
-            if (editTarget) {
-                const res = await updateEventDepartment(editTarget.id, { role: form.role, note: form.note });
-                setFormSuccess(res.data.message);
-            } else {
-                const res = await assignDepartmentToEvent(form);
-                setFormSuccess(res.data.message);
-                setForm(prev => ({ ...prev, department_id: "", note: "" }));
-            }
+            const res = await assignStaff(form);
+            setFormSuccess(res.data.message || "Đã thêm nhân sự thành công!");
+            setForm(prev => ({ ...prev, user_id: "" }));
             loadData();
         } catch (err) {
             setFormError(err.response?.data?.message || "Thao tác thất bại");
@@ -104,10 +83,10 @@ export default function StaffList() {
         }
     };
 
-    const handleDelete = async (a) => {
-        if (!window.confirm(`Hủy phân công phòng ban "${a.department_name}" khỏi sự kiện "${a.event_name}"?`)) return;
+    const handleDelete = async (s) => {
+        if (!window.confirm(`Xóa nhân viên "${s.user_name}" khỏi ban tổ chức sự kiện "${s.event_name}"?`)) return;
         try {
-            await removeEventDepartment(a.id);
+            await removeStaff(s.id);
             loadData();
         } catch (err) {
             alert(err.response?.data?.message || "Xóa thất bại");
@@ -115,60 +94,67 @@ export default function StaffList() {
     };
 
     // Lọc
-    const filtered = assignments.filter(a => {
-        if (filterEvent && String(a.event_id) !== filterEvent) return false;
-        if (filterDept  && String(a.department_id) !== filterDept) return false;
+    const filtered = staffList.filter(s => {
+        if (filterEvent && String(s.event_id) !== filterEvent) return false;
+        if (filterUser  && !s.user_name.toLowerCase().includes(filterUser.toLowerCase())) return false;
         return true;
     });
 
     return (
         <Layout>
-            {/* Header */}
             <div className="page-header" style={{ marginBottom: 24 }}>
                 <div>
-                    <h2 className="gradient-text">🏢 Phân công Phòng ban</h2>
+                    <h2 className="gradient-text">👥 Nhân sự tổ chức</h2>
                     <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
-                        Giao trách nhiệm tổ chức sự kiện cho từng phòng ban · {assignments.length} phân công
+                        Quản lý danh sách nhân viên tham gia thực hiện các sự kiện · {staffList.length} nhân sự
                     </p>
                 </div>
                 {canManage && (
                     <button className="btn btn-primary" onClick={openAdd}
                         style={{ borderRadius: 12, padding: "10px 22px" }}>
-                        🏢 + Phân công phòng ban
+                        👤 + Thêm nhân sự
                     </button>
                 )}
             </div>
 
-            {/* Bộ lọc */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                <select className="form-control" style={{ maxWidth: 240, height: 38, fontSize: 13 }}
+            {/* Filters Row */}
+            <div style={{
+                display: "flex", gap: 12, marginBottom: 24, padding: "16px 20px",
+                background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border-color)",
+                alignItems: "center", flexWrap: "wrap", boxShadow: "0 4px 20px rgba(0,0,0,0.03)"
+            }}>
+                <select className="form-control" style={{ minWidth: 240, height: 42, borderRadius: 10 }}
                     value={filterEvent} onChange={e => setFilterEvent(e.target.value)}>
-                    <option value="">-- Lọc theo sự kiện --</option>
+                    <option value="">📅 Tất cả sự kiện</option>
                     {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
                 </select>
-                <select className="form-control" style={{ maxWidth: 220, height: 38, fontSize: 13 }}
-                    value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-                    <option value="">-- Lọc theo phòng ban --</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>🏢 {d.name}</option>)}
-                </select>
-                {(filterEvent || filterDept) && (
-                    <button className="btn btn-outline btn-sm"
-                        onClick={() => { setFilterEvent(""); setFilterDept(""); }}
-                        style={{ height: 38, fontSize: 13 }}>✕ Xóa lọc</button>
+                <div style={{ position: "relative", flex: 1, minWidth: 260 }}>
+                    <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>🔍</span>
+                    <input className="form-control" placeholder="Tìm theo tên nhân sự..."
+                        value={filterUser} onChange={e => setFilterUser(e.target.value)} 
+                        style={{ width: "100%", height: 42, paddingLeft: 38, borderRadius: 10 }} />
+                </div>
+                {(filterEvent || filterUser) && (
+                    <button className="btn btn-sm btn-ghost"
+                        onClick={() => { setFilterEvent(""); setFilterUser(""); }}
+                        style={{ height: 42, color: "#dc2626", fontWeight: 700 }}>✕ XÓA LỌC</button>
                 )}
             </div>
 
-            {/* Bảng */}
-            <div style={{ background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border-color)", overflow: "hidden" }}>
+            {/* Main Table Section */}
+            <div style={{ 
+                background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border-color)", 
+                overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" 
+            }}>
                 {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Đang tải...</p></div>
+                    <div className="empty-state" style={{ padding: "80px 0" }}><span>⏳</span><p>Đang tải dữ liệu...</p></div>
                 ) : filtered.length === 0 ? (
-                    <div className="empty-state">
-                        <span style={{ fontSize: 36 }}>🏢</span>
-                        <p>{assignments.length === 0 ? "Chưa có phân công phòng ban nào." : "Không có kết quả phù hợp."}</p>
-                        {canManage && assignments.length === 0 && (
+                    <div className="empty-state" style={{ padding: "80px 0" }}>
+                        <span style={{ fontSize: 48, marginBottom: 16 }}>👤</span>
+                        <p style={{ fontWeight: 600 }}>{staffList.length === 0 ? "Chưa có nhân sự nào được phân công." : "Không có kết quả phù hợp."}</p>
+                        {canManage && staffList.length === 0 && (
                             <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={openAdd}>
-                                Thêm phân công đầu tiên
+                                + Thêm nhân sự đầu tiên
                             </button>
                         )}
                     </div>
@@ -176,67 +162,69 @@ export default function StaffList() {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th style={{ paddingLeft: 20, width: 48 }}>#</th>
-                                <th>Phòng ban</th>
-                                <th>Sự kiện</th>
-                                <th>Vai trò / Nhiệm vụ</th>
-                                <th>Trưởng phòng</th>
-                                <th style={{ textAlign: "center" }}>Nhân sự</th>
-                                {canManage && <th style={{ textAlign: "right", paddingRight: 20 }}>Thao tác</th>}
+                                <th style={{ paddingLeft: 24, width: 60 }}>#</th>
+                                <th>Nhân sự</th>
+                                <th>Sự kiện tiếp nhận</th>
+                                <th>Vai trò tổ chức</th>
+                                <th>Phòng ban gốc</th>
+                                {canManage && <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>}
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((a, i) => {
-                                const st = STATUS_COLORS[a.event_status] || STATUS_COLORS.upcoming;
+                            {filtered.map((s, i) => {
+                                const st = STATUS_COLORS[s.event_status] || STATUS_COLORS.upcoming;
+                                const roleInfo = ROLE_OPTIONS.find(r => r.value === s.role) || { label: s.role };
                                 return (
-                                    <tr key={a.id}>
-                                        <td style={{ color: "var(--text-muted)", paddingLeft: 20 }}>{String(i + 1).padStart(2, "0")}</td>
+                                    <tr key={s.id} className="table-row-hover">
+                                        <td style={{ color: "var(--text-muted)", paddingLeft: 24, fontWeight: 600 }}>{String(i + 1).padStart(2, "0")}</td>
                                         <td>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                                <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(99,102,241,0.1)", color: "#4338ca", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🏢</div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                <div style={{ 
+                                                    width: 40, height: 40, borderRadius: 12, 
+                                                    background: "linear-gradient(135deg, #6366f1, #a855f7)", 
+                                                    color: "white", display: "flex", alignItems: "center", 
+                                                    justifyContent: "center", fontWeight: 800, fontSize: 15,
+                                                    boxShadow: "0 4px 10px rgba(99,102,241,0.2)"
+                                                }}>
+                                                    {s.user_name[0]?.toUpperCase()}
+                                                </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 700, fontSize: 13 }}>{a.department_name}</div>
-                                                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                                                        {new Date(a.assigned_at).toLocaleDateString("vi-VN")}
-                                                    </div>
+                                                    <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{s.user_name}</div>
+                                                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{s.user_email}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
                                             <div>
-                                                <div style={{ fontWeight: 600, fontSize: 13, color: "var(--color-primary)" }}>🎯 {a.event_name}</div>
-                                                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 999, background: st.bg, color: st.color }}>
+                                                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--color-primary)" }}>🎯 {s.event_name}</div>
+                                                <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 999, background: st.bg, color: st.color, textTransform: "uppercase", marginTop: 4, display: "inline-block" }}>
                                                     {st.label}
                                                 </span>
                                             </div>
                                         </td>
                                         <td>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: "#059669" }}>{a.role}</div>
-                                            {a.note && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2, maxWidth: 180 }}>{a.note}</div>}
+                                            <div style={{ 
+                                                fontSize: 12, fontWeight: 700, color: "#4f46e5", 
+                                                background: "#f5f3ff", padding: "4px 12px", 
+                                                borderRadius: 10, display: "inline-block", border: "1px solid #e0e7ff"
+                                            }}>
+                                                {roleInfo.label}
+                                            </div>
                                         </td>
                                         <td>
-                                            {a.manager_name ? (
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <div style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(251,191,36,0.2)", color: "#d97706", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                        {a.manager_name[0]?.toUpperCase()}
-                                                    </div>
-                                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{a.manager_name}</span>
-                                                </div>
-                                            ) : <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>Chưa phân công</span>}
-                                        </td>
-                                        <td style={{ textAlign: "center" }}>
-                                            <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 12px", borderRadius: 999, background: "rgba(99,102,241,0.1)", color: "#4338ca" }}>
-                                                {a.employee_count} người
-                                            </span>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>
+                                                🏢 {s.department_name || "Vãng lai"}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{s.role_in_dept || "Thành viên"}</div>
                                         </td>
                                         {canManage && (
-                                            <td style={{ textAlign: "right", paddingRight: 16 }}>
-                                                <button className="btn btn-sm btn-outline"
-                                                    onClick={() => openEdit(a)}
-                                                    style={{ marginRight: 6 }}>✏️</button>
-                                                <button className="btn btn-sm"
-                                                    onClick={() => handleDelete(a)}
-                                                    style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }}>🗑️</button>
+                                            <td style={{ textAlign: "right", paddingRight: 20 }}>
+                                                <button className="btn btn-sm btn-ghost"
+                                                    onClick={() => handleDelete(s)}
+                                                    style={{ padding: 8, borderRadius: 10, color: "#dc2626" }}
+                                                    title="Xóa nhân sự">
+                                                    🗑️
+                                                </button>
                                             </td>
                                         )}
                                     </tr>
@@ -247,9 +235,9 @@ export default function StaffList() {
                 )}
             </div>
 
-            {/* Modal phân công / sửa */}
+            {/* Modal Add Staff */}
             <Modal
-                title={editTarget ? "✏️ Sửa phân công phòng ban" : "🏢 Phân công phòng ban vào sự kiện"}
+                title="👤 Thêm nhân sự vào sự kiện"
                 isOpen={modalOpen}
                 onClose={() => { setModalOpen(false); setFormError(""); setFormSuccess(""); }}>
                 <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -260,12 +248,11 @@ export default function StaffList() {
                         </div>
                     )}
 
-                    {/* Sự kiện — disabled khi edit */}
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Sự kiện tiếp nhận <span style={{ color: "#ef4444" }}>*</span></label>
+                        <label>Chọn sự kiện <span style={{ color: "#ef4444" }}>*</span></label>
                         <select className="form-control" value={form.event_id}
                             onChange={e => setForm({ ...form, event_id: e.target.value })}
-                            required disabled={!!editTarget}>
+                            required>
                             <option value="">-- Chọn sự kiện --</option>
                             {events.map(ev => (
                                 <option key={ev.id} value={ev.id}>
@@ -275,55 +262,40 @@ export default function StaffList() {
                         </select>
                     </div>
 
-                    {/* Phòng ban — disabled khi edit */}
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Phòng ban đảm nhiệm <span style={{ color: "#ef4444" }}>*</span></label>
-                        <select className="form-control" value={form.department_id}
-                            onChange={e => setForm({ ...form, department_id: e.target.value })}
-                            required disabled={!!editTarget}>
-                            <option value="">-- Chọn phòng ban --</option>
-                            {departments.map(d => (
-                                <option key={d.id} value={d.id}>
-                                    🏢 {d.name}
-                                    {d.manager_name ? ` — TP: ${d.manager_name}` : ""}
-                                    {" "}({d.employee_count || 0} người)
-                                </option>
-                            ))}
+                        <label>Chọn nhân viên <span style={{ color: "#ef4444" }}>*</span></label>
+                        <select className="form-control" value={form.user_id}
+                            onChange={e => setForm({ ...form, user_id: e.target.value })}
+                            required>
+                            <option value="">-- Chọn nhân viên --</option>
+                            {allUsers
+                                .filter(u => u.role === 'user') // Chỉ hiện role user (nhân viên)
+                                .map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        👤 {u.name} ({u.email}) — 🏢 {u.department_name || "Chưa có PB"}
+                                    </option>
+                                ))
+                            }
                         </select>
-                        {!editTarget && (
-                            <small style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 4, display: "block" }}>
-                                Phòng ban sẽ chịu trách nhiệm tổ chức sự kiện này
-                            </small>
-                        )}
                     </div>
 
-                    {/* Vai trò */}
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Vai trò / Nhiệm vụ</label>
+                        <label>Vai trò trong ban tổ chức</label>
                         <select className="form-control" value={form.role}
                             onChange={e => setForm({ ...form, role: e.target.value })}>
-                            {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                            {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>
-                    </div>
-
-                    {/* Ghi chú */}
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label>Ghi chú <span style={{ color: "var(--text-muted)", fontSize: 11 }}>(tuỳ chọn)</span></label>
-                        <textarea className="form-control" rows={2}
-                            placeholder="VD: Phụ trách setup phòng, âm thanh ánh sáng..."
-                            value={form.note}
-                            onChange={e => setForm({ ...form, note: e.target.value })} />
                     </div>
 
                     <div style={{ padding: "12px 0 0", borderTop: "1px solid var(--border-color)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
                         <button type="button" className="btn btn-outline"
-                            onClick={() => { if (formSuccess) { setModalOpen(false); } else { setModalOpen(false); } }}
+                            onClick={() => setModalOpen(false)}
                             style={{ borderRadius: 12, padding: "10px 22px" }}>
                             {formSuccess ? "Đóng" : "Hủy"}
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={submitting}
                             style={{ borderRadius: 12, padding: "10px 26px" }}>
-                            {submitting ? "Đang lưu..." : editTarget ? "Cập nhật" : "✅ Xác nhận phân công"}
+                            {submitting ? "Đang xử lý..." : "✅ Xác nhận thêm"}
                         </button>
                     </div>
                 </form>

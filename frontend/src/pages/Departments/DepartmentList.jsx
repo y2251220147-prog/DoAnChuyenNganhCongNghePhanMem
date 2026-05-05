@@ -159,65 +159,112 @@ export default function DepartmentList() {
                 )}
 
                 {/* Stats */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 24 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 32 }}>
                     {[
-                        { label: "Tổng phòng ban", value: departments.length, icon: "🏢", color: "#6366f1" },
-                        { label: "Tổng nhân viên", value: totalEmployees, icon: "👥", color: "#0ea5e9" },
-                        { label: "Có trưởng phòng", value: departments.filter(d => d.manager_id).length, icon: "👑", color: "#10b981" },
+                        { label: "Tổng phòng ban", value: departments.length, icon: "🏢", color: "#6366f1", bg: "rgba(99,102,241,0.08)" },
+                        { label: "Tổng nhân viên", value: totalEmployees, icon: "👥", color: "#0ea5e9", bg: "rgba(14,165,233,0.08)" },
+                        { label: "Có trưởng phòng", value: departments.filter(d => d.manager_id).length, icon: "👑", color: "#10b981", bg: "rgba(16,185,129,0.08)" },
                     ].map(s => (
-                        <div key={s.label} style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 12, padding: "16px 20px", borderLeft: `4px solid ${s.color}` }}>
-                            <div style={{ fontSize: 22 }}>{s.icon}</div>
-                            <div style={{ fontSize: 26, fontWeight: 700, color: s.color }}>{s.value}</div>
-                            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{s.label}</div>
+                        <div key={s.label} style={{ 
+                            background: "var(--bg-card)", border: "1px solid var(--border-color)", 
+                            borderRadius: 16, padding: "20px 24px", display: "flex", alignItems: "center", gap: 16,
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.02)"
+                        }}>
+                            <div style={{ 
+                                width: 50, height: 50, borderRadius: 12, background: s.bg, 
+                                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 
+                            }}>{s.icon}</div>
+                            <div>
+                                <div style={{ fontSize: 28, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4, fontWeight: 500 }}>{s.label}</div>
+                            </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Table */}
-                <div style={{ background: "var(--bg-card)", borderRadius: 12, border: "1px solid var(--border-color)", overflow: "hidden" }}>
+                {/* Table Section */}
+                <div style={{ 
+                    background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border-color)", 
+                    overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" 
+                }}>
                     {loading ? (
-                        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>Đang tải...</div>
+                        <div className="empty-state" style={{ padding: "80px 0" }}><span>⏳</span><p>Đang tải dữ liệu...</p></div>
                     ) : departments.length === 0 ? (
-                        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--text-muted)" }}>
-                            <div style={{ fontSize: 36, marginBottom: 10 }}>🏢</div>
-                            <div>Chưa có phòng ban nào</div>
-                            <button className="btn btn-primary btn-sm" style={{ marginTop: 14 }} onClick={openAdd}>Thêm phòng ban đầu tiên</button>
+                        <div className="empty-state" style={{ padding: "80px 0" }}>
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>🏢</div>
+                            <div style={{ fontWeight: 600 }}>Chưa có phòng ban nào được tạo</div>
+                            <p style={{ fontSize: 14, color: "var(--text-muted)" }}>Bắt đầu bằng cách thêm phòng ban đầu tiên của bạn</p>
+                            <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={openAdd}>+ Thêm phòng ban</button>
                         </div>
                     ) : (
-                        <table className="table">
-                            <thead><tr>
-                                <th>#</th><th>Tên phòng ban</th><th>Trưởng phòng</th><th>Mô tả</th>
-                                <th style={{ textAlign: "center" }}>Nhân viên</th><th style={{ textAlign: "right" }}>Thao tác</th>
-                            </tr></thead>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ paddingLeft: 24, width: 60 }}>#</th>
+                                    <th>Phòng ban</th>
+                                    <th>Trưởng phòng</th>
+                                    <th>Mô tả</th>
+                                    <th style={{ textAlign: "center" }}>Quy mô</th>
+                                    <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 {departments.map((d, i) => (
-                                    <tr key={d.id}>
-                                        <td style={{ color: "var(--text-muted)", width: 40 }}>{i + 1}</td>
-                                        <td><div style={{ fontWeight: 700, fontSize: 14 }}>🏢 {d.name}</div></td>
+                                    <tr key={d.id} className="table-row-hover">
+                                        <td style={{ color: "var(--text-muted)", paddingLeft: 24, fontWeight: 600 }}>{String(i + 1).padStart(2, '0')}</td>
+                                        <td>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                <div style={{ fontSize: 18 }}>🏢</div>
+                                                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{d.name}</div>
+                                            </div>
+                                        </td>
                                         <td>
                                             {d.manager_name ? (
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(99,102,241,0.12)", color: "#4338ca", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                    <div style={{ 
+                                                        width: 32, height: 32, borderRadius: "50%", 
+                                                        background: "linear-gradient(135deg, #fbbf24, #f59e0b)", 
+                                                        color: "white", fontSize: 12, fontWeight: 800, 
+                                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                                        boxShadow: "0 2px 5px rgba(245,158,11,0.2)"
+                                                    }}>
                                                         {d.manager_name[0]?.toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <div style={{ fontWeight: 600, fontSize: 13 }}>{d.manager_name}</div>
-                                                        <span style={{ fontSize: 10, background: "#fef3c7", color: "#d97706", padding: "1px 6px", borderRadius: 999, fontWeight: 700 }}>👑 Trưởng phòng</span>
+                                                        <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.2 }}>{d.manager_name}</div>
+                                                        <div style={{ fontSize: 10, color: "#d97706", fontWeight: 800, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.02em" }}>👑 Manager</div>
                                                     </div>
                                                 </div>
-                                            ) : <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>Chưa phân công</span>}
+                                            ) : <span style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>— Trống —</span>}
                                         </td>
-                                        <td style={{ color: "var(--text-secondary)", fontSize: 13, maxWidth: 200 }}>
-                                            {d.description || <span style={{ fontStyle: "italic", color: "var(--text-muted)" }}>Chưa có mô tả</span>}
+                                        <td style={{ color: "var(--text-secondary)", fontSize: 13, maxWidth: 250 }}>
+                                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {d.description || <span style={{ fontStyle: "italic", color: "#cbd5e1" }}>Chưa có thông tin mô tả...</span>}
+                                            </div>
                                         </td>
                                         <td style={{ textAlign: "center" }}>
-                                            <span style={{ background: d.employee_count > 0 ? "rgba(99,102,241,0.1)" : "var(--bg-main)", color: d.employee_count > 0 ? "var(--color-primary)" : "var(--text-muted)", borderRadius: 20, padding: "3px 12px", fontWeight: 700, fontSize: 13 }}>
-                                                {d.employee_count || 0} người
+                                            <span style={{ 
+                                                background: d.employee_count > 0 ? "rgba(99,102,241,0.12)" : "#f8fafc", 
+                                                color: d.employee_count > 0 ? "var(--color-primary)" : "#94a3b8", 
+                                                borderRadius: 12, padding: "4px 14px", fontWeight: 800, fontSize: 12,
+                                                border: d.employee_count > 0 ? "1px solid rgba(99,102,241,0.2)" : "1px solid #e2e8f0"
+                                            }}>
+                                                {d.employee_count || 0} NS
                                             </span>
                                         </td>
-                                        <td style={{ textAlign: "right" }}>
-                                            <button className="btn btn-sm btn-outline" onClick={() => openEdit(d)} style={{ marginRight: 6 }}>✏️ Sửa</button>
-                                            <button className="btn btn-sm" style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }} onClick={() => handleDelete(d)}>🗑️ Xóa</button>
+                                        <td style={{ textAlign: "right", paddingRight: 20 }}>
+                                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                                                <button className="btn btn-sm btn-ghost" 
+                                                    style={{ padding: 8, borderRadius: 10, color: "var(--color-primary)" }}
+                                                    onClick={() => openEdit(d)} title="Sửa phòng ban">
+                                                    ✏️
+                                                </button>
+                                                <button className="btn btn-sm btn-ghost"
+                                                    style={{ padding: 8, borderRadius: 10, color: "#dc2626" }}
+                                                    onClick={() => handleDelete(d)} title="Xóa phòng ban">
+                                                    🗑️
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

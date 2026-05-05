@@ -100,70 +100,87 @@ export default function BudgetList() {
                 )}
             </div>
 
-            <div className="grid-2" style={{ marginBottom: "28px", gap: "24px" }}>
-                <div className="card-stat" style={{ background: "linear-gradient(135deg, #fff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }}>
-                    <div className="card-stat-icon indigo" style={{ borderRadius: 14 }}>📋</div>
-                    <div className="card-stat-info">
-                        <h3 style={{ fontSize: 24, fontWeight: 800 }}>{budgetItems.length}</h3>
-                        <p style={{ fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", fontSize: 11, letterSpacing: "0.05em" }}>Hạng mục chi tiêu</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 24, marginBottom: 32 }}>
+                <div style={{ 
+                    background: "var(--bg-card)", border: "1px solid var(--border-color)", 
+                    borderRadius: 20, padding: "24px 28px", display: "flex", alignItems: "center", gap: 20,
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.02)"
+                }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(99,102,241,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>📋</div>
+                    <div>
+                        <div style={{ fontSize: 32, fontWeight: 900, color: "var(--color-primary)", lineHeight: 1.1 }}>{budgetItems.length}</div>
+                        <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Hạng mục chi tiêu</div>
                     </div>
                 </div>
-                <div className="card-stat" style={{ background: "linear-gradient(135deg, #fff 0%, #fffbeb 100%)", border: "1px solid #fde68a" }}>
-                    <div className="card-stat-icon amber" style={{ borderRadius: 14 }}>💰</div>
-                    <div className="card-stat-info">
-                        <h3 style={{ fontSize: 24, fontWeight: 800, color: "#b45309" }}>{formatVND(totalCost)}</h3>
-                        <p style={{ fontWeight: 600, color: "#92400e", textTransform: "uppercase", fontSize: 11, letterSpacing: "0.05em" }}>Tổng ngân sách đã chi</p>
+                <div style={{ 
+                    background: "var(--bg-card)", border: "1px solid #fde68a", 
+                    borderRadius: 20, padding: "24px 28px", display: "flex", alignItems: "center", gap: 20,
+                    boxShadow: "0 10px 25px rgba(245,158,11,0.05)", background: "linear-gradient(135deg, var(--bg-card) 0%, #fffbeb 100%)"
+                }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(245,158,11,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>💰</div>
+                    <div>
+                        <div style={{ fontSize: 28, fontWeight: 900, color: "#b45309", lineHeight: 1.1 }}>{formatVND(totalCost)}</div>
+                        <div style={{ fontSize: 13, color: "#92400e", marginTop: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Tổng ngân sách đã chi</div>
                     </div>
                 </div>
             </div>
 
-            <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 16, overflow: "hidden", border: "1px solid #f1f5f9" }}>
+            <div style={{ 
+                background: "var(--bg-card)", borderRadius: 20, border: "1px solid var(--border-color)", 
+                overflow: "hidden", boxShadow: "0 10px 40px rgba(0,0,0,0.04)" 
+            }}>
                 {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Đang tải dữ liệu...</p></div>
+                    <div className="empty-state" style={{ padding: "80px 0" }}><span>⏳</span><p>Đang tổng hợp dữ liệu tài chính...</p></div>
                 ) : budgetItems.length === 0 ? (
-                    <div className="empty-state">
-                        <span>💸</span>
-                        <p>Chưa có bản ghi ngân sách nào{canManage ? ". Hãy thêm chi phí ngay!" : "."}</p>
+                    <div className="empty-state" style={{ padding: "80px 0" }}>
+                        <span style={{ fontSize: 48, marginBottom: 16 }}>💸</span>
+                        <p style={{ fontWeight: 600 }}>Chưa có bản ghi ngân sách nào được khởi tạo.</p>
+                        {canManage && <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={handleAddClick}>Tạo khoản chi đầu tiên</button>}
                     </div>
                 ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th style={{ paddingLeft: 24 }}>#</th>
+                                <th style={{ paddingLeft: 24, width: 60 }}>#</th>
                                 <th>Hạng mục chi tiêu</th>
-                                <th>Sự kiện liên quan</th>
-                                <th style={{ textAlign: "right" }}>Số tiền (VND)</th>
+                                <th>Sự kiện áp dụng</th>
+                                <th style={{ textAlign: "right" }}>Số tiền dự toán</th>
                                 {canManage && <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {budgetItems.map((b, i) => (
-                                <tr key={b.id}>
-                                    <td style={{ color: "var(--text-muted)", paddingLeft: 24 }}>{String(i + 1).padStart(2, '0')}</td>
-                                    <td style={{ fontWeight: 700, color: "var(--text-primary)" }}>💼 {b.item}</td>
+                                <tr key={b.id} className="table-row-hover">
+                                    <td style={{ color: "var(--text-muted)", paddingLeft: 24, fontWeight: 600 }}>{String(i + 1).padStart(2, '0')}</td>
                                     <td>
-                                        <span className="badge badge-default" style={{ borderRadius: 6, fontWeight: 600 }}>
-                                            {getEventName(b.event_id)}
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                            <div style={{ fontSize: 18 }}>💼</div>
+                                            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{b.item}</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)", background: "rgba(99,102,241,0.08)", padding: "4px 12px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.15)" }}>
+                                            🎯 {getEventName(b.event_id)}
                                         </span>
                                     </td>
-                                    <td style={{ textAlign: "right", color: "var(--color-primary)", fontWeight: 800, fontSize: 15 }}>
+                                    <td style={{ textAlign: "right", color: "var(--color-primary)", fontWeight: 900, fontSize: 16, letterSpacing: "-0.01em" }}>
                                         {formatVND(b.cost)}
                                     </td>
                                     {canManage && (
-                                        <td style={{ textAlign: "right", paddingRight: 24 }}>
-                                            <div className="actions" style={{ justifyContent: "flex-end" }}>
-                                                <button className="btn btn-outline btn-sm" onClick={() => handleEditClick(b)} title="Chỉnh sửa" style={{ borderRadius: 8 }}>✎</button>
-                                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(b.id)} title="Xóa" style={{ borderRadius: 8 }}>🗑</button>
+                                        <td style={{ textAlign: "right", paddingRight: 20 }}>
+                                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                                                <button className="btn btn-sm btn-ghost" onClick={() => handleEditClick(b)} title="Chỉnh sửa" style={{ padding: 8, borderRadius: 10, color: "var(--color-primary)" }}>✏️</button>
+                                                <button className="btn btn-sm btn-ghost" onClick={() => handleDelete(b.id)} title="Xóa" style={{ padding: 8, borderRadius: 10, color: "#dc2626" }}>🗑️</button>
                                             </div>
                                         </td>
                                     )}
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot style={{ background: "#f8fafc" }}>
+                        <tfoot style={{ background: "var(--bg-main)", borderTop: "2px solid var(--border-color)" }}>
                             <tr>
-                                <th colSpan={3} style={{ textAlign: "right", padding: "16px 24px", fontWeight: 700, fontSize: 13, textTransform: "uppercase", color: "var(--text-secondary)" }}>Tổng cộng:</th>
-                                <th style={{ textAlign: "right", color: "var(--color-primary)", fontSize: "18px", fontWeight: 900, paddingRight: canManage ? "12px" : "24px" }}>
+                                <th colSpan={3} style={{ textAlign: "right", padding: "20px 24px", fontWeight: 800, fontSize: 12, textTransform: "uppercase", color: "var(--text-secondary)", letterSpacing: "0.05em" }}>Tổng cộng ngân sách:</th>
+                                <th style={{ textAlign: "right", color: "#b45309", fontSize: "20px", fontWeight: 900, paddingRight: canManage ? "12px" : "24px" }}>
                                     {formatVND(totalCost)}
                                 </th>
                                 {canManage && <th style={{ paddingRight: 24 }}></th>}

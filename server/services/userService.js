@@ -17,10 +17,11 @@ const getUserById = async (id) => {
     if (!user) {
         throw { status: 404, message: "User not found" };
     }
+    const stats = await User.getStats(id);
     // Không trả về password
     // eslint-disable-next-line no-unused-vars
     const { password: _pw, ...safeUser } = user;
-    return safeUser;
+    return { ...safeUser, stats };
 };
 
 /**

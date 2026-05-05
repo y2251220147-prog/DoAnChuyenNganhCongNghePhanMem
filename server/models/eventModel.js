@@ -8,7 +8,8 @@ const Event = {
                    org.name AS organizer_name,
                    v.location AS detailed_location,
                    d.name AS department_name, d.manager_id AS dept_manager_id,
-                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
+                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count,
+                   (SELECT COUNT(*) FROM event_staff es WHERE es.event_id = e.id) AS staff_count
             FROM events e
             LEFT JOIN users u   ON e.owner_id     = u.id
             LEFT JOIN users a   ON e.approved_by  = a.id
@@ -26,7 +27,8 @@ const Event = {
                    org.name AS organizer_name,
                    v.location AS detailed_location,
                    d.name AS department_name, d.manager_id AS dept_manager_id,
-                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
+                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count,
+                   (SELECT COUNT(*) FROM event_staff es WHERE es.event_id = e.id) AS staff_count
             FROM events e
             LEFT JOIN users u   ON e.owner_id     = u.id
             LEFT JOIN users a   ON e.approved_by  = a.id
@@ -129,12 +131,15 @@ const Event = {
             SELECT e.*, u.name AS owner_name, a.name AS approver_name,
                    org.name AS organizer_name,
                    v.location AS detailed_location,
-                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count
+                   d.name AS department_name,
+                   (SELECT COUNT(*) FROM attendees att WHERE att.event_id = e.id) AS registered_count,
+                   (SELECT COUNT(*) FROM event_staff es WHERE es.event_id = e.id) AS staff_count
             FROM events e
             LEFT JOIN users u   ON e.owner_id     = u.id
             LEFT JOIN users a   ON e.approved_by  = a.id
             LEFT JOIN users org ON e.organizer_id = org.id
             LEFT JOIN venues v  ON e.venue_id     = v.id
+            LEFT JOIN departments d ON e.department_id = d.id
             ${where}
             ORDER BY e.created_at DESC
             LIMIT ? OFFSET ?

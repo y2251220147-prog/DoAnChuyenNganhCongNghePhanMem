@@ -54,7 +54,6 @@ export default function EventDetail() {
     const { user } = useContext(AuthContext);
 
     const [event, setEvent] = useState(null);
-    const [guests, setGuests] = useState([]);
     const [attendees, setAttendees] = useState([]);
     const [staff, setStaff] = useState([]);
     const [timeline, setTimeline] = useState([]);
@@ -90,9 +89,8 @@ export default function EventDetail() {
     const loadAll = useCallback(async () => {
         setLoading(true); setError("");
         try {
-            const [evR, guR, stR, tlR, buR, atR, deR, tkR] = await Promise.allSettled([
+            const [evR, stR, tlR, buR, atR, deR, tkR] = await Promise.allSettled([
                 api.get(`/events/${id}`),
-                api.get(`/guests/event/${id}`),
                 api.get(`/staff/event/${id}`),
                 api.get(`/timeline/event/${id}`),
                 api.get(`/budgets/event/${id}`),
@@ -102,7 +100,6 @@ export default function EventDetail() {
             ]);
             if (evR.status === "rejected") { setError("Không tìm thấy sự kiện."); setLoading(false); return; }
             setEvent(evR.value.data);
-            setGuests(guR.status === "fulfilled" ? (guR.value.data || []) : []);
             setStaff(stR.status === "fulfilled" ? (stR.value.data || []) : []);
             setTimeline(tlR.status === "fulfilled" ? (tlR.value.data || []) : []);
             setBudget(buR.status === "fulfilled"
@@ -123,8 +120,10 @@ export default function EventDetail() {
     const fmtVND = n => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
     const fmtDT = d => d ? new Date(d).toLocaleString("vi-VN") : "—";
 
-    const totalParticipants = guests.length + attendees.length;
-    const checkedIn = guests.filter(g => g.checked_in).length + attendees.filter(a => a.checked_in).length;
+    const externalGuests = attendees.filter(a => a.attendee_type === "external");
+    const internalStaff = attendees.filter(a => a.attendee_type === "internal");
+    const totalParticipants = attendees.length;
+    const checkedIn = attendees.filter(a => a.checked_in).length;
     const checkinPct = totalParticipants > 0 ? Math.round((checkedIn / totalParticipants) * 100) : 0;
     const taskDone = tasks.filter(t => t.status === 'done').length;
     const taskProgress = tasks.length > 0 ? Math.round((taskDone / tasks.length) * 100) : 0;
@@ -153,13 +152,12 @@ export default function EventDetail() {
 
             if (parsedGuests.length === 0) throw new Error("Danh sách khách mời không hợp lệ");
 
-            const r = await api.post("/guests/bulk-invite", {
-                event_id: id,
+            const r = await api.post("/attendees/bulk-external", {
+                event_id: Number(id),
                 guests: parsedGuests,
-                subject: bulkForm.subject,
-                content: bulkForm.content
+                note: bulkForm.content
             });
-            alert(`Đã hoàn thành! Thành công: ${r.data.stats.success}, Thất bại: ${r.data.stats.failed}`);
+            alert(`Đã hoàn thành! Thêm thành công ${r.data.count}/${r.data.total} khách mời.`);
             setBulkModal(false);
             setBulkForm({ guests: "", subject: "", content: "" });
             loadAll();
@@ -401,17 +399,17 @@ export default function EventDetail() {
                                 </button>
                             )}
                         </div>
-                        {guests.length === 0
-                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời</p></div>
+                        {externalGuests.length === 0
+                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời bên ngoài</p></div>
                             : <table className="data-table">
-                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th></tr></thead>
+                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban / Công ty</th><th>Trạng thái</th></tr></thead>
                                 <tbody>
-                                    {guests.map((g, i) => (
+                                    {externalGuests.map((g, i) => (
                                         <tr key={g.id}>
                                             <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
                                             <td style={{ fontWeight: 600 }}>{g.checked_in ? "✅" : "⏳"} {g.name}</td>
                                             <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
-                                            <td>{g.phone || "—"}</td>
+                                            <td>{g.organization || "—"}</td>
                                             <td>{g.checked_in
                                                 ? <span className="badge badge-success">Đã check-in</span>
                                                 : <span className="badge badge-default">Chờ</span>}
@@ -427,17 +425,17 @@ export default function EventDetail() {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                             <h3 style={{ fontSize: 15, fontWeight: 700 }}>🏢 Nhân viên tham gia (Nội bộ)</h3>
                         </div>
-                        {attendees.length === 0
-                            ? <div className="empty-state"><span>🏢</span><p>Chưa có nhân viên tham gia</p></div>
+                        {internalStaff.length === 0
+                            ? <div className="empty-state"><span>🏢</span><p>Chưa có nhân viên đăng ký tham gia</p></div>
                             : <table className="data-table">
                                 <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban</th><th>Trạng thái</th></tr></thead>
                                 <tbody>
-                                    {attendees.map((a, i) => (
+                                    {internalStaff.map((a, i) => (
                                         <tr key={a.id}>
                                             <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
                                             <td style={{ fontWeight: 600 }}>{a.checked_in ? "✅" : "⏳"} {a.name}</td>
                                             <td style={{ color: "var(--text-secondary)" }}>{a.email}</td>
-                                            <td>{a.department || "—"}</td>
+                                            <td>{a.user_department || "—"}</td>
                                             <td>{a.checked_in
                                                 ? <span className="badge badge-success">Đã check-in</span>
                                                 : <span className="badge badge-default">Chờ</span>}
@@ -577,7 +575,8 @@ export default function EventDetail() {
             {tab === "tasks" && (
                 <TaskBoard 
                     eventId={id} 
-                    staffList={staff} 
+                    eventStaff={staff} 
+                    allUsers={users}
                     departments={departments}
                     canManage={canManage} 
                     onRefreshParent={loadAll}

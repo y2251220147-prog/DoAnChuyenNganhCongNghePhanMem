@@ -1,5 +1,7 @@
 const Task = require("../models/taskModel");
+const Event = require("../models/eventModel");
 const Attendee = require("../models/attendeeModel");
+const Staff = require("../models/staffModel");
 const Notification = require("../models/notificationModel");
 
 const VALID_STATUSES = ['todo', 'in_progress', 'done'];
@@ -9,7 +11,6 @@ const STATUS_LABEL = {
     done: 'Hoàn thành'
 };
 
-// ── Kiểm tra attendee lock ─────────────────────────────────
 // Nếu user X đã đăng ký tham gia sự kiện đó → không được gán task
 const checkAttendeeConflict = async (eventId, userId) => {
     if (!userId) return;
@@ -19,6 +20,24 @@ const checkAttendeeConflict = async (eventId, userId) => {
             status: 400,
             message: "Nhân viên đã đăng ký tham gia sự kiện không thể được gán công việc"
         };
+    }
+};
+
+// Đảm bảo user có trong event_staff (nhân sự tổ chức)
+const ensureEventStaff = async (eventId, userId) => {
+    if (!userId) return;
+    
+    // 1. Kiểm tra xem user này có đang là "người tham gia" (attendee) không
+    const att = await Attendee.findByUserAndEvent(userId, eventId);
+    if (att) {
+        // Nếu đã là người tham gia thì không tự động thêm vào ban tổ chức
+        return;
+    }
+
+    // 2. Nếu chưa là nhân sự tổ chức thì mới thêm
+    const existing = await Staff.findByEventAndUser(eventId, userId);
+    if (!existing) {
+        await Staff.assign({ event_id: eventId, user_id: userId, role: 'support' });
     }
 };
 
@@ -32,6 +51,7 @@ exports.getById = async (id) => {
     return t;
 };
 exports.getEventStats = async (eid) => await Task.getEventStats(eid);
+exports.getMyTasks = async (userId) => await Task.getMyTasks(userId);
 
 exports.create = async (data, creatorId) => {
     if (!data.event_id || !data.title)
@@ -39,9 +59,10 @@ exports.create = async (data, creatorId) => {
     if (!data.due_date)
         throw { status: 400, message: "Deadline (due_date) là bắt buộc khi tạo nhiệm vụ" };
 
-    // Kiểm tra attendee conflict
+    // Kiểm tra attendee conflict và đảm bảo là staff
     if (data.assigned_to) {
         await checkAttendeeConflict(data.event_id, data.assigned_to);
+        await ensureEventStaff(data.event_id, data.assigned_to);
     }
 
     const id = await Task.create({ ...data, created_by: creatorId });
@@ -59,6 +80,20 @@ exports.create = async (data, creatorId) => {
             link: `/events/${data.event_id}?tab=tasks`
         });
     }
+
+    // Thông báo cho Người sở hữu sự kiện (nếu người tạo không phải là chủ sở hữu)
+    try {
+        const event = await Event.getById(data.event_id);
+        if (event && event.owner_id && String(event.owner_id) !== String(creatorId)) {
+            await Notification.create({
+                user_id: event.owner_id,
+                type: 'task_assigned',
+                title: 'Nhiệm vụ mới trong sự kiện',
+                message: `Một nhiệm vụ mới "${data.title}" vừa được tạo trong sự kiện của bạn.`,
+                link: `/events/${data.event_id}?tab=tasks`
+            });
+        }
+    } catch (e) { console.error("Lỗi thông báo Organizer (task create):", e); }
 
     return { id };
 };
@@ -84,6 +119,7 @@ exports.update = async (id, data, userId) => {
     // Kiểm tra attendee conflict khi thay đổi người phụ trách
     if (data.assigned_to && String(data.assigned_to) !== String(task.assigned_to)) {
         await checkAttendeeConflict(task.event_id, data.assigned_to);
+        await ensureEventStaff(task.event_id, data.assigned_to);
         changes.push({ action: 'assign', old_value: task.assigned_name || '', new_value: data.assigned_to });
         if (String(data.assigned_to) !== String(userId)) {
             await Notification.create({
@@ -125,15 +161,27 @@ exports.updateStatus = async (id, status, userId) => {
         type: 'status_change'
     });
 
-    // Thông báo creator khi done
-    if (status === 'done' && task.created_by && String(task.created_by) !== String(userId)) {
-        await Notification.create({
-            user_id: task.created_by,
-            type: 'task_done',
-            title: 'Nhiệm vụ đã hoàn thành',
-            message: `"${task.title}" đã được đánh dấu hoàn thành`,
-            link: `/events/${task.event_id}?tab=tasks`
-        });
+    // Thông báo creator và owner khi hoàn thành hoặc đang làm
+    const notifyIds = new Set();
+    if (task.created_by && String(task.created_by) !== String(userId)) notifyIds.add(task.created_by);
+    if (task.event_owner_id && String(task.event_owner_id) !== String(userId)) notifyIds.add(task.event_owner_id);
+
+    if (notifyIds.size > 0) {
+        let title = '';
+        if (status === 'done') title = 'Nhiệm vụ đã hoàn thành ✅';
+        else if (status === 'in_progress') title = 'Công việc đang được thực hiện 🔨';
+
+        if (title) {
+            for (const uid of notifyIds) {
+                await Notification.create({
+                    user_id: uid,
+                    type: 'task_status',
+                    title,
+                    message: `"${task.title}": ${STATUS_LABEL[status]}`,
+                    link: `/events/${task.event_id}?tab=tasks`
+                });
+            }
+        }
     }
 };
 
@@ -145,6 +193,61 @@ exports.updateProgress = async (id, progress, userId) => {
         task_id: id, user_id: userId, action: 'progress',
         old_value: `${task.progress}%`, new_value: `${progress}%`
     });
+
+    // Thông báo creator và owner về tiến độ
+    const notifyIds = new Set();
+    if (task.created_by && String(task.created_by) !== String(userId)) notifyIds.add(task.created_by);
+    if (task.event_owner_id && String(task.event_owner_id) !== String(userId)) notifyIds.add(task.event_owner_id);
+
+    if (notifyIds.size > 0 && progress > task.progress) {
+        for (const uid of notifyIds) {
+            await Notification.create({
+                user_id: uid,
+                type: 'task_progress',
+                title: 'Tiến độ công việc mới',
+                message: `"${task.title}" đã đạt ${progress}%`,
+                link: `/events/${task.event_id}?tab=tasks`
+            });
+        }
+    }
+};
+
+exports.reportIssue = async (id, note, userId) => {
+    const task = await Task.getById(id);
+    if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
+    
+    // Thêm comment loại issue
+    await Task.addComment({
+        task_id: id,
+        user_id: userId,
+        content: `⚠️ BÁO CÁO SỰ CỐ: ${note}`,
+        type: 'comment'
+    });
+
+    // Ghi lịch sử
+    await Task.addHistory({
+        task_id: id,
+        user_id: userId,
+        action: 'issue_reported',
+        new_value: note
+    });
+
+    // Thông báo creator và owner
+    const notifyIds = new Set();
+    if (task.created_by && String(task.created_by) !== String(userId)) notifyIds.add(task.created_by);
+    if (task.event_owner_id && String(task.event_owner_id) !== String(userId)) notifyIds.add(task.event_owner_id);
+
+    if (notifyIds.size > 0) {
+        for (const uid of notifyIds) {
+            await Notification.create({
+                user_id: uid,
+                type: 'task_issue',
+                title: '⚠️ Báo cáo sự cố công việc',
+                message: `Nhiệm vụ "${task.title}": ${note}`,
+                link: `/events/${task.event_id}?tab=tasks`
+            });
+        }
+    }
 };
 
 exports.updateFeedback = async (id, data, userId) => {

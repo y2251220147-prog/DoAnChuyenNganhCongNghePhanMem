@@ -110,14 +110,17 @@ exports.create = async (data) => {
         if (!mgr) throw { status: 404, message: "Không tìm thấy người dùng được chọn làm trưởng phòng" };
         if (mgr.role === "admin" || mgr.role === "organizer")
             throw { status: 400, message: "Admin và Organizer không thể được chọn làm trưởng phòng" };
+
+        const existingDept = await Department.findByManager(manager_id);
+        if (existingDept) throw { status: 400, message: `Người này đã là trưởng phòng của "${existingDept.name}"` };
     }
 
     const id = await Department.create({ name: name.trim(), description, manager_id: manager_id || null });
 
     if (manager_id) {
         await syncManagerRole(manager_id, name.trim());
-        // Đảm bảo trưởng phòng thuộc phòng ban này
-        await db.query("UPDATE users SET department_id = ? WHERE id = ? AND department_id IS NULL", [id, manager_id]);
+        // Đảm bảo trưởng phòng thuộc phòng ban này (chuyển phòng nếu cần)
+        await db.query("UPDATE users SET department_id = ? WHERE id = ?", [id, manager_id]);
     }
 
     return { id };
@@ -139,6 +142,10 @@ exports.update = async (id, data) => {
         if (!mgr) throw { status: 404, message: "Không tìm thấy người dùng được chọn làm trưởng phòng" };
         if (mgr.role === "admin" || mgr.role === "organizer")
             throw { status: 400, message: "Admin và Organizer không thể được chọn làm trưởng phòng" };
+
+        const existingDept = await Department.findByManager(manager_id);
+        if (existingDept && existingDept.id !== Number(id)) 
+            throw { status: 400, message: `Người này đã là trưởng phòng của "${existingDept.name}"` };
     }
 
     const oldManagerId = dept.manager_id;
@@ -151,8 +158,8 @@ exports.update = async (id, data) => {
         if (oldManagerId) await clearOldManagerRole(oldManagerId, oldName);
         if (newManagerId) {
             await syncManagerRole(newManagerId, name.trim());
-            // Đảm bảo trưởng phòng mới thuộc phòng ban này
-            await db.query("UPDATE users SET department_id = ? WHERE id = ? AND department_id IS NULL", [id, newManagerId]);
+            // Đảm bảo trưởng phòng mới thuộc phòng ban này (chuyển phòng nếu cần)
+            await db.query("UPDATE users SET department_id = ? WHERE id = ?", [id, newManagerId]);
         }
     } else if (oldManagerId && oldName !== name.trim()) {
         await syncManagerRole(oldManagerId, name.trim());

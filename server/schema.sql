@@ -15,10 +15,13 @@ DROP TABLE IF EXISTS `departments`;
 CREATE TABLE `departments` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
+  `manager_id` int DEFAULT NULL,
   `description` text,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`)
+  UNIQUE KEY `name` (`name`),
+  KEY `manager_id` (`manager_id`),
+  CONSTRAINT `departments_ibfk_manager` FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -33,6 +36,7 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `role` enum('admin','organizer','user') DEFAULT 'user',
   `department_id` int DEFAULT NULL,
+  `role_in_dept` varchar(100) DEFAULT NULL,
   `position` varchar(100) DEFAULT NULL,
   `avatar` varchar(300) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
@@ -80,7 +84,7 @@ CREATE TABLE `events` (
   `event_type` varchar(100) DEFAULT NULL,
   `owner_id` int DEFAULT NULL,
   `organizer_id` int DEFAULT NULL,
-  `coordination_unit` varchar(255) DEFAULT NULL,
+  `department_id` int DEFAULT NULL,
   `venue_id` int DEFAULT NULL,
   `start_date` datetime NOT NULL,
   `end_date` datetime NOT NULL,
@@ -97,10 +101,12 @@ CREATE TABLE `events` (
   KEY `approved_by` (`approved_by`),
   KEY `organizer_id` (`organizer_id`),
   KEY `venue_id` (`venue_id`),
+  KEY `department_id` (`department_id`),
   CONSTRAINT `events_ibfk_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_approver` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `events_ibfk_organizer` FOREIGN KEY (`organizer_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `events_ibfk_venue` FOREIGN KEY (`venue_id`) REFERENCES `venues` (`id`) ON DELETE SET NULL
+  CONSTRAINT `events_ibfk_venue` FOREIGN KEY (`venue_id`) REFERENCES `venues` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `events_ibfk_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -248,6 +254,25 @@ CREATE TABLE `event_budget` (
   PRIMARY KEY (`id`),
   KEY `event_id` (`event_id`),
   CONSTRAINT `event_budget_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- 9.1 BẢNG PHÒNG BAN THAM GIA (EVENT_DEPARTMENTS)
+-- ----------------------------------------------------------
+DROP TABLE IF EXISTS `event_departments`;
+CREATE TABLE `event_departments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `event_id` int NOT NULL,
+  `department_id` int NOT NULL,
+  `role` varchar(100) DEFAULT 'Đảm nhiệm',
+  `note` text,
+  `assigned_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_event_dept` (`event_id`, `department_id`),
+  KEY `event_id` (`event_id`),
+  KEY `department_id` (`department_id`),
+  CONSTRAINT `event_departments_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `event_departments_ibfk_2` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

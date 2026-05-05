@@ -133,104 +133,93 @@ export default function VenueList() {
 
             {/* Sub-header & Controls */}
             <div style={{ 
-                display: "flex", gap: 12, marginBottom: 32, padding: "12px 20px", 
-                background: "#f8fafc", borderRadius: 20, alignItems: "center",
-                border: "1px solid #f1f5f9"
+                display: "flex", gap: 16, marginBottom: 32, padding: "16px 24px", 
+                background: "var(--bg-card)", borderRadius: 20, alignItems: "center",
+                border: "1px solid var(--border-color)", boxShadow: "0 4px 20px rgba(0,0,0,0.03)"
             }}>
-                <div style={{ display: "flex", gap: 6, background: "#fff", padding: 6, borderRadius: 14, boxShadow: "var(--shadow-sm)" }}>
+                <div style={{ display: "flex", gap: 6, background: "var(--bg-main)", padding: 6, borderRadius: 14 }}>
                     {[
                         { key: "venues", label: "🏢 Địa điểm", count: venues.length },
                         { key: "resources", label: "🔧 Tài nguyên", count: resources.length },
                     ].map(t => (
                         <button key={t.key} 
                             style={{ 
-                                padding: "10px 20px", borderRadius: 10, border: "none",
+                                padding: "10px 24px", borderRadius: 10, border: "none",
                                 fontSize: 13, fontWeight: 800, cursor: "pointer",
                                 background: tab === t.key ? "var(--color-primary)" : "transparent",
-                                color: tab === t.key ? "#fff" : "#64748b",
-                                transition: "all 0.2s"
+                                color: tab === t.key ? "#fff" : "var(--text-muted)",
+                                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                                boxShadow: tab === t.key ? "0 4px 12px rgba(99,102,241,0.3)" : "none"
                             }}
                             onClick={() => setTab(t.key)}>
-                            {t.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>({t.count})</span>
+                            {t.label} <span style={{ opacity: 0.6, marginLeft: 4, fontSize: 11 }}>{t.count}</span>
                         </button>
                     ))}
                 </div>
                 
-                <div style={{ position: "relative", marginLeft: "auto", width: 320 }}>
-                    <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 16 }}>🔍</span>
+                <div style={{ position: "relative", marginLeft: "auto", width: 340 }}>
+                    <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", fontSize: 16, opacity: 0.6 }}>🔍</span>
                     <input className="form-control" placeholder="Tìm kiếm nhanh hạ tầng..."
                         value={search} onChange={e => setSearch(e.target.value)}
-                        style={{ borderRadius: 14, height: 46, paddingLeft: 44, border: "1px solid #e2e8f0", background: "#fff" }} />
+                        style={{ borderRadius: 14, height: 46, paddingLeft: 44, border: "1px solid var(--border-color)", background: "var(--bg-main)" }} />
                 </div>
             </div>
 
             {/* ══ VENUES ══ */}
             {tab === "venues" && (
-                loading ? <div className="empty-state" style={{ padding: 100 }}><span>⏳</span><p>Đang đồng bộ dữ liệu địa điểm...</p></div>
+                loading ? <div className="empty-state" style={{ padding: "100px 0" }}><span>⏳</span><p>Đang đồng bộ dữ liệu địa điểm...</p></div>
                     : filteredV.length === 0
-                        ? <div className="empty-state" style={{ padding: 100 }}><span>🏢</span><p>Hiện không có địa điểm nào phù hợp.</p></div>
-                        : <div className="grid-3" style={{ gap: 32 }}>
+                        ? <div className="empty-state" style={{ padding: "100px 0" }}><span>🏢</span><p>Hiện không có địa điểm nào phù hợp.</p></div>
+                        : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 32 }}>
                             {filteredV.map(v => {
                                 const sc = STATUS_CFG[v.status] || STATUS_CFG.available;
                                 const fac = v.facilities ? (typeof v.facilities === 'string' ? JSON.parse(v.facilities) : v.facilities) : [];
                                 return (
-                                    <div key={v.id} className="card" 
-                                        style={{ 
-                                            padding: 0, overflow: "hidden", border: "1px solid #f1f5f9", 
-                                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.03)", borderRadius: 24,
-                                            transition: "transform 0.3s ease, box-shadow 0.3s ease",
-                                            cursor: "default"
-                                        }}>
-                                        <div style={{ 
-                                            padding: "32px 32px 24px", 
-                                            background: "linear-gradient(180deg, #f8fafc 0%, #fff 100%)",
-                                            borderBottom: "1px solid #f1f5f9" 
-                                        }}>
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                                    <div key={v.id} style={{ 
+                                        background: "var(--bg-card)", borderRadius: 24, border: "1px solid var(--border-color)",
+                                        overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+                                        transition: "all 0.3s ease"
+                                    }} className="table-row-hover">
+                                        <div style={{ padding: "28px 28px 20px" }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                                                 <div style={{ 
-                                                    fontSize: 11, fontWeight: 900, color: "var(--color-primary)", 
-                                                    textTransform: "uppercase", letterSpacing: "0.1em",
-                                                    background: "rgba(99,102,241,0.05)", padding: "4px 10px", borderRadius: 8
+                                                    fontSize: 10, fontWeight: 900, color: "var(--color-primary)", 
+                                                    textTransform: "uppercase", letterSpacing: "0.05em",
+                                                    background: "rgba(99,102,241,0.08)", padding: "4px 12px", borderRadius: 8
                                                 }}>
                                                     {TYPE_ICON[v.type]} {TYPE_LABEL[v.type]}
                                                 </div>
                                                 <StatusBadge cfg={sc} />
                                             </div>
-                                            <div style={{ fontWeight: 900, fontSize: 22, marginBottom: 16, color: "#1e293b", letterSpacing: "-0.02em" }}>{v.name}</div>
-                                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                                {v.location && (
-                                                    <div style={{ fontSize: 14, color: "#64748b", display: "flex", alignItems: "center", gap: 10, fontWeight: 500 }}>
-                                                        <span style={{ fontSize: 18 }}>📍</span> <span>{v.location}</span>
-                                                    </div>
-                                                )}
-                                                {v.capacity && (
-                                                    <div style={{ fontSize: 14, color: "#64748b", display: "flex", alignItems: "center", gap: 10, fontWeight: 500 }}>
-                                                        <span style={{ fontSize: 18 }}>👥</span> <span>Sức chứa: <strong style={{ color: "#1e293b" }}>{v.capacity}</strong> nhân sự</span>
-                                                    </div>
-                                                )}
+                                            <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 16, color: "var(--text-primary)" }}>{v.name}</div>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                                <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 10 }}>
+                                                    <span style={{ width: 24, textAlign: "center" }}>📍</span> <span>{v.location || "Chưa cập nhật vị trí"}</span>
+                                                </div>
+                                                <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 10 }}>
+                                                    <span style={{ width: 24, textAlign: "center" }}>👥</span> <span>Sức chứa: <strong style={{ color: "var(--text-primary)" }}>{v.capacity || "—"}</strong> nhân sự</span>
+                                                </div>
                                             </div>
                                         </div>
                                         
-                                        <div style={{ padding: "20px 32px", background: "#fff", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                        <div style={{ padding: "0 28px 24px", display: "flex", flexWrap: "wrap", gap: 6 }}>
                                             {fac.length > 0 ? fac.map(f => (
                                                 <span key={f} style={{ 
-                                                    fontSize: 12, background: "#f1f5f9", color: "#475569", 
-                                                    fontWeight: 700, padding: "4px 12px", borderRadius: 10
+                                                    fontSize: 10, background: "var(--bg-main)", color: "var(--text-muted)", 
+                                                    fontWeight: 700, padding: "3px 10px", borderRadius: 8, border: "1px solid var(--border-color)"
                                                 }}>{f}</span>
-                                            )) : (
-                                                <span style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>Không có tiện ích tiêu chuẩn</span>
-                                            )}
+                                            )) : <span style={{ fontSize: 11, color: "var(--text-muted)", fontStyle: "italic" }}>Không có tiện ích đi kèm</span>}
                                         </div>
 
                                         {isManager && (
-                                            <div style={{ padding: "24px 32px", display: "flex", gap: 12, background: "#f8fafc", borderTop: "1px solid #f1f5f9" }}>
+                                            <div style={{ padding: "20px 28px", background: "var(--bg-main)", borderTop: "1px solid var(--border-color)", display: "flex", gap: 10 }}>
                                                 <button className="btn btn-outline" 
-                                                    style={{ flex: 1, borderRadius: 14, height: 44, fontWeight: 700 }} 
-                                                    onClick={() => openVenueModal(v)}>✎ Hiệu chỉnh</button>
+                                                    style={{ flex: 1, borderRadius: 12, height: 40, fontWeight: 700, fontSize: 13 }} 
+                                                    onClick={() => openVenueModal(v)}>✎ CHỈNH SỬA</button>
                                                 {user?.role === "admin" && (
-                                                    <button className="btn btn-danger" 
-                                                        style={{ width: 50, borderRadius: 14, height: 44, display: "flex", alignItems: "center", justifyContent: "center" }} 
-                                                        onClick={() => handleDeleteVenue(v.id)}>🗑</button>
+                                                    <button className="btn btn-ghost" 
+                                                        style={{ width: 40, borderRadius: 12, height: 40, color: "#dc2626" }} 
+                                                        onClick={() => handleDeleteVenue(v.id)}>🗑️</button>
                                                 )}
                                             </div>
                                         )}
@@ -242,25 +231,48 @@ export default function VenueList() {
 
             {/* ══ RESOURCES ══ */}
             {tab === "resources" && (
-                <div className="data-table-wrapper">
-                    {loading ? <div className="empty-state"><span>⏳</span><p>Đang tải...</p></div>
+                <div style={{ 
+                    background: "var(--bg-card)", borderRadius: 16, border: "1px solid var(--border-color)", 
+                    overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" 
+                }}>
+                    {loading ? <div className="empty-state" style={{ padding: "80px 0" }}><span>⏳</span><p>Đang tải dữ liệu...</p></div>
                         : filteredR.length === 0
-                            ? <div className="empty-state"><span>🔧</span><p>Chưa có tài nguyên nào</p></div>
+                            ? <div className="empty-state" style={{ padding: "80px 0" }}><span>🔧</span><p>Chưa có tài nguyên nào được đăng ký.</p></div>
                             : <table className="data-table">
-                                <thead><tr><th>#</th><th>Tên thiết bị</th><th>Danh mục</th><th>Số lượng</th><th>Đơn vị</th><th>Trạng thái</th>{isManager && <th>Thao tác</th>}</tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th style={{ paddingLeft: 24, width: 60 }}>#</th>
+                                        <th>Thiết bị / Tài nguyên</th>
+                                        <th>Phân loại</th>
+                                        <th>Số lượng</th>
+                                        <th>Trạng thái</th>
+                                        {isManager && <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>}
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     {filteredR.map((r, i) => {
                                         const sc = STATUS_CFG[r.status] || STATUS_CFG.available;
                                         return (
-                                            <tr key={r.id}>
-                                                <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                                <td style={{ fontWeight: 600 }}>🔧 {r.name}</td>
-                                                <td><span className="badge badge-default">{r.category || "—"}</span></td>
-                                                <td style={{ fontWeight: 700, color: "var(--color-primary)" }}>{r.quantity}</td>
-                                                <td style={{ color: "var(--text-secondary)" }}>{r.unit || "—"}</td>
-                                                <td><span className={`badge ${sc.cls}`}>{sc.label}</span></td>
+                                            <tr key={r.id} className="table-row-hover">
+                                                <td style={{ color: "var(--text-muted)", paddingLeft: 24, fontWeight: 600 }}>{String(i+1).padStart(2, '0')}</td>
+                                                <td>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(99,102,241,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🔧</div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 700, fontSize: 14 }}>{r.name}</div>
+                                                            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>ID: RES-{r.id}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td><span style={{ fontSize: 11, fontWeight: 700, background: "#f1f5f9", padding: "3px 10px", borderRadius: 8, color: "#475569" }}>{r.category || "KHÁC"}</span></td>
+                                                <td>
+                                                    <div style={{ fontWeight: 800, color: "var(--color-primary)", fontSize: 15 }}>{r.quantity} <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)" }}>{r.unit || "đv"}</span></div>
+                                                </td>
+                                                <td><StatusBadge cfg={sc} /></td>
                                                 {isManager && (
-                                                    <td><button className="btn btn-danger btn-sm" onClick={() => handleDeleteRes(r.id)}>🗑</button></td>
+                                                    <td style={{ textAlign: "right", paddingRight: 20 }}>
+                                                        <button className="btn btn-sm btn-ghost" onClick={() => handleDeleteRes(r.id)} style={{ padding: 8, borderRadius: 10, color: "#dc2626" }} title="Xóa tài nguyên">🗑️</button>
+                                                    </td>
                                                 )}
                                             </tr>
                                         );

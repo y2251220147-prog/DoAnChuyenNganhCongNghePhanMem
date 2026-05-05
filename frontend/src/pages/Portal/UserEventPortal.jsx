@@ -1,9 +1,8 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import Layout from "../../components/Layout/Layout";
 import { AuthContext } from "../../context/AuthContext";
 import {
     checkRegistration,
-    getAttendeesByEvent,
     removeAttendee,
     selfRegister,
 } from "../../services/attendeeService";
@@ -11,7 +10,6 @@ import { getEvents } from "../../services/eventService";
 import "../../styles/global.css";
 import "./portal.css";
 
-// ── Màu emoji theo loại sự kiện ───────────────────────────────
 const TYPE_EMOJI = {
     "Hội thảo": { emoji: "🧠", bg: "#EEEDFE" },
     "Hội nghị": { emoji: "🎙️", bg: "#E1F5EE" },
@@ -24,15 +22,14 @@ const TYPE_EMOJI = {
 };
 
 const STATUS_CFG = {
-    draft: { label: "Bản nháp", cls: "badge-gray" },
-    planning: { label: "Lên kế hoạch", cls: "badge-purple" },
-    approved: { label: "Đã duyệt", cls: "badge-blue" },
-    running: { label: "Đang diễn ra", cls: "badge-green" },
-    completed: { label: "Hoàn thành", cls: "badge-gray" },
-    cancelled: { label: "Đã hủy", cls: "badge-red" },
+    draft: { label: "Bản nháp", cls: "badge-default" },
+    planning: { label: "Lên kế hoạch", cls: "badge-warning" },
+    approved: { label: "Đã duyệt", cls: "badge-admin" },
+    running: { label: "Đang diễn ra", cls: "badge-success" },
+    completed: { label: "Hoàn thành", cls: "badge-default" },
+    cancelled: { label: "Đã hủy", cls: "badge-danger" },
 };
 
-// ── QR mini pattern trang trí ──────────────────────────────────
 const QR_PAT = [
     1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1,
     1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0,
@@ -42,13 +39,10 @@ const QR_PAT = [
 
 function QRMini({ onClick }) {
     return (
-        <div className="portal-qr-mini" onClick={onClick} title="Xem QR lớn">
-            <div className="portal-qr-grid" style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 1.5, width: 36 }}>
+        <div className="portal-qr-mini" onClick={onClick} title="Xem QR lớn" style={{ background: "var(--bg-main)", borderRadius: 12, padding: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 1.5, width: 32 }}>
                 {QR_PAT.map((v, i) => (
-                    <div key={i} style={{
-                        width: 4, height: 4, borderRadius: 0.5,
-                        background: v ? "#1A1917" : "#F0EEE9",
-                    }} />
+                    <div key={i} style={{ width: 4, height: 4, borderRadius: 0.5, background: v ? "var(--text-primary)" : "#f1f5f9" }} />
                 ))}
             </div>
         </div>
@@ -59,23 +53,22 @@ function QRLarge({ value }) {
     const url = value
         ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(value)}&margin=10`
         : null;
-    if (url) return <img src={url} alt="QR" style={{ borderRadius: 10, display: "block" }} />;
-    // fallback pattern decoratif
+    if (url) return <img src={url} alt="QR" style={{ borderRadius: 12, display: "block" }} />;
     return (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 3, width: 120 }}>
             {QR_PAT.map((v, i) => (
-                <div key={i} style={{ width: 13, height: 13, borderRadius: 1, background: v ? "#1A1917" : "#F0EEE9" }} />
+                <div key={i} style={{ width: 13, height: 13, borderRadius: 1, background: v ? "var(--text-primary)" : "#f1f5f9" }} />
             ))}
         </div>
     );
 }
 
-// ── Format ngày giờ ────────────────────────────────────────────
 function fmtDate(d) {
     if (!d) return "—";
     const dt = new Date(d);
     return dt.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 }
+
 function fmtTime(start, end) {
     if (!start) return "";
     const s = new Date(start).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -83,33 +76,16 @@ function fmtTime(start, end) {
     return e ? `${s}–${e}` : s;
 }
 
-// ── Capacity bar ────────────────────────────────────────────────
-function CapBar({ registered, capacity }) {
-    const pct = capacity > 0 ? Math.min(Math.round((registered / capacity) * 100), 100) : 0;
-    const color = pct > 90 ? "#A32D2D" : pct > 70 ? "#854F0B" : "#0F6E56";
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{registered}/{capacity} người</span>
-            <div style={{ width: 70, height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 2 }} />
-            </div>
-            <span style={{ fontSize: 11, color, fontWeight: 600 }}>{pct}%</span>
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════
 export default function UserEventPortal() {
     const { user } = useContext(AuthContext);
     const [events, setEvents] = useState([]);
-    const [myAtIds, setMyAtIds] = useState({}); // { eventId: attendeeId }
+    const [myAtIds, setMyAtIds] = useState({});
     const [loading, setLoading] = useState(true);
     const [filterTab, setFilterTab] = useState("all");
-    const [qrModal, setQrModal] = useState(null); // { eventName, code }
+    const [qrModal, setQrModal] = useState(null);
     const [busy, setBusy] = useState({});
     const [search, setSearch] = useState("");
 
-    // Load events + kiểm tra đăng ký
     const loadAll = async () => {
         setLoading(true);
         try {
@@ -117,14 +93,12 @@ export default function UserEventPortal() {
             const evList = evRes.data || [];
             setEvents(evList);
 
-            // Kiểm ra event nào user đã đăng ký
             const checks = await Promise.allSettled(
                 evList.map(ev => checkRegistration(ev.id))
             );
             const map = {};
             checks.forEach((r, i) => {
                 if (r.status === "fulfilled" && r.value?.data?.registered) {
-                    // Lưu cả attendee_id và qr_code thực tế từ server
                     map[evList[i].id] = {
                         id: r.value.data.attendee?.id ?? null,
                         qr_code: r.value.data.attendee?.qr_code ?? null,
@@ -142,7 +116,6 @@ export default function UserEventPortal() {
 
     const handleRegister = async (ev) => {
         if (busy[ev.id]) return;
-        // Chỉ cho đăng ký khi sự kiện đã được duyệt hoặc đang diễn ra
         if (!['approved', 'running'].includes(ev.status)) {
             alert('Sự kiện chưa mở đăng ký.');
             return;
@@ -168,7 +141,7 @@ export default function UserEventPortal() {
         try {
             const atData = myAtIds[ev.id];
             const atId = atData?.id ?? atData;
-            if (typeof atId === "number") await removeAttendee(atId);
+            if (atId) await removeAttendee(atId);
             setMyAtIds(m => { const nm = { ...m }; delete nm[ev.id]; return nm; });
         } catch (err) {
             alert(err?.response?.data?.message || "Huỷ đăng ký thất bại");
@@ -177,14 +150,12 @@ export default function UserEventPortal() {
         }
     };
 
-    // Mở modal QR với mã thực tế từ server
     const openQR = (ev) => {
         const atData = myAtIds[ev.id];
         const code = atData?.qr_code || null;
         setQrModal({ eventName: ev.name, code });
     };
 
-    // ── Lọc ──────────────────────────────────────────────────────
     const visible = events
         .filter(ev => !["cancelled", "draft"].includes(ev.status))
         .filter(ev => ev.name.toLowerCase().includes(search.toLowerCase()))
@@ -198,11 +169,10 @@ export default function UserEventPortal() {
     const registeredList = events.filter(ev => isRegistered(ev.id));
     const upcomingRegistered = registeredList.filter(ev => ["planning", "approved", "running"].includes(ev.status));
 
-    // ── Stats ─────────────────────────────────────────────────────
     const stats = [
-        { val: registeredList.length, lbl: "Đã đăng ký", color: "var(--color-primary)" },
-        { val: upcomingRegistered.length, lbl: "Sắp diễn ra", color: "#0F6E56" },
-        { val: registeredList.filter(e => e.status === "completed").length, lbl: "Đã tham dự", color: "var(--text-secondary)" },
+        { val: registeredList.length, lbl: "Sự kiện đăng ký", color: "var(--color-primary)", bg: "var(--bg-main)" },
+        { val: upcomingRegistered.length, lbl: "Sắp diễn ra", color: "#f59e0b", bg: "#fff7ed" },
+        { val: registeredList.filter(e => e.status === "completed").length, lbl: "Đã hoàn thành", color: "#10b981", bg: "#ecfdf5" },
     ];
 
     const getEC = (ev) => TYPE_EMOJI[ev.event_type] || TYPE_EMOJI["Khác"];
@@ -210,67 +180,53 @@ export default function UserEventPortal() {
 
     return (
         <Layout>
-            {/* ── Page Header ── */}
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 32 }}>
                 <div>
-                    <h2>🙋 Sự kiện của tôi</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        Xin chào, <strong>{user?.name || "Bạn"}</strong> — Khám phá và đăng ký tham dự sự kiện công ty
-                    </p>
+                    <h2 style={{ fontSize: 28, fontWeight: 800 }}>🙋 Sự kiện của tôi</h2>
+                    <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>Quản lý các sự kiện bạn đã tham gia và đang theo dõi</p>
                 </div>
             </div>
 
-            {/* ── Stat Strip ── */}
-            <div className="portal-stat-strip">
+            <div className="grid-3" style={{ gap: 24, marginBottom: 40 }}>
                 {stats.map(s => (
-                    <div className="portal-stat-box" key={s.lbl}>
-                        <div className="portal-stat-val" style={{ color: s.color }}>{s.val}</div>
-                        <div className="portal-stat-lbl">{s.lbl}</div>
+                    <div className="card" key={s.lbl} style={{ padding: 24, borderRadius: 24, textAlign: "center", background: s.bg, border: "none" }}>
+                        <div style={{ fontSize: 32, fontWeight: 800, color: s.color, marginBottom: 4 }}>{s.val}</div>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.lbl}</div>
                     </div>
                 ))}
             </div>
 
-            {/* ── Sự kiện đã đăng ký sắp tới ── */}
             {upcomingRegistered.length > 0 && (
-                <section style={{ marginBottom: 28 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                        <h3 className="portal-section-title">Sự kiện của tôi sắp tới</h3>
-                    </div>
-                    <div className="portal-upcoming-grid">
+                <section style={{ marginBottom: 48 }}>
+                    <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ width: 36, height: 36, borderRadius: 10, background: "var(--bg-main)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⭐</span>
+                        Sắp tới của bạn
+                    </h3>
+                    <div className="grid-2" style={{ gap: 24 }}>
                         {upcomingRegistered.slice(0, 4).map(ev => {
-                            const ec = getEC(ev);
                             const code = `EVT-${ev.id}-${user?.id || "U"}`;
                             return (
-                                <div className="portal-my-card" key={ev.id}>
-                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                                        <div className="portal-date-block" style={{ background: "var(--color-primary-light)" }}>
-                                            <div className="portal-date-day">{new Date(ev.start_date).getDate()}</div>
-                                            <div className="portal-date-mo">{new Date(ev.start_date).toLocaleDateString("vi-VN", { month: "short" })}</div>
+                                <div className="card" key={ev.id} style={{ padding: 24, borderRadius: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                                        <div style={{ width: 56, height: 64, borderRadius: 16, background: "var(--color-primary)", color: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                            <div style={{ fontSize: 20, fontWeight: 800 }}>{new Date(ev.start_date).getDate()}</div>
+                                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>T{new Date(ev.start_date).getMonth() + 1}</div>
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                {ev.name}
+                                            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.name}</div>
+                                            <div style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 4 }}>
+                                                🕒 {fmtTime(ev.start_date, ev.end_date)} • 📍 {ev.location || "Online"}
                                             </div>
-                                            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                                                {fmtTime(ev.start_date, ev.end_date)} · {ev.location || "—"}
-                                            </div>
-                                            <span className={`portal-badge ${getStatus(ev).cls}`} style={{ marginTop: 6, display: "inline-block" }}>
-                                                ✓ Đã đăng ký
-                                            </span>
                                         </div>
                                     </div>
-                                    <div className="portal-ticket-row">
+                                    <div style={{ padding: 16, borderRadius: 16, background: "var(--bg-main)", display: "flex", alignItems: "center", gap: 16, border: "1px solid #f1f5f9" }}>
                                         <QRMini onClick={() => openQR(ev)} />
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>Mã vé của bạn</div>
-                                            <div style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.08em" }}>{code}</div>
-                                            <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>Nhấn QR để phóng to</div>
+                                            <div style={{ fontSize: 11, fontWeight: 800, color: "var(--text-muted)", marginBottom: 2 }}>MÃ VÉ CỦA BẠN</div>
+                                            <div style={{ fontFamily: "monospace", fontSize: 13, color: "var(--text-primary)", fontWeight: 700 }}>{code}</div>
                                         </div>
-                                        <button className="btn btn-cancel btn-sm"
-                                            disabled={busy[ev.id]}
-                                            onClick={() => handleCancel(ev)}>
-                                            Huỷ
-                                        </button>
+                                        <button className="btn btn-outline" style={{ borderRadius: 10, fontSize: 12, color: "#ef4444", borderColor: "#fecaca" }}
+                                            disabled={busy[ev.id]} onClick={() => handleCancel(ev)}>Huỷ vé</button>
                                     </div>
                                 </div>
                             );
@@ -279,92 +235,76 @@ export default function UserEventPortal() {
                 </section>
             )}
 
-            {/* ── Khám phá sự kiện ── */}
             <section>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-                    <h3 className="portal-section-title">Tất cả sự kiện</h3>
-                    <input className="form-control"
-                        style={{ maxWidth: 240, fontSize: 13 }}
-                        placeholder="🔍 Tìm sự kiện..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)} />
-                </div>
-
-                {/* Pills Filter */}
-                <div className="portal-pill-row">
-                    {[
-                        { key: "all", label: "Tất cả" },
-                        { key: "registered", label: "Đã đăng ký" },
-                        { key: "upcoming", label: "Sắp diễn ra" },
-                        { key: "running", label: "Đang diễn ra" },
-                    ].map(t => (
-                        <button key={t.key}
-                            className={`portal-pill${filterTab === t.key ? " active" : ""}`}
-                            onClick={() => setFilterTab(t.key)}>
-                            {t.label}
-                        </button>
-                    ))}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
+                    <h3 style={{ fontSize: 20, fontWeight: 800 }}>Khám phá sự kiện</h3>
+                    <div style={{ display: "flex", gap: 12, flex: 1, maxWidth: 600 }}>
+                        <div className="portal-pill-row" style={{ marginBottom: 0 }}>
+                            {[
+                                { key: "all", label: "Tất cả" },
+                                { key: "registered", label: "Đã đăng ký" },
+                                { key: "upcoming", label: "Sắp diễn ra" },
+                                { key: "running", label: "Đang diễn ra" },
+                            ].map(t => (
+                                <button key={t.key} className={`portal-pill${filterTab === t.key ? " active" : ""}`} onClick={() => setFilterTab(t.key)}>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                        <input className="form-control" style={{ maxWidth: 240, borderRadius: 12 }} placeholder="🔍 Tìm kiếm sự kiện..." value={search} onChange={e => setSearch(e.target.value)} />
+                    </div>
                 </div>
 
                 {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Đang tải sự kiện...</p></div>
+                    <div className="card" style={{ padding: 80, textAlign: "center", border: "1px dashed #cbd5e1", background: "transparent" }}>
+                        <div style={{ fontSize: 32 }}>⏳</div>
+                        <p style={{ marginTop: 12, color: "var(--text-secondary)", fontWeight: 600 }}>Đang tải danh sách sự kiện...</p>
+                    </div>
                 ) : visible.length === 0 ? (
-                    <div className="empty-state"><span>🎪</span><p>Không có sự kiện nào.</p></div>
+                    <div className="card" style={{ padding: 80, textAlign: "center", border: "1px dashed #cbd5e1", background: "transparent" }}>
+                        <div style={{ fontSize: 32 }}>🎪</div>
+                        <p style={{ marginTop: 12, color: "var(--text-secondary)", fontWeight: 600 }}>Không tìm thấy sự kiện phù hợp.</p>
+                    </div>
                 ) : (
-                    <div className="portal-event-feed">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         {visible.map(ev => {
                             const ec = getEC(ev);
                             const st = getStatus(ev);
                             const reg = isRegistered(ev.id);
-                            const cap = ev.capacity || 0;
-                            const filled = 0; // API chưa trả registered count trong list
-                            const canReg = !reg && ['approved', 'running'].includes(ev.status);
                             return (
-                                <div key={ev.id} className={`portal-event-card${reg ? " registered" : ""}`}>
-                                    <div className="portal-ec-header">
-                                        <div className="portal-ec-icon" style={{ background: ec.bg }}>{ec.emoji}</div>
+                                <div key={ev.id} className="card" style={{ padding: 20, borderRadius: 24, border: reg ? "2px solid var(--color-primary)" : "1px solid #e2e8f0", transition: "all 0.2s" }}>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
+                                        <div style={{ width: 64, height: 64, borderRadius: 16, background: ec.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, flexShrink: 0 }}>{ec.emoji}</div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
-                                                <span className="portal-ec-type">{ev.event_type || "Sự kiện"}</span>
-                                                <span className={`portal-badge ${st.cls}`}>{st.label}</span>
-                                                {reg && <span className="portal-reg-mark">✓ Đã đăng ký</span>}
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                                                <span style={{ fontSize: 11, fontWeight: 800, color: "var(--text-muted)", textTransform: "uppercase" }}>{ev.event_type}</span>
+                                                <span className={`badge ${st.cls}`} style={{ fontSize: 10 }}>{st.label}</span>
+                                                {reg && <span className="badge badge-admin" style={{ fontSize: 10 }}>✓ Đã đăng ký</span>}
                                             </div>
-                                            <div className="portal-ec-title">{ev.name}</div>
-                                            <div className="portal-ec-meta">
+                                            <h4 style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>{ev.name}</h4>
+                                            <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13, color: "var(--text-secondary)" }}>
                                                 <span>📅 {fmtDate(ev.start_date)}</span>
-                                                <span>📍 {ev.location || "—"}</span>
-                                                <span>⏰ {fmtTime(ev.start_date, ev.end_date)}</span>
+                                                <span>📍 {ev.location || "Chưa xác định"}</span>
+                                                <span>🕒 {fmtTime(ev.start_date, ev.end_date)}</span>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="portal-ec-footer">
-                                        <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                                            Sức chứa: {ev.capacity || "—"} người
-                                        </div>
-                                        <div style={{ display: "flex", gap: 8 }}>
-                                            {reg ? (
-                                                <>
-                                                    <button className="btn btn-outline btn-sm"
-                                                        onClick={() => openQR(ev)}>
-                                                        📱 Mã QR
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-muted)", marginBottom: 4 }}>Sức chứa: {ev.capacity || "—"}</div>
+                                            <div style={{ display: "flex", gap: 8 }}>
+                                                {reg ? (
+                                                    <>
+                                                        <button className="btn btn-outline" style={{ borderRadius: 10, fontSize: 12, height: 36 }} onClick={() => openQR(ev)}>Mã QR</button>
+                                                        <button className="btn btn-outline" style={{ borderRadius: 10, fontSize: 12, height: 36, color: "#ef4444", borderColor: "#fecaca" }}
+                                                            disabled={busy[ev.id]} onClick={() => handleCancel(ev)}>Huỷ</button>
+                                                    </>
+                                                ) : (
+                                                    <button className="btn btn-primary" style={{ borderRadius: 10, fontSize: 12, height: 36, padding: "0 20px" }}
+                                                        disabled={busy[ev.id] || !['approved', 'running'].includes(ev.status)}
+                                                        onClick={() => handleRegister(ev)}>
+                                                        {busy[ev.id] ? "..." : "Đăng ký tham gia"}
                                                     </button>
-                                                    <button className="btn btn-cancel btn-sm"
-                                                        disabled={busy[ev.id]}
-                                                        onClick={() => handleCancel(ev)}>
-                                                        Huỷ đăng ký
-                                                    </button>
-                                                </>
-                                            ) : ev.status !== "draft" ? (
-                                                <button className="btn btn-primary btn-sm"
-                                                    disabled={busy[ev.id]}
-                                                    onClick={() => handleRegister(ev)}>
-                                                    {busy[ev.id] ? "..." : "Đăng ký ngay"}
-                                                </button>
-                                            ) : (
-                                                <button className="btn btn-outline btn-sm" disabled style={{ opacity: 0.5 }}>
-                                                    Chưa mở
-                                                </button>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -374,29 +314,16 @@ export default function UserEventPortal() {
                 )}
             </section>
 
-            {/* ── QR Modal ── */}
             {qrModal && (
-                <div className="portal-modal-overlay" onClick={() => setQrModal(null)}>
-                    <div className="portal-modal" onClick={e => e.stopPropagation()}>
-                        <div className="portal-modal-title">🎫 Mã QR Check-in</div>
-                        <div style={{ textAlign: "center", padding: "16px 0" }}>
-                            <div style={{
-                                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                width: 200, height: 200, background: "var(--bg-main)",
-                                borderRadius: 12, border: "1px solid var(--border-color)", overflow: "hidden"
-                            }}>
-                                <QRLarge value={qrModal.code} />
-                            </div>
-                            <div className="portal-modal-event">{qrModal.eventName}</div>
-                            <div style={{ fontFamily: "monospace", fontSize: 13, letterSpacing: "0.1em", color: "var(--text-muted)", marginTop: 8 }}>
-                                {qrModal.code}
-                            </div>
-                            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 6 }}>Xuất trình mã này khi check-in</p>
+                <div className="modal-overlay" onClick={() => setQrModal(null)} style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}>
+                    <div className="card" style={{ maxWidth: 400, width: "90%", padding: 32, borderRadius: 32, textAlign: "center" }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>🎫 Vé Check-in của bạn</h3>
+                        <div style={{ background: "var(--bg-main)", padding: 24, borderRadius: 24, display: "inline-block", marginBottom: 24, border: "1px solid #f1f5f9" }}>
+                            <QRLarge value={qrModal.code} />
                         </div>
-                        <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}
-                            onClick={() => setQrModal(null)}>
-                            Đóng
-                        </button>
+                        <h4 style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>{qrModal.eventName}</h4>
+                        <div style={{ fontFamily: "monospace", fontSize: 14, fontWeight: 700, color: "var(--color-primary)", letterSpacing: "0.1em", marginBottom: 24 }}>{qrModal.code}</div>
+                        <button className="btn btn-primary" style={{ width: "100%", height: 52, borderRadius: 14, fontWeight: 800 }} onClick={() => setQrModal(null)}>Đóng vé</button>
                     </div>
                 </div>
             )}

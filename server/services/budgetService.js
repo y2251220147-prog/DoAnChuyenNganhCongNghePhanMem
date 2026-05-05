@@ -1,5 +1,42 @@
 const Budget = require("../models/budgetModel");
 const Event = require("../models/eventModel");
+const Notification = require("../models/notificationModel");
+const { notifyManagers } = require("./notificationUtils");
+
+const checkBudgetAlert = async (eventId) => {
+    try {
+        const event = await Event.getById(eventId);
+        if (!event || !event.total_budget || event.total_budget <= 0) return;
+
+        const items = await Budget.getByEvent(eventId);
+        const totalCost = items.reduce((sum, b) => sum + parseFloat(b.cost || 0), 0);
+
+        if (totalCost > event.total_budget) {
+            const message = `Sự kiện "${event.name}" đã chi tiêu ${totalCost.toLocaleString('vi-VN')}đ, vượt mức ngân sách ${event.total_budget.toLocaleString('vi-VN')}đ.`;
+            
+            // 1. Thông báo cho Organizer
+            if (event.owner_id) {
+                await Notification.create({
+                    user_id: event.owner_id,
+                    type: 'budget_alert',
+                    title: '⚠️ Cảnh báo vượt ngân sách!',
+                    message,
+                    link: `/budget?eventId=${eventId}`
+                });
+            }
+
+            // 2. Thông báo cho cấp quản lý (Admins & Organizers)
+            await notifyManagers({
+                type: 'budget_alert',
+                title: 'Cảnh báo ngân sách sự kiện',
+                message,
+                link: `/budget?eventId=${eventId}`
+            });
+        }
+    } catch (e) {
+        console.error("Lỗi checkBudgetAlert:", e);
+    }
+};
 
 const getAllBudgets = async () => await Budget.getAll();
 
@@ -19,10 +56,13 @@ const createBudget = async ({ event_id, item, cost, note }) => {
     const event = await Event.getById(event_id);
     if (!event) throw { status: 404, message: "Event not found" };
     const id = await Budget.create({ event_id, item, cost: parseFloat(cost), note });
+    
+    // Kiểm tra vượt ngân sách sau khi thêm
+    await checkBudgetAlert(event_id);
+    
     return { id };
 };
 
-// FIX: kiểm tra budget item tồn tại trước khi update
 const updateBudget = async (id, { item, cost, note }) => {
     const existing = await Budget.findById(id);
     if (!existing) throw { status: 404, message: "Budget item not found" };
@@ -33,9 +73,11 @@ const updateBudget = async (id, { item, cost, note }) => {
         cost: cost !== undefined ? parseFloat(cost) : existing.cost,
         note: note !== undefined ? note : existing.note,
     });
+    
+    // Kiểm tra vượt ngân sách sau khi cập nhật
+    await checkBudgetAlert(existing.event_id);
 };
 
-// FIX: kiểm tra budget item tồn tại trước khi delete
 const deleteBudget = async (id) => {
     const existing = await Budget.findById(id);
     if (!existing) throw { status: 404, message: "Budget item not found" };

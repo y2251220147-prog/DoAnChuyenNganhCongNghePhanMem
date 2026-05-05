@@ -132,10 +132,9 @@ export default function Reports() {
 
         // Sheet 3: Công việc
         const taskData = [
-            { "Trạng thái": "Cần làm", "Số lượng": taskMap.todo || 0 },
-            { "Trạng thái": "Đang làm", "Số lượng": taskMap.in_progress || 0 },
-            { "Trạng thái": "Đã xong", "Số lượng": taskMap.done || 0 },
-            { "Trạng thái": "Đã hủy", "Số lượng": taskMap.cancelled || 0 },
+            { "Trạng thái": "Chuẩn Bị", "Số lượng": taskMap.todo || 0 },
+            { "Trạng thái": "Đang Làm", "Số lượng": taskMap.in_progress || 0 },
+            { "Trạng thái": "Hoàn Thành", "Số lượng": taskMap.done || 0 },
         ];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), "Công việc");
 
@@ -255,11 +254,9 @@ export default function Reports() {
                                 ? <div className="empty-state"><span>📋</span><p>Chưa có nhiệm vụ nào</p></div>
                                 : <>
                                     {[
-                                        { key: "todo", label: "Chưa bắt đầu", color: "#94a3b8" },
-                                        { key: "in_progress", label: "Đang triển khai", color: "#f59e0b" },
-                                        { key: "review", label: "Đang chờ duyệt", color: "#6366f1" },
-                                        { key: "done", label: "Đã hoàn thành", color: "#10b981" },
-                                        { key: "cancelled", label: "Đã hủy bỏ", color: "#ef4444" },
+                                        { key: "todo", label: "Chuẩn Bị", color: "#6366f1" },
+                                        { key: "in_progress", label: "Đang Làm", color: "#f59e0b" },
+                                        { key: "done", label: "Hoàn Thành", color: "#10b981" },
                                     ].map(s => (
                                         <ProgressRow key={s.key} label={s.label}
                                             value={taskMap[s.key] || 0} max={totalTasks} color={s.color} />

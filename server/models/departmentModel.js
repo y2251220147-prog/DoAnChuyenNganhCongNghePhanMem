@@ -36,6 +36,11 @@ const Department = {
         return rows[0] || null;
     },
 
+    findByManager: async (managerId) => {
+        const [rows] = await db.query("SELECT id, name FROM departments WHERE manager_id = ?", [managerId]);
+        return rows[0] || null;
+    },
+
     create: async (data) => {
         const [r] = await db.query(
             "INSERT INTO departments (name, manager_id, description) VALUES (?, ?, ?)",

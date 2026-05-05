@@ -123,22 +123,20 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
 
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <Avatar name={task.assigned_dept_name || task.assigned_name} />
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+                    <Avatar name={task.assigned_name || task.assigned_dept_name} />
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {task.assigned_name || task.assigned_dept_name || "—"}
+                    </div>
                     {task.comment_count > 0 && (
-                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>💬 {task.comment_count}</span>
-                    )}
-                    {task.subtask_count > 0 && (
-                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                            ☑ {task.subtask_done}/{task.subtask_count}
-                        </span>
+                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>💬{task.comment_count}</span>
                     )}
                 </div>
                 {task.due_date && (
                     <span style={{
                         fontSize: 10, fontWeight: 600,
                         color: overdue ? "#dc2626" : "var(--text-muted)",
-                        fontFamily: "monospace"
+                        fontFamily: "monospace", flexShrink: 0
                     }}>
                         {overdue ? "⚠️ " : ""}{fmtDate(task.due_date)}
                     </span>
@@ -150,10 +148,17 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
 
 // ─── Main Component ──────────────────────────────────────────
 export default function TaskBoard({ 
-    eventId, staffList = [], departments = [], canManage, onRefreshParent
+    eventId, 
+    phases = [], 
+    eventStaff = [], 
+    allUsers = [], 
+    departments = [], 
+    canManage = false, 
+    onRefreshParent 
 }) {
+    // Luôn đảm bảo eventStaff là mảng
+    const safeStaff = Array.isArray(eventStaff) ? eventStaff : [];
     const { user } = useContext(AuthContext);
-
 
     const [tasks, setTasks] = useState([]);
     const [stats, setStats] = useState(null);
@@ -415,6 +420,13 @@ export default function TaskBoard({
                         <option value="high">🔴 Ưu tiên Cao</option>
                         <option value="medium">🟡 Ưu tiên Trung bình</option>
                         <option value="low">🟢 Ưu tiên Thấp</option>
+                    </select>
+                    <select className="form-control" style={{ maxWidth: 160, borderRadius: 12, fontSize: 13, height: 44, border: "1px solid #e2e8f0" }}
+                        value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
+                        <option value="all">Mọi người thực hiện</option>
+                        {safeStaff.map(s => (
+                            <option key={s.user_id} value={s.user_id}>👤 {s.user_name}</option>
+                        ))}
                     </select>
                     <input className="form-control" placeholder="🔍 Nhập từ khóa tìm nhiệm vụ..."
                         value={search} onChange={e => setSearch(e.target.value)}
@@ -876,13 +888,31 @@ export default function TaskBoard({
                     </div>
 
 
-                    <div className="grid-2" style={{ marginBottom: 16 }}>
+                    <div className="grid-3" style={{ marginBottom: 16 }}>
                         <div className="form-group">
                             <label>Phòng ban phụ trách</label>
                             <select className="form-control" value={form.assigned_department_id}
-                                onChange={e => setForm({ ...form, assigned_department_id: e.target.value })}>
+                                disabled={!!form.assigned_to}
+                                onChange={e => {
+                                    setForm({ ...form, assigned_department_id: e.target.value });
+                                }}>
                                 <option value="">-- Chọn phòng ban --</option>
                                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Người thực hiện</label>
+                            <select className="form-control" value={form.assigned_to}
+                                disabled={!!form.assigned_department_id}
+                                onChange={e => setForm({ ...form, assigned_to: e.target.value })}>
+                                <option value="">-- Chọn nhân viên --</option>
+                                {eventStaff
+                                    .map(s => (
+                                        <option key={s.user_id} value={s.user_id}>
+                                            {s.user_name} ({s.role})
+                                        </option>
+                                    ))
+                                }
                             </select>
                         </div>
                         <div className="form-group">

@@ -41,7 +41,7 @@ export default function Dashboard() {
                 setMyRegs(myRes.data || []);
                 
                 if (user.role !== 'user') {
-                    setStaffCount(evList.reduce((n, e) => n + (e.staff_count || 0), 0));
+                    setStaffCount(overview.users || 0);
                     setGuestsCount(overview.attendees?.total || 0);
                     setCheckedIn(overview.attendees?.checkedIn || 0);
                     setBudgetTotal(overview.budget?.actual || 0);

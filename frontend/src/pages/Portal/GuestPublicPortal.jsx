@@ -37,7 +37,7 @@ export default function GuestPublicPortal() {
         if (!email.trim()) return;
         setLoading(true); setError(""); setResults(null);
         try {
-            const res = await fetch(`${API_BASE}/guests/lookup?email=${encodeURIComponent(email.trim())}`);
+            const res = await fetch(`${API_BASE}/attendees/lookup?email=${encodeURIComponent(email.trim())}`);
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body.message || "Không tìm thấy thông tin");

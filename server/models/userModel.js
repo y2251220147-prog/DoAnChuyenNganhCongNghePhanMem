@@ -56,6 +56,16 @@ const User = {
     },
     async updateDepartment(id, department_id) {
         await db.query("UPDATE users SET department_id = ? WHERE id = ?", [department_id || null, id]);
+    },
+    async getStats(id) {
+        const [[stats]] = await db.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM attendees WHERE user_id = ?) AS total,
+                (SELECT COUNT(*) FROM attendees WHERE user_id = ? AND checked_in = 1) AS attended,
+                (SELECT COUNT(*) FROM attendees a JOIN events e ON a.event_id = e.id 
+                 WHERE a.user_id = ? AND e.start_date > NOW()) AS upcoming
+        `, [id, id, id]);
+        return stats;
     }
 };
 

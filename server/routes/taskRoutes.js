@@ -7,6 +7,7 @@ const mgr = ["admin", "organizer"];
 
 
 // Tasks
+r.get("/my", auth, c.getMyTasks);
 r.get("/event/:eventId", auth, c.getByEvent);
 r.get("/stats/:eventId", auth, c.getStats);
 r.get("/:id", auth, c.getById);
@@ -14,6 +15,7 @@ r.post("/", auth, can(mgr), c.create);
 r.put("/:id", auth, can(mgr), c.update);
 r.patch("/:id/status", auth, c.updateStatus);       // all logged-in
 r.patch("/:id/progress", auth, c.updateProgress);   // all logged-in
+r.patch("/:id/report-issue", auth, c.reportIssue);  // all logged-in
 r.patch("/:id/feedback", auth, c.updateFeedback);   // all logged-in
 r.delete("/:id", auth, can(mgr), c.delete);
 

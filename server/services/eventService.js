@@ -71,9 +71,9 @@ const createEvent = async (data, userId) => {
         }
     }
 
-    // Thông báo cho admin
-    const { notifyAdmins } = require("./notificationUtils");
-    await notifyAdmins({
+    // Thông báo cho cấp quản lý
+    const { notifyManagers } = require("./notificationUtils");
+    await notifyManagers({
         type: 'event_reminder',
         title: 'Sự kiện mới chờ duyệt',
         message: `Sự kiện "${name}" vừa được lên nháp. Vui lòng kiểm tra và phê duyệt.`,
@@ -164,6 +164,18 @@ const changeStatus = async (id, newStatus, userId, userRole) => {
     if (newStatus === "approved") {
         await Event.approve(id, userId);
         try {
+            // 1. Thông báo cho người sở hữu sự kiện (Organizer)
+            if (event.owner_id) {
+                await Notification.create({
+                    user_id: event.owner_id,
+                    type: 'event_approved',
+                    title: 'Sự kiện của bạn đã được duyệt ✅',
+                    message: `Sự kiện "${event.name}" đã được phê duyệt và đang ở trạng thái chuẩn bị.`,
+                    link: `/events/${id}`
+                });
+            }
+
+            // 2. Thông báo cho toàn bộ nhân viên (User)
             const allUsers = await User.getAllUsers();
             const employees = allUsers.filter(u => u.role === 'user');
             for (const u of employees) {
@@ -179,8 +191,8 @@ const changeStatus = async (id, newStatus, userId, userRole) => {
     } else {
         await Event.changeStatus(id, newStatus);
         if (newStatus === "cancelled") {
-            const { notifyAdmins } = require("./notificationUtils");
-            await notifyAdmins({
+            const { notifyManagers } = require("./notificationUtils");
+            await notifyManagers({
                 type: 'status_change',
                 title: 'Sự kiện bị hủy',
                 message: `Sự kiện "${event.name}" đã bị hủy.`,
@@ -197,8 +209,8 @@ const deleteEvent = async (id) => {
         throw { status: 400, message: `Không thể xóa sự kiện ở trạng thái "${event.status}". Hãy hủy sự kiện trước.` };
     await Event.delete(id);
 
-    const { notifyAdmins } = require("./notificationUtils");
-    await notifyAdmins({
+    const { notifyManagers } = require("./notificationUtils");
+    await notifyManagers({
         type: 'status_change',
         title: 'Sự kiện đã bị xóa',
         message: `Sự kiện "${event.name}" vừa bị xóa khỏi hệ thống.`,

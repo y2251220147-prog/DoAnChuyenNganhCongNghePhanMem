@@ -5,7 +5,7 @@ import { getProfile, updateProfile } from "../../services/userService";
 import UploadAvatar from "../../components/UploadAvatar";
 
 export default function ProfilePage() {
-    const { user, logoutUser, updateProfileData } = useContext(AuthContext);
+    const { user, logoutUser, updateProfileData, getAvatarUrl } = useContext(AuthContext);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: "", text: "" });
@@ -33,10 +33,16 @@ export default function ProfilePage() {
                     phone: data.phone || "",
                     gender: data.gender || "",
                     address: data.address || "",
-                    // Department info (read-only, set by admin)
                     department_name: data.department_name || "",
                     role_in_dept: data.role_in_dept || "",
                 });
+                if (data.stats) {
+                    setStats({
+                        total: data.stats.total || 0,
+                        attended: data.stats.attended || 0,
+                        upcoming: data.stats.upcoming || 0
+                    });
+                }
             } catch (err) {
                 console.error("Lỗi lấy thông tin hồ sơ:", err);
             } finally {
@@ -58,178 +64,152 @@ export default function ProfilePage() {
         try {
             await updateProfile(formData);
             updateProfileData(formData);
-            setMessage({ type: "success", text: "Cập nhật hồ sơ thành công! ✨" });
+            setMessage({ type: "success", text: "✨ Cập nhật hồ sơ thành công!" });
             setTimeout(() => setMessage({ type: "", text: "" }), 3000);
         } catch (err) {
-            setMessage({ type: "error", text: err.response?.data?.message || "Lỗi cập nhật hồ sơ. Vui lòng thử lại." });
+            setMessage({ type: "error", text: err.response?.data?.message || "Lỗi cập nhật hồ sơ." });
         } finally {
             setSaving(false);
         }
     };
 
     const attendRate = stats.total > 0 ? Math.round(stats.attended / stats.total * 100) : 0;
+    const initials = user?.name ? user.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) : "U";
 
-    if (loading) {
-        return (
-            <Layout title="Hồ sơ cá nhân">
-                <div className="emp-panel" style={{ padding: '80px', textAlign: 'center', color: 'var(--emp-text2)' }}>
-                    <div className="emp-loader" style={{ marginBottom: 15, fontSize: 30 }}>⏳</div>
-                    <p>Đang tải dữ liệu hồ sơ cao cấp...</p>
-                </div>
-            </Layout>
-        );
-    }
+    if (loading) return (
+        <Layout title="Hồ sơ cá nhân">
+            <div style={{ padding: '80px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <div className="loader" style={{ marginBottom: 15, fontSize: 32 }}>⏳</div>
+                <p style={{ fontWeight: 600 }}>Đang tải dữ liệu hồ sơ...</p>
+            </div>
+        </Layout>
+    );
 
     return (
-        <Layout title="Thiết lập tài khoản">
-            <div style={{ width: "100%", padding: "0 4px" }}>
+        <Layout title="Hồ sơ cá nhân">
+            <div style={{ maxWidth: 1200, margin: "0 auto" }}>
                 
-                {/* ── SECTION 1: IDENTITY HEADER ── */}
-                <div className="emp-panel" style={{ marginBottom: 30, padding: '48px', position: 'relative', overflow: 'hidden', borderRadius: 24, background: "linear-gradient(135deg, var(--emp-surface) 0%, rgba(108,114,255,0.05) 100%)" }}>
-                    <div style={{ 
-                        position: 'absolute', top: -50, right: -50, width: 400, height: 400, 
-                        background: 'radial-gradient(circle, var(--emp-accent-glow) 0%, transparent 70%)', 
-                        opacity: 0.3, pointerEvents: 'none' 
-                    }} />
+                {/* ── HEADER SECTION ── */}
+                <div style={{ 
+                    marginBottom: 32, padding: '48px', borderRadius: 32, 
+                    background: "linear-gradient(135deg, var(--color-primary) 0%, #4338ca 100%)",
+                    color: "#fff", position: 'relative', overflow: 'hidden',
+                    boxShadow: "0 20px 40px rgba(79, 70, 229, 0.15)"
+                }}>
+                    <div style={{ position: 'absolute', top: -50, right: -50, width: 250, height: 250, background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', bottom: -30, left: '20%', width: 120, height: 120, background: 'rgba(255,255,255,0.03)', borderRadius: '50%' }} />
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: 40, position: 'relative', zIndex: 1 }}>
-                        <div style={{ boxShadow: "0 20px 40px -10px rgba(0,0,0,0.3)", borderRadius: "50%", padding: 4, background: "var(--emp-accent)" }}>
-                            <UploadAvatar />
-                        </div>
+                        <UploadAvatar />
+
+
                         <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
-                                <h1 style={{ fontSize: 36, fontWeight: 900, color: 'var(--emp-text)', margin: 0 }}>{user?.name || "Thành viên"}</h1>
-                                <span className="emp-badge emp-badge-purple" style={{ textTransform: 'uppercase', padding: '6px 16px', borderRadius: 12, fontWeight: 800, fontSize: 12, letterSpacing: "0.1em" }}>
-                                    {user?.role?.toUpperCase()}
+                                <h1 style={{ fontSize: 36, fontWeight: 900, margin: 0 }}>{user?.name || "Thành viên"}</h1>
+                                <span style={{ background: "rgba(255,255,255,0.2)", padding: '6px 14px', borderRadius: 12, fontWeight: 800, fontSize: 11, textTransform: 'uppercase', letterSpacing: "0.05em", backdropFilter: "blur(8px)" }}>
+                                    {user?.role}
                                 </span>
                             </div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-                                <div style={{ fontSize: 16, color: 'var(--emp-text2)', display: 'flex', alignItems: 'center', gap: 10, fontWeight: 500 }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    {user?.email}
-                                </div>
-                                <div style={{ fontSize: 16, color: 'var(--emp-text2)', display: 'flex', alignItems: 'center', gap: 10, fontWeight: 500 }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                    {formData.address || "Chưa cập nhật địa chỉ"}
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
-                                <span className="emp-badge emp-badge-green" style={{ padding: "6px 14px", borderRadius: 10 }}>● Đang hoạt động</span>
-                                {formData.department_name && (
-                                    <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10, background: "rgba(99,102,241,0.12)", color: "#4338ca" }}>
-                                        🏢 {formData.department_name}
-                                    </span>
-                                )}
-                                {formData.role_in_dept && (
-                                    <span className="emp-badge emp-badge-gray" style={{ padding: "6px 14px", borderRadius: 10, background: "rgba(16,185,129,0.1)", color: "#047857" }}>
-                                        💼 {formData.role_in_dept}
-                                    </span>
-                                )}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, opacity: 0.9 }}>
+                                <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>📧 {user?.email}</div>
+                                <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>📍 {formData.address || "Chưa cập nhật địa chỉ"}</div>
+                                {formData.department_name && <div style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>🏢 {formData.department_name}</div>}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* ── SECTION 2: BENTO GRID ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.4fr', gap: 30 }}>
+                <div className="grid-2" style={{ gap: 32, gridTemplateColumns: '1.6fr 1fr' }}>
                     
-                    {/* LEFT COL: INFO FORM */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
-                        <div className="emp-panel" style={{ padding: 40, borderRadius: 24 }}>
-                            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 40, display: 'flex', alignItems: 'center', gap: 14 }}>
-                                <div style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--emp-accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--emp-accent)', boxShadow: "0 8px 16px -4px rgba(108,114,255,0.2)" }}>
-                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    {/* LEFT: INFO FORM */}
+                    <div className="card" style={{ padding: 40, borderRadius: 32 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 40 }}>
+                            <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>👤</div>
+                            <div>
+                                <h3 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Thông tin cá nhân</h3>
+                                <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>Cập nhật thông tin định danh của bạn trên hệ thống</p>
+                            </div>
+                        </div>
+
+                        <form onSubmit={handleSubmit}>
+                            <div className="grid-2" style={{ gap: 24, marginBottom: 24 }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Họ và tên</label>
+                                    <input className="form-control" style={{ height: 52, borderRadius: 12 }} type="text" name="name" value={formData.name} onChange={handleChange} required />
                                 </div>
-                                <div style={{ display: "flex", flexDirection: "column" }}>
-                                    <span>Hồ sơ thành viên</span>
-                                    <span style={{ fontSize: 12, color: "var(--emp-text3)", fontWeight: 500 }}>Cập nhật thông tin định danh của bạn</span>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Số điện thoại</label>
+                                    <input className="form-control" style={{ height: 52, borderRadius: 12 }} type="text" name="phone" value={formData.phone} onChange={handleChange} />
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSubmit}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
-                                    <div className="emp-form-group" style={{ marginBottom: 0 }}>
-                                        <label className="emp-form-label" style={{ fontWeight: 700 }}>Họ và tên đầy đủ</label>
-                                        <input className="emp-form-input" type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="VD: Nguyễn Văn An" style={{ padding: 16, fontSize: 15, borderRadius: 14 }} />
-                                    </div>
-                                    <div className="emp-form-group" style={{ marginBottom: 0 }}>
-                                        <label className="emp-form-label" style={{ fontWeight: 700 }}>Số điện thoại</label>
-                                        <input className="emp-form-input" type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="VD: 0987 654 321" style={{ padding: 16, fontSize: 15, borderRadius: 14 }} />
-                                    </div>
+                            <div className="grid-2" style={{ gap: 24, marginBottom: 24 }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Giới tính</label>
+                                    <select className="form-control" style={{ height: 52, borderRadius: 12 }} name="gender" value={formData.gender} onChange={handleChange}>
+                                        <option value="">Chọn giới tính</option>
+                                        <option value="male">Nam</option>
+                                        <option value="female">Nữ</option>
+                                        <option value="other">Khác</option>
+                                    </select>
                                 </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
-                                    <div className="emp-form-group" style={{ marginBottom: 0 }}>
-                                        <label className="emp-form-label" style={{ fontWeight: 700 }}>Giới tính</label>
-                                        <select className="emp-form-select" name="gender" value={formData.gender} onChange={handleChange} style={{ padding: "0 16px", height: 52, borderRadius: 14 }}>
-                                            <option value="">Chọn giới tính</option>
-                                            <option value="male">Nam</option>
-                                            <option value="female">Nữ</option>
-                                            <option value="other">Khai báo khác</option>
-                                        </select>
-                                    </div>
-                                    <div className="emp-form-group" style={{ marginBottom: 0 }}>
-                                        <label className="emp-form-label" style={{ fontWeight: 700 }}>Email (Không thể sửa)</label>
-                                        <input className="emp-form-input" type="email" value={user?.email || ""} disabled style={{ padding: 16, fontSize: 15, borderRadius: 14, opacity: 0.6, background: "rgba(255,255,255,0.05)" }} />
-                                    </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Email (Hệ thống)</label>
+                                    <input className="form-control" style={{ height: 52, borderRadius: 12, background: 'var(--bg-main)', border: 'none' }} type="email" value={user?.email || ""} disabled />
                                 </div>
+                            </div>
 
-                                <div className="emp-form-group" style={{ marginBottom: 40 }}>
-                                    <label className="emp-form-label" style={{ fontWeight: 700 }}>Địa chỉ liên hệ hiện tại</label>
-                                    <input className="emp-form-input" type="text" name="address" value={formData.address} onChange={handleChange} placeholder="VD: 123 Núi Thành, Hải Châu, Đà Nẵng" style={{ padding: 16, fontSize: 15, borderRadius: 14 }} />
+                            <div className="form-group" style={{ marginBottom: 40 }}>
+                                <label style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Địa chỉ liên lạc</label>
+                                <input className="form-control" style={{ height: 52, borderRadius: 12 }} type="text" name="address" value={formData.address} onChange={handleChange} />
+                            </div>
+
+                            {message.text && (
+                                <div style={{ 
+                                    padding: '16px', borderRadius: 16, marginBottom: 32, textAlign: 'center', fontSize: 14, fontWeight: 700,
+                                    background: message.type === "success" ? "#ecfdf5" : "#fef2f2",
+                                    color: message.type === "success" ? "#10b981" : "#ef4444",
+                                    border: `1px solid ${message.type === "success" ? "#d1fae5" : "#fee2e2"}`
+                                }}>
+                                    {message.text}
                                 </div>
+                            )}
 
-                                {message.text && (
-                                    <div className={`emp-badge emp-badge-${message.type === "success" ? "green" : "red"}`} style={{ width: '100%', padding: '18px', borderRadius: 16, marginBottom: 32, justifyContent: 'center', fontSize: 15, fontWeight: 700 }}>
-                                        {message.text}
-                                    </div>
-                                )}
-
-                                <button className="emp-btn emp-btn-primary" type="submit" disabled={saving} style={{ width: '100%', height: 60, fontSize: 16, fontWeight: 800, borderRadius: 16, gap: 12, boxShadow: "0 10px 25px -5px rgba(108,114,255,0.4)" }}>
-                                    {saving ? "🔄 ĐANG LƯU DỮ LIỆU..." : (
-                                        <>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                            XÁC NHẬN CẬP NHẬT HỒ SƠ
-                                        </>
-                                    )}
-                                </button>
-                            </form>
-                        </div>
+                            <button className="btn btn-primary" type="submit" disabled={saving} style={{ width: '100%', height: 56, borderRadius: 14, fontSize: 16, fontWeight: 800 }}>
+                                {saving ? "Đang xử lý..." : "Lưu thay đổi hồ sơ"}
+                            </button>
+                        </form>
                     </div>
 
-                    {/* RIGHT COL: STATS & ACCOUNT */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 30 }}>
+                    {/* RIGHT: STATS & SECURITY */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                         
-                        {/* STATS BENTO */}
-                        <div className="emp-panel" style={{ padding: 32, borderRadius: 24 }}>
-                            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, color: 'var(--emp-text2)', textTransform: 'uppercase', letterSpacing: "0.1em" }}>Hiệu suất tham xự</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        <div className="card" style={{ padding: 32, borderRadius: 32 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: "0.08em", marginBottom: 24 }}>Thống kê tham dự</h3>
+                            <div className="grid-2" style={{ gap: 16 }}>
                                 {[
-                                    { label: "SỰ KIỆN ĐÃ ĐĂNG KÝ", val: stats.total, color: "var(--emp-accent)", icon: "🎫" },
-                                    { label: "ĐÃ CÓ MẶT", val: stats.attended, color: "#10b981", icon: "✅" },
-                                    { label: "TỈ LỆ CHUYÊN CẦN", val: `${attendRate}%`, color: "#06b6d4", icon: "📊" },
-                                    { label: "SỰ KIỆN SẮP TỚI", val: stats.upcoming, color: "#f59e0b", icon: "⏰" },
+                                    { lbl: "ĐĂNG KÝ", val: stats.total, color: "var(--color-primary)", bg: "#f5f3ff", icon: "🎫" },
+                                    { lbl: "THAM DỰ", val: stats.attended, color: "#10b981", bg: "#ecfdf5", icon: "✅" },
+                                    { lbl: "TỈ LỆ", val: `${attendRate}%`, color: "#06b6d4", bg: "#ecfeff", icon: "📊" },
+                                    { lbl: "SẮP TỚI", val: stats.upcoming, color: "#f59e0b", bg: "#fff7ed", icon: "⏰" },
                                 ].map(s => (
-                                    <div key={s.label} className="emp-bento-card" style={{ padding: 20, borderRadius: 16, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                                        <div style={{ fontSize: 24, marginBottom: 12 }}>{s.icon}</div>
-                                        <div style={{ fontSize: 32, fontWeight: 900, color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.val}</div>
-                                        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--emp-text3)', textTransform: 'uppercase', marginTop: 8 }}>{s.label}</div>
+                                    <div key={s.lbl} style={{ padding: 20, borderRadius: 20, background: s.bg, border: '1px solid rgba(0,0,0,0.02)' }}>
+                                        <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
+                                        <div style={{ fontSize: 28, fontWeight: 900, color: s.color }}>{s.val}</div>
+                                        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginTop: 4 }}>{s.lbl}</div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* SECURITY BENTO */}
-                        <div className="emp-panel" style={{ padding: 32, borderRadius: 24 }}>
-                            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 24, color: 'var(--emp-text2)', textTransform: 'uppercase', letterSpacing: "0.1em" }}>Tài khoản & Bảo mật</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                <button className="emp-btn emp-btn-outline" style={{ justifyContent: 'center', height: 56, borderRadius: 16, fontSize: 14, fontWeight: 700, border: "2px solid rgba(255,255,255,0.1)" }} onClick={() => window.location.href = "/reset-password"}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 10 }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                                    Thay đổi mật khẩu đăng nhập
+                        <div className="card" style={{ padding: 32, borderRadius: 32 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: "0.08em", marginBottom: 24 }}>Bảo mật & Tài khoản</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <button className="btn btn-outline" style={{ height: 52, borderRadius: 12, justifyContent: 'center', fontWeight: 700 }} onClick={() => window.location.href = "/reset-password"}>
+                                    🔒 Thay đổi mật khẩu
                                 </button>
-                                <button className="emp-btn emp-btn-cancel" style={{ justifyContent: 'center', height: 56, borderRadius: 16, fontSize: 14, fontWeight: 700, background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "none" }} onClick={logoutUser}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: 10 }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                                    Đăng xuất tài khoản ngay
+                                <button className="btn" style={{ height: 52, borderRadius: 12, justifyContent: 'center', background: '#fef2f2', color: '#ef4444', fontWeight: 700 }} onClick={logoutUser}>
+                                    🚪 Đăng xuất hệ thống
                                 </button>
                             </div>
                         </div>
