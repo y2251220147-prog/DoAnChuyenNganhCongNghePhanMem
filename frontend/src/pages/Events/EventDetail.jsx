@@ -103,8 +103,8 @@ export default function EventDetail() {
             setStaff(stR.status === "fulfilled" ? (stR.value.data || []) : []);
             setTimeline(tlR.status === "fulfilled" ? (tlR.value.data || []) : []);
             setBudget(buR.status === "fulfilled"
-                ? { items: buR.value.data.items || [], total: buR.value.data.total || 0 }
-                : { items: [], total: 0 });
+                ? buR.value.data
+                : { items: [], total: 0, stats: { planned: 0, total_estimated: 0, total_paid: 0 } });
             setAttendees(atR.status === "fulfilled" ? (atR.value.data || []) : []);
             setDepartments(deR.status === "fulfilled" ? (deR.value.data || []) : []);
             setTasks(tkR.status === "fulfilled" ? (tkR.value.data || []) : []);
@@ -517,56 +517,95 @@ export default function EventDetail() {
 
             {/* ════ TAB: BUDGET ════ */}
             {tab === "budget" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>💰 Ngân sách sự kiện</h3>
-                        <div style={{ textAlign: "right" }}>
-                            <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Dự kiến</p>
-                            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text-secondary)" }}>{fmtVND(event.total_budget || 0)}</p>
-                            <p style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", marginTop: 6 }}>Thực tế</p>
-                            <p style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)" }}>{fmtVND(budget.total)}</p>
+                <div className="card" style={{ border: "1px solid var(--border-color)", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+                    <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: "1px solid #f1f5f9" }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--text-primary)", marginBottom: 4 }}>💰 Quản lý Tài chính Thực tế</h3>
+                        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Phân tích sự sai lệch giữa kế hoạch, dự trù và chi tiêu thực tế.</p>
+                    </div>
+
+                    {/* Budget Overview Cards */}
+                    <div className="grid-3" style={{ gap: 20, marginBottom: 24 }}>
+                        <div style={{ padding: 20, background: "#f8fafc", borderRadius: 16, border: "1px solid #e2e8f0" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: 8 }}>Ngân sách kế hoạch</div>
+                            <div style={{ fontSize: 24, fontWeight: 900, color: "var(--color-primary)" }}>{fmtVND(budget?.stats?.planned || 0)}</div>
+                        </div>
+                        <div style={{ padding: 20, background: "#fffbeb", borderRadius: 16, border: "1px solid #fde68a" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#92400e", textTransform: "uppercase", marginBottom: 8 }}>Tổng dự trù (Ước tính)</div>
+                            <div style={{ fontSize: 24, fontWeight: 900, color: "#d97706" }}>{fmtVND(budget?.stats?.total_estimated || 0)}</div>
+                            <div style={{ fontSize: 10, color: "#b45309", marginTop: 4 }}>Bao gồm cả các dự trù chưa chi</div>
+                        </div>
+                        <div style={{ 
+                            padding: 20, background: (budget?.stats?.total_paid > (budget?.stats?.planned || 0)) ? "#fef2f2" : "#f0fdf4", 
+                            borderRadius: 16, border: `1px solid ${(budget?.stats?.total_paid > (budget?.stats?.planned || 0)) ? "#fecaca" : "#bbf7d0"}` 
+                        }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: (budget?.stats?.total_paid > (budget?.stats?.planned || 0)) ? "#991b1b" : "#166534", textTransform: "uppercase", marginBottom: 8 }}>Thực tế đã chi</div>
+                            <div style={{ fontSize: 24, fontWeight: 900, color: (budget?.stats?.total_paid > (budget?.stats?.planned || 0)) ? "#dc2626" : "#10b981" }}>{fmtVND(budget?.stats?.total_paid || 0)}</div>
+                            {budget?.stats?.total_paid > (budget?.stats?.planned || 0) && (
+                                <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>⚠️ VƯỢT NGÂN SÁCH</div>
+                            )}
                         </div>
                     </div>
-                    {/* So sánh ngân sách */}
-                    {(event.total_budget || 0) > 0 && (
-                        <div style={{
-                            marginBottom: 20, padding: "10px 14px", borderRadius: 8,
-                            background: budget.total > event.total_budget ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)"
-                        }}>
-                            <span style={{
-                                fontSize: 13, fontWeight: 600,
-                                color: budget.total > event.total_budget ? "#dc2626" : "#059669"
-                            }}>
-                                {budget.total > event.total_budget
-                                    ? `⚠️ Vượt ngân sách ${fmtVND(budget.total - event.total_budget)}`
-                                    : `✅ Còn lại ${fmtVND(event.total_budget - budget.total)}`}
+
+                    {/* Progress Bar */}
+                    <div style={{ marginBottom: 32 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 12, fontWeight: 700 }}>
+                            <span style={{ color: "var(--text-secondary)" }}>Tỉ lệ giải ngân thực tế</span>
+                            <span style={{ color: "var(--color-primary)" }}>
+                                {Math.round((budget?.stats?.total_paid / (budget?.stats?.planned || 1)) * 100)}%
                             </span>
                         </div>
-                    )}
-                    {budget.items.length === 0
-                        ? <div className="empty-state"><span>💰</span><p>Chưa có khoản chi</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Khoản mục</th><th>Ghi chú</th><th style={{ textAlign: "right" }}>Chi phí</th></tr></thead>
+                        <div style={{ height: 12, background: "#e2e8f0", borderRadius: 6, overflow: "hidden" }}>
+                            <div style={{ 
+                                height: "100%", 
+                                width: `${Math.min(100, (budget?.stats?.total_paid / (budget?.stats?.planned || 1)) * 100)}%`,
+                                background: (budget?.stats?.total_paid > (budget?.stats?.planned || 0)) ? "#ef4444" : "linear-gradient(90deg, #6366f1, #10b981)",
+                                borderRadius: 6, transition: "width 1s ease-in-out"
+                            }} />
+                        </div>
+                    </div>
+
+                    <div className="data-table-wrapper" style={{ borderRadius: 16, border: "1px solid #f1f5f9", overflow: "hidden" }}>
+                        <table className="data-table">
+                            <thead style={{ background: "#f8fafc" }}>
+                                <tr>
+                                    <th>Hạng mục chi tiêu</th>
+                                    <th>Loại</th>
+                                    <th style={{ textAlign: "right" }}>Dự kiến</th>
+                                    <th style={{ textAlign: "right" }}>Thực chi</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
                             <tbody>
-                                {budget.items.map((b, i) => (
-                                    <tr key={b.id}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                                {(budget.items || []).map((b) => (
+                                    <tr key={b.id} className="table-row-hover">
                                         <td style={{ fontWeight: 600 }}>{b.item}</td>
-                                        <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{b.note || "—"}</td>
-                                        <td style={{ textAlign: "right", fontWeight: 700, color: "var(--color-primary)" }}>{fmtVND(b.cost)}</td>
+                                        <td>
+                                            <span style={{ 
+                                                fontSize: 10, fontWeight: 700, textTransform: "uppercase", padding: "3px 8px", borderRadius: 6,
+                                                background: String(b.id).startsWith('task-') ? "rgba(99,102,241,0.1)" : "rgba(245,158,11,0.1)",
+                                                color: String(b.id).startsWith('task-') ? "var(--color-primary)" : "#b45309",
+                                                border: `1px solid ${String(b.id).startsWith('task-') ? "rgba(99,102,241,0.2)" : "rgba(245,158,11,0.2)"}`
+                                            }}>
+                                                {String(b.id).startsWith('task-') ? "Công việc" : "Trực tiếp"}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: "right", color: "#64748b" }}>{fmtVND(b.estimated_cost || 0)}</td>
+                                        <td style={{ textAlign: "right", fontWeight: 800, color: "var(--color-primary)" }}>
+                                            {b.status === 'paid' ? fmtVND(b.cost || 0) : "—"}
+                                        </td>
+                                        <td>
+                                            <span style={{ 
+                                                fontSize: 10, fontWeight: 800, textTransform: "uppercase",
+                                                color: b.status === 'paid' ? "#10b981" : "#f59e0b"
+                                            }}>
+                                                {b.status === 'paid' ? "✅ Đã chi" : "⏳ Dự kiến"}
+                                            </span>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot>
-                                <tr style={{ borderTop: "2px solid var(--border-color)" }}>
-                                    <td colSpan={3} style={{ fontWeight: 700, fontSize: 13, padding: "12px 16px" }}>Tổng cộng</td>
-                                    <td style={{ textAlign: "right", fontWeight: 800, fontSize: 15, color: "var(--color-primary)", padding: "12px 16px" }}>
-                                        {fmtVND(budget.total)}
-                                    </td>
-                                </tr>
-                            </tfoot>
                         </table>
-                    }
+                    </div>
                 </div>
             )}
 

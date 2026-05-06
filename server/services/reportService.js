@@ -17,14 +17,25 @@ exports.getOverview = async () => {
         FROM attendees
     `);
 
-    const [[bud]]  = await db.query("SELECT COALESCE(SUM(cost),0) AS total FROM event_budget");
-    const [[plan]] = await db.query("SELECT COALESCE(SUM(total_budget),0) AS total FROM events");
+    const [[directBud]] = await db.query("SELECT COALESCE(SUM(cost),0) AS total FROM event_budget WHERE status='paid'");
+    const [[plan]]     = await db.query("SELECT COALESCE(SUM(total_budget),0) AS total FROM events");
+
+    // Đếm số sự kiện vượt ngân sách
+    const [[over]] = await db.query(`
+        SELECT COUNT(*) AS count FROM (
+            SELECT e.id, e.total_budget, COALESCE(SUM(eb.cost),0) AS actual
+            FROM events e
+            LEFT JOIN event_budget eb ON e.id = eb.event_id AND eb.status = 'paid'
+            GROUP BY e.id
+            HAVING actual > e.total_budget AND e.total_budget > 0
+        ) t
+    `);
 
     return {
         events: { total: ev.total, running: run.total },
         users: usr.total,
         attendees: { total: Number(att.total) || 0, checkedIn: Number(att.checked_in) || 0 },
-        budget: { planned: Number(plan.total), actual: Number(bud.total) }
+        budget: { planned: Number(plan.total), actual: Number(directBud.total) || 0, overBudgetCount: over.count }
     };
 };
 
@@ -66,9 +77,14 @@ exports.getAttendeesByEvent = async () => {
 exports.getBudgetByEvent = async () => {
     const [rows] = await db.query(`
         SELECT e.id, e.name, e.total_budget AS planned,
-               COALESCE(SUM(b.cost),0) AS actual
-        FROM events e LEFT JOIN event_budget b ON e.id = b.event_id
-        GROUP BY e.id HAVING planned > 0 ORDER BY actual DESC
+               COALESCE(b.direct_actual, 0) AS actual
+        FROM events e 
+        LEFT JOIN (
+            SELECT event_id, SUM(cost) AS direct_actual 
+            FROM event_budget WHERE status='paid' GROUP BY event_id
+        ) b ON e.id = b.event_id
+        WHERE e.total_budget > 0
+        ORDER BY actual DESC
     `);
     return rows;
 };

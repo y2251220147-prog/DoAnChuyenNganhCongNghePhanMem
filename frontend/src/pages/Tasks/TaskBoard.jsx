@@ -24,7 +24,7 @@ const EMPTY_TASK = {
     assigned_to: "", assigned_department_id: "", priority: "medium", status: "todo",
     start_date: "", due_date: "", is_milestone: false,
     estimated_h: "", progress: 0,
-    estimated_budget: "", feedback_status: 'none', feedback_note: ""
+    estimated_budget: "", actual_budget: "", feedback_status: 'none', feedback_note: ""
 };
 
 const fmtDT = (d) => d ? new Date(d).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
@@ -294,6 +294,7 @@ export default function TaskBoard({
             estimated_h: task.estimated_h || "",
             progress: task.progress || 0,
             estimated_budget: task.estimated_budget || "",
+            actual_budget: task.actual_budget || "",
             feedback_status: task.feedback_status || 'none',
             feedback_note: task.feedback_note || "",
         });
@@ -699,6 +700,7 @@ export default function TaskBoard({
                             },
                             { label: "Ước tính (giờ)", value: openTask.estimated_h ? `${openTask.estimated_h}h` : "—" },
                             { label: "Dự trù ngân sách", value: openTask.estimated_budget ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(openTask.estimated_budget) : "—" },
+                            { label: "Chi phí thực tế", value: openTask.actual_budget ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(openTask.actual_budget) : "—", style: { color: "var(--color-primary)", fontWeight: 800 } },
                         ].map(row => (
                             <div key={row.label} style={{ padding: "8px 12px", background: "var(--bg-main)", borderRadius: 6 }}>
                                 <div style={{
@@ -946,15 +948,24 @@ export default function TaskBoard({
 
                     <div className="grid-2" style={{ marginBottom: 16 }}>
                         <div className="form-group">
-                            <label>Dự trù ngân sách (VND)</label>
+                            <label>Dự kiến chi phí (VND)</label>
                             <input type="number" min="0" className="form-control" value={form.estimated_budget}
                                 onChange={e => setForm({ ...form, estimated_budget: e.target.value })} placeholder="500000" />
                         </div>
-                        <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 30 }}>
-                            <input type="checkbox" id="milestone" checked={form.is_milestone}
-                                onChange={e => setForm({ ...form, is_milestone: e.target.checked })} />
-                            <label htmlFor="milestone" style={{ cursor: "pointer", fontWeight: 700, margin: 0 }}>🏁 Milestone (Mốc quan trọng)</label>
+                        <div className="form-group">
+                            <label>Thực tế đã chi (VND)</label>
+                            <input type="number" className="form-control" value={form.actual_budget} readOnly 
+                                style={{ background: "#f8fafc", cursor: "not-allowed", fontWeight: 700, color: "var(--color-primary)" }}
+                                title="Vui lòng thực hiện 'Giải ngân' trong mục Quản lý Ngân sách để cập nhật con số này." />
+                            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
+                                💡 Tự động cập nhật khi "Giải ngân" tại mục Ngân sách.
+                            </div>
                         </div>
+                    </div>
+                    <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                        <input type="checkbox" id="milestone" checked={form.is_milestone}
+                            onChange={e => setForm({ ...form, is_milestone: e.target.checked })} />
+                        <label htmlFor="milestone" style={{ cursor: "pointer", fontWeight: 700, margin: 0 }}>🏁 Milestone (Mốc quan trọng)</label>
                     </div>
 
                     <div className="form-group">
