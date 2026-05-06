@@ -28,11 +28,12 @@ const ITEM_STATUS_CFG = {
     done: { dot: "#6366f1", label: "Đã xong", labelColor: "#6366f1", bg: "rgba(99,102,241,0.04)" },
 };
 
-const EMPTY_FORM = { event_id: "", title: "", start_time: "", end_time: "", description: "" };
+const EMPTY_FORM = { event_id: "", title: "", start_time: "", end_time: "", description: "", category: "general", location: "", pic_name: "" };
 
 export default function TimelineList() {
     const [timeline, setTimeline] = useState([]);
     const [events, setEvents] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
@@ -40,15 +41,20 @@ export default function TimelineList() {
     const [error, setError] = useState("");
     const [filterEvent, setFilter] = useState("all");
 
-    const { user } = useContext(AuthContext);
+    const { user, getAvatarUrl } = useContext(AuthContext);
     const canManage = user?.role === "admin" || user?.role === "organizer";
 
     const load = async () => {
         setLoading(true);
         try {
-            const [tR, eR] = await Promise.all([getTimeline(), getEvents()]);
+            const [tR, eR, uR] = await Promise.all([
+                getTimeline(), 
+                getEvents(),
+                import("../../services/api").then(m => m.default.get("/users"))
+            ]);
             setTimeline(tR.data || []);
             setEvents(eR.data || []);
+            setUsers(uR.data || []);
         } catch {/**/ }
         finally { setLoading(false); }
     };
@@ -372,7 +378,9 @@ export default function TimelineList() {
                                 required>
                                 <option value="">-- Chọn sự kiện từ danh sách --</option>
                                 {events.map(ev => (
-                                    <option key={ev.id} value={ev.id}>{ev.name} ({new Date(ev.start_date).toLocaleDateString()})</option>
+                                    <option key={ev.id} value={ev.id}>
+                                        {ev.name} {ev.start_date ? `(${new Date(ev.start_date).toLocaleDateString("vi-VN")})` : ""}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -398,7 +406,7 @@ export default function TimelineList() {
                                 required />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: 15, fontWeight: 700 }}>Thời điểm kết thúc (tùy chọn)</label>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Thời điểm kết thúc</label>
                             <input type="datetime-local" className="form-control"
                                 style={{ height: 50, fontSize: 15, borderRadius: 12 }}
                                 value={form.end_time}
@@ -406,11 +414,53 @@ export default function TimelineList() {
                         </div>
                     </div>
 
+                    <div className="grid-2" style={{ gap: 24 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Loại hoạt động</label>
+                            <select className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                                value={form.category}
+                                onChange={e => setForm({ ...form, category: e.target.value })}>
+                                <option value="general">Mục chung</option>
+                                <option value="opening">Khai mạc / Chào mừng</option>
+                                <option value="performance">Tiết mục văn nghệ</option>
+                                <option value="speech">Phát biểu / Tham luận</option>
+                                <option value="award">Trao giải / Vinh danh</option>
+                                <option value="break">Giải lao / Teabreak</option>
+                                <option value="closing">Bế mạc / Kết thúc</option>
+                            </select>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Người phụ trách (PIC)</label>
+                            <select className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                                value={form.pic_name}
+                                onChange={e => setForm({ ...form, pic_name: e.target.value })}>
+                                <option value="">-- Chọn nhân sự phụ trách --</option>
+                                {users.map(u => (
+                                    <option key={u.id} value={u.name}>
+                                        {u.name} {u.department_name ? `[${u.department_name}]` : ""}
+                                    </option>
+                                ))}
+                                <option value="Khác">Khác (MC/Khách mời bên ngoài...)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 15, fontWeight: 700 }}>Địa điểm / Vị trí thực hiện</label>
+                        <input className="form-control"
+                            style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                            placeholder="VD: Sân khấu chính, Sảnh A, Phòng họp VIP..."
+                            value={form.location}
+                            onChange={e => setForm({ ...form, location: e.target.value })} />
+                    </div>
+
                     <div className="form-group" style={{ marginBottom: 0 }}>
                         <label style={{ fontSize: 15, fontWeight: 700 }}>Ghi chú nội dung kịch bản</label>
-                        <textarea className="form-control" rows="4"
+                        <textarea className="form-control" rows="3"
                             style={{ fontSize: 15, padding: 16, borderRadius: 12, lineHeight: 1.6 }}
-                            placeholder="Chi tiết diễn biến, nhân sự phụ trách, lưu ý kỹ thuật..."
+                            placeholder="Chi tiết diễn biến, lưu ý kỹ thuật, thiết bị cần dùng..."
                             value={form.description}
                             onChange={e => setForm({ ...form, description: e.target.value })} />
                     </div>

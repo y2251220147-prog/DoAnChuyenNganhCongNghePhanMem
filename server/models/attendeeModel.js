@@ -22,8 +22,10 @@ const Attendee = {
     },
     getByEvent: async (eventId) => {
         const [r] = await db.query(`
-            SELECT a.*, u.role AS user_role, u.department
-            FROM attendees a LEFT JOIN users u ON a.user_id = u.id
+            SELECT a.*, u.role AS user_role, d.name AS department_name
+            FROM attendees a 
+            LEFT JOIN users u ON a.user_id = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
             WHERE a.event_id=? ORDER BY a.checked_in DESC, a.name ASC
         `, [eventId]);
         return r;
@@ -82,6 +84,17 @@ const Attendee = {
             internalCount: Number(x.internal_count) || 0, externalCount: Number(x.external_count) || 0,
             internalCheckin: Number(x.internal_checkin) || 0, externalCheckin: Number(x.external_checkin) || 0
         };
+    },
+    lookup: async (email) => {
+        const [rows] = await db.query(`
+            SELECT a.*, e.name AS event_name, e.start_date, e.end_date, e.location, e.status AS event_status
+            FROM attendees a
+            JOIN events e ON a.event_id = e.id
+            WHERE a.email = ?
+            ORDER BY e.start_date DESC
+        `, [email]);
+        return rows;
     }
 };
 module.exports = Attendee;
+

@@ -56,7 +56,7 @@ export default function CheckinScanner() {
     const [message, setMessage] = useState(null);
     const [history, setHistory] = useState([]);
     const [stats, setStats] = useState(null);
-    const [guestList, setGuestList] = useState([]);
+    const [attendeeList, setAttendeeList] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
     const [tab, setTab] = useState("scanner");
     const [cameraOpen, setCameraOpen] = useState(false);
@@ -79,16 +79,16 @@ export default function CheckinScanner() {
         api.get(`/checkin/stats/${selectedEvent}`)
             .then(r => setStats(r.data))
             .catch(() => setStats(null));
-        loadGuestList();
+        loadAttendeeList();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedEvent]);
 
-    const loadGuestList = async () => {
+    const loadAttendeeList = async () => {
         if (!selectedEvent) return;
         setLoadingList(true);
         try {
             const r = await api.get(`/checkin/list/${selectedEvent}`);
-            setGuestList(r.data || []);
+            setAttendeeList(r.data || []);
         } catch {/**/ }
         finally { setLoadingList(false); }
     };
@@ -119,7 +119,7 @@ export default function CheckinScanner() {
                 api.get(`/checkin/list/${selectedEvent}`)
             ]);
             setStats(sR.data);
-            setGuestList(lR.data || []);
+            setAttendeeList(lR.data || []);
         } catch (err) {
             const errMsg = err.response?.data?.message || "Check-in thất bại";
             setMessage({ type: "error", text: "❌ " + errMsg });
@@ -143,9 +143,9 @@ export default function CheckinScanner() {
     };
 
     const exportToCSV = () => {
-        if (!guestList || guestList.length === 0) return;
+        if (!attendeeList || attendeeList.length === 0) return;
         const headers = ["STT", "Họ và tên", "Email", "Phân nhóm", "Thời gian Check-in", "Trạng thái"];
-        const rows = guestList.map((g, i) => [
+        const rows = attendeeList.map((g, i) => [
             i + 1,
             `"${(g.name || '').replace(/"/g, '""')}"`,
             `"${(g.email || '').replace(/"/g, '""')}"`,
@@ -160,7 +160,7 @@ export default function CheckinScanner() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `DanhSachKhachMoi_Event_${selectedEvent}.csv`);
+        link.setAttribute("download", `DanhSachNguoiThamDu_Event_${selectedEvent}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -175,7 +175,7 @@ export default function CheckinScanner() {
                 <div>
                     <h2 className="gradient-text">🎟️ Kiểm soát Check-in</h2>
                     <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
-                        Quản lý lượt vào/ra bằng cách quét mã QR cho cả khách mời và nhân sự.
+                        Quản lý lượt vào/ra bằng cách quét mã QR cho cả người tham dự và nhân sự.
                     </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#f8fafc", padding: "8px 16px", borderRadius: 14, border: "1px solid #e2e8f0" }}>
@@ -238,7 +238,7 @@ export default function CheckinScanner() {
             <div style={{ display: "flex", gap: 12, marginBottom: 24, padding: "6px", background: "#f1f5f9", borderRadius: 16, width: "fit-content" }}>
                 {[
                     { id: "scanner", label: "📷 Quét mã QR", icon: "📸" },
-                    { id: "guests", label: `👥 Danh sách ${stats ? `(${stats.total})` : ""}`, icon: "👥" },
+                    { id: "attendees", label: `👥 Danh sách ${stats ? `(${stats.total})` : ""}`, icon: "👥" },
                     { id: "history", label: `📋 Lịch sử quét ${history.length > 0 ? `(${history.length})` : ""}`, icon: "📋" }
                 ].map(t => (
                     <button key={t.id} 
@@ -355,21 +355,21 @@ export default function CheckinScanner() {
                 </div>
             )}
 
-            {/* ===== TAB: GUESTS ===== */}
-            {tab === "guests" && (
+            {/* ===== TAB: ATTENDEES ===== */}
+            {tab === "attendees" && (
                 <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 20, overflow: "hidden", border: "1px solid #f1f5f9" }}>
                     <div style={{ background: "#f8fafc", padding: "16px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <h3 style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>👥 DANH SÁCH NGƯỜI THAM DỰ</h3>
                         <div style={{ display: "flex", gap: 8 }}>
-                            <button className="btn btn-outline btn-sm" onClick={loadGuestList} style={{ borderRadius: 8 }}>↻ Cập nhật</button>
-                            <button className="btn btn-primary btn-sm" onClick={exportToCSV} style={{ borderRadius: 8, background: "#10b981", border: "none" }} disabled={guestList.length === 0}>📥 Xuất Excel (CSV)</button>
+                            <button className="btn btn-outline btn-sm" onClick={loadAttendeeList} style={{ borderRadius: 8 }}>↻ Cập nhật</button>
+                            <button className="btn btn-primary btn-sm" onClick={exportToCSV} style={{ borderRadius: 8, background: "#10b981", border: "none" }} disabled={attendeeList.length === 0}>📥 Xuất Excel (CSV)</button>
                         </div>
                     </div>
                     {!selectedEvent ? (
                         <div className="empty-state" style={{ padding: 60 }}><span>🎪</span><p>Chọn sự kiện để xem danh sách chi tiết</p></div>
                     ) : loadingList ? (
                         <div className="empty-state" style={{ padding: 60 }}><span>⏳</span><p>Đang tải dữ liệu người tham dự...</p></div>
-                    ) : guestList.length === 0 ? (
+                    ) : attendeeList.length === 0 ? (
                         <div className="empty-state" style={{ padding: 60 }}><span>🎟️</span><p>Chưa có ai đăng ký tham dự sự kiện này</p></div>
                     ) : (
                         <table className="data-table">
@@ -383,7 +383,7 @@ export default function CheckinScanner() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {guestList.map((g, i) => (
+                                {attendeeList.map((g, i) => (
                                     <tr key={`${g.source}-${g.id}`} style={g.checked_in ? { background: "rgba(16,185,129,0.03)" } : {}}>
                                         <td style={{ color: "var(--text-muted)", paddingLeft: 24 }}>{String(i + 1).padStart(2, '0')}</td>
                                         <td>

@@ -2,18 +2,15 @@ import { useContext, useEffect, useRef, useState } from "react";
 import Modal from "../../components/UI/Modal";
 import { AuthContext } from "../../context/AuthContext";
 import {
-    createPhase, deletePhase, getPhases,
     createTask, updateTask, updateTaskStatus, updateTaskProgress, deleteTask,
     getComments, addComment, deleteComment, getHistory, getTaskStats
 } from "../../services/taskService";
 
 // ─── Hằng số ─────────────────────────────────────────────────
 const STATUSES = [
-    { key: "todo", label: "Chưa bắt đầu", color: "#94a3b8" },
+    { key: "todo", label: "Chuẩn bị", color: "#94a3b8" },
     { key: "in_progress", label: "Đang làm", color: "#f59e0b" },
-    { key: "review", label: "Chờ duyệt", color: "#6366f1" },
     { key: "done", label: "Hoàn thành", color: "#10b981" },
-    { key: "cancelled", label: "Đã hủy", color: "#ef4444" },
 ];
 const PRIORITY_CFG = {
     high: { label: "Cao", color: "#ef4444", bg: "#fef2f2" },
@@ -22,10 +19,9 @@ const PRIORITY_CFG = {
 };
 const STATUS_BADGE = Object.fromEntries(STATUSES.map(s => [s.key, s]));
 
-const PHASE_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6"];
 const EMPTY_TASK = {
-    title: "", description: "", phase_id: "", parent_id: "", deadline_id: "",
-    assigned_to: "", priority: "medium", status: "todo",
+    title: "", description: "", parent_id: "", deadline_id: "",
+    assigned_to: "", assigned_department_id: "", priority: "medium", status: "todo",
     start_date: "", due_date: "", is_milestone: false,
     estimated_h: "", progress: 0,
     estimated_budget: "", feedback_status: 'none', feedback_note: ""
@@ -33,6 +29,12 @@ const EMPTY_TASK = {
 
 const fmtDT = (d) => d ? new Date(d).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : null;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }) : null;
+const toInputDT = (d) => {
+    if (!d) return "";
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return "";
+    return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
 const isOverdue = (d, s) => d && !["done", "cancelled"].includes(s) && new Date(d) < new Date();
 
 // ─── Avatar mini ────────────────────────────────────────────
@@ -88,15 +90,6 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
                     }}>
                         {p.label}
                     </span>
-                    {task.phase_name && (
-                        <span style={{
-                            fontSize: 9, color: task.phase_color || "var(--text-muted)",
-                            background: (task.phase_color || "#6366f1") + "18",
-                            padding: "1px 6px", borderRadius: 999, fontWeight: 600
-                        }}>
-                            {task.phase_name}
-                        </span>
-                    )}
                 </div>
                 {canManage && (
                     <button 
@@ -119,19 +112,6 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
                 {task.title}
             </div>
 
-            {/* Progress bar */}
-            {task.progress > 0 && (
-                <div style={{
-                    height: 4, background: "var(--border-color)", borderRadius: 2,
-                    overflow: "hidden", marginBottom: 7
-                }}>
-                    <div style={{
-                        height: "100%", width: `${task.progress}%`,
-                        background: task.progress === 100 ? "#10b981" : "var(--color-primary)",
-                        borderRadius: 2, transition: "width 0.4s"
-                    }} />
-                </div>
-            )}
 
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -167,7 +147,7 @@ export default function TaskBoard({
 }) {
     const { user } = useContext(AuthContext);
 
-    const [phases, setPhases] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -190,31 +170,39 @@ export default function TaskBoard({
     const [saving, setSaving] = useState(false);
     const [formErr, setFormErr] = useState("");
 
-    // Phase modal
-    const [phaseModal, setPhaseModal] = useState(false);
-    const [phaseForm, setPhaseForm] = useState({ name: "", color: "#6366f1" });
 
     // Filter
     const [filterStatus, setFilterStatus] = useState("all");
     const [filterPriority, setFilterPriority] = useState("all");
     const [filterAssignee, setFilterAssignee] = useState("all");
+    const [filterDepartment, setFilterDepartment] = useState("all");
     const [search, setSearch] = useState("");
 
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [ph, tk, st] = await Promise.all([
-                getPhases(eventId),
+            const [tk, st, dp] = await Promise.all([
                 import("../../services/taskService").then(m => m.getTasksByEvent(eventId)),
                 import("../../services/taskService").then(m => m.getTaskStats(eventId)),
+                import("../../services/api").then(m => m.default.get("/departments")),
             ]);
-            setPhases(ph.data || []);
             setTasks(tk.data || []);
             setStats(st.data || null);
+            setDepartments(dp.data || []);
         } catch {/**/ }
         finally { setLoading(false); }
     };
     useEffect(() => { loadAll(); }, [eventId]);
+
+    // Auto-sync department when assignee changes
+    useEffect(() => {
+        if (formModal && form.assigned_to) {
+            const sel = staffList.find(s => String(s.user_id) === String(form.assigned_to) || String(s.id) === String(form.assigned_to));
+            if (sel && sel.department_id && (!form.assigned_department_id || form.assigned_department_id === "")) {
+                setForm(prev => ({ ...prev, assigned_department_id: sel.department_id }));
+            }
+        }
+    }, [form.assigned_to, formModal, staffList]);
 
     // ── Kanban drag & drop ───────────────────────────────────
     const onDragStart = (e, id) => { setDrag(id); e.dataTransfer.effectAllowed = "move"; };
@@ -262,13 +250,6 @@ export default function TaskBoard({
         finally { setSending(false); }
     };
 
-    const handleProgressUpdate = async (progress) => {
-        try {
-            await updateTaskProgress(openTask.id, progress);
-            setOpenTask(prev => ({ ...prev, progress }));
-            setTasks(prev => prev.map(t => t.id === openTask.id ? { ...t, progress } : t));
-        } catch {/**/ }
-    };
 
     const handleFeedbackUpdate = async (e) => {
         e.preventDefault();
@@ -297,10 +278,11 @@ export default function TaskBoard({
             parent_id: task.parent_id || "",
             deadline_id: task.deadline_id || "",
             assigned_to: task.assigned_to || "",
+            assigned_department_id: task.assigned_department_id || "",
             priority: task.priority || "medium",
             status: task.status || "todo",
-            start_date: task.start_date?.slice(0, 16) || "",
-            due_date: task.due_date?.slice(0, 16) || "",
+            start_date: task.start_date || "",
+            due_date: task.due_date || "",
             is_milestone: task.is_milestone || false,
             estimated_h: task.estimated_h || "",
             progress: task.progress || 0,
@@ -326,25 +308,18 @@ export default function TaskBoard({
     const handleDeleteTask = async (id) => {
         if (!window.confirm("Xóa nhiệm vụ này?")) return;
         try { 
-            await deleteTask(id); setOpenTask(null); 
+            await deleteTask(id); 
+            // Chỉ đóng modal và load lại sau khi đã xóa thành công ở server
+            if (openTask && openTask.id === id) setOpenTask(null); 
             await loadAll(); 
             if (onRefreshParent) onRefreshParent();
         }
-        catch { alert("Xóa thất bại"); }
+        catch (err) { 
+            console.error("Delete task error:", err);
+            alert("Xóa thất bại: " + (err.response?.data?.message || "Lỗi server")); 
+        }
     };
 
-    // ── Create phase ─────────────────────────────────────────
-    const handleCreatePhase = async (e) => {
-        e.preventDefault();
-        try { await createPhase({ ...phaseForm, event_id: eventId }); setPhaseForm({ name: "", color: "#6366f1" }); loadAll(); }
-        catch {/**/ }
-    };
-
-    const handleDeletePhase = async (id) => {
-        if (!window.confirm("Xóa giai đoạn này có thể ảnh hưởng đến các nhiệm vụ đang gán. Tiếp tục?")) return;
-        try { await deletePhase(id); loadAll(); }
-        catch { alert("Không thể xóa giai đoạn đang có nhiệm vụ"); }
-    };
 
     // ── Filter ───────────────────────────────────────────────
     const applyFilters = (t) => {
@@ -352,6 +327,7 @@ export default function TaskBoard({
         if (filterStatus !== "all" && t.status !== filterStatus) return false;
         if (filterPriority !== "all" && t.priority !== filterPriority) return false;
         if (filterAssignee !== "all" && String(t.assigned_to) !== String(filterAssignee)) return false;
+        if (filterDepartment !== "all" && String(t.assigned_department_id) !== String(filterDepartment)) return false;
         if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
     };
@@ -369,10 +345,9 @@ export default function TaskBoard({
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 20, marginBottom: 28 }}>
                     {[
                         { label: "Tổng số", value: stats.total || 0, color: "#64748b", bg: "#f8fafc" },
-                        { label: "Đang xử lý", value: stats.in_progress || 0, color: "#f59e0b", bg: "#fffbeb" },
-                        { label: "Chờ kiểm duyệt", value: stats.review || 0, color: "#6366f1", bg: "#f5f3ff" },
-                        { label: "Đã hoàn tất", value: stats.done || 0, color: "#10b981", bg: "#f0fdf4" },
-                        { label: "Quá hạn ⚠️", value: stats.overdue || 0, color: "#ef4444", bg: "#fef2f2" },
+                        { label: "Chuẩn bị", value: stats.todo || 0, color: "#94a3b8", bg: "#f1f5f9" },
+                        { label: "Đang làm", value: stats.in_progress || 0, color: "#f59e0b", bg: "#fffbeb" },
+                        { label: "Hoàn thành", value: stats.done || 0, color: "#10b981", bg: "#f0fdf4" },
                     ].map(s => (
                         <div key={s.label} className="card-stat" style={{ 
                             background: s.bg, border: "1px solid rgba(0,0,0,0.04)", 
@@ -389,7 +364,9 @@ export default function TaskBoard({
                             padding: "20px 24px", borderRadius: 16, display: "flex", 
                             flexDirection: "column", alignItems: "flex-start", gap: 4
                         }}>
-                            <span style={{ fontSize: 32, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{stats.avg_progress}%</span>
+                            <span style={{ fontSize: 32, fontWeight: 900, color: "#fff", lineHeight: 1 }}>
+                                {tasks.length > 0 ? Math.round((tasks.filter(t => t.status === 'done' && !t.parent_id).length / tasks.filter(t => !t.parent_id).length) * 100) : 0}%
+                            </span>
                             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tiến độ trung bình</span>
                         </div>
                     )}
@@ -464,6 +441,11 @@ export default function TaskBoard({
                         <option value="medium">🟡 Ưu tiên Trung bình</option>
                         <option value="low">🟢 Ưu tiên Thấp</option>
                     </select>
+                    <select className="form-control" style={{ maxWidth: 160, borderRadius: 12, fontSize: 13, height: 44, border: "1px solid #e2e8f0" }}
+                        value={filterDepartment} onChange={e => setFilterDepartment(e.target.value)}>
+                        <option value="all">Mọi phòng ban</option>
+                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
                     <input className="form-control" placeholder="🔍 Nhập từ khóa tìm nhiệm vụ..."
                         value={search} onChange={e => setSearch(e.target.value)}
                         style={{ flex: 1, borderRadius: 12, fontSize: 13, height: 44, border: "1px solid #e2e8f0", paddingLeft: 16 }} />
@@ -471,11 +453,6 @@ export default function TaskBoard({
 
                 {canManage && (
                     <div style={{ display: "flex", gap: 8 }}>
-                        <button className="btn btn-outline"
-                            style={{ borderRadius: 12, height: 44, fontWeight: 700, padding: "0 20px" }}
-                            onClick={() => { setPhaseForm({ name: "", color: "#6366f1" }); setPhaseModal(true); }}>
-                            ⚙️ Quản lý Giai đoạn
-                        </button>
                         <button className="btn btn-primary" 
                             style={{ borderRadius: 12, height: 44, fontWeight: 700, padding: "0 24px", boxShadow: "0 4px 12px rgba(99,102,241,0.2)" }}
                             onClick={() => openCreateForm()}>
@@ -488,7 +465,7 @@ export default function TaskBoard({
             {/* ════ VIEW: KANBAN ════ */}
             {viewMode === "kanban" && (
                 <div style={{ 
-                    display: "grid", gridTemplateColumns: "repeat(5, minmax(280px, 1fr))", 
+                    display: "grid", gridTemplateColumns: "repeat(3, minmax(280px, 1fr))", 
                     gap: 16, alignItems: "start", height: "calc(100vh - 350px)", minHeight: 600
                 }}>
                     {STATUSES.map(col => {
@@ -544,29 +521,16 @@ export default function TaskBoard({
             {/* ════ VIEW: LIST (Phân cấp theo giai đoạn) ════ */}
             {viewMode === "list" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {/* Tasks không có giai đoạn */}
-                    {filtered.filter(t => !t.phase_id && !t.parent_id).length > 0 && (
-                        <PhaseSection
-                            phase={{ id: null, name: "Không có giai đoạn", color: "#94a3b8" }}
-                            tasks={filtered.filter(t => !t.phase_id)}
-                            canManage={canManage}
-                            onOpen={openTaskDetail}
-                            onEdit={openEditForm}
-                            onDelete={handleDeleteTask}
-                            onAddSub={openCreateForm}
-                        />
-                    )}
-                    {phases.map(phase => (
-                        <PhaseSection key={phase.id} phase={phase}
-                            tasks={filtered.filter(t => t.phase_id === phase.id)}
-                            canManage={canManage}
-                            onOpen={openTaskDetail}
-                            onEdit={openEditForm}
-                            onDelete={handleDeleteTask}
-                            onAddSub={(pid) => openCreateForm(pid, phase.id)}
-                            onAddTask={() => openCreateForm(null, phase.id)}
-                        />
-                    ))}
+                    <PhaseSection
+                        phase={{ id: null, name: "Danh sách nhiệm vụ", color: "#6366f1" }}
+                        tasks={filtered}
+                        canManage={canManage}
+                        onOpen={openTaskDetail}
+                        onEdit={openEditForm}
+                        onDelete={handleDeleteTask}
+                        onAddSub={openCreateForm}
+                        onAddTask={() => openCreateForm()}
+                    />
                 </div>
             )}
 
@@ -593,7 +557,7 @@ export default function TaskBoard({
                                 onClick={async () => {
                                     try {
                                         await updateTaskStatus(openTask.id, s.key);
-                                        setOpenTask(p => ({ ...p, status: s.key }));
+                                        setOpenTask(p => ({ ...p, status: s.key, progress: s.key === 'done' ? 100 : 0 }));
                                         await loadAll();
                                         if (onRefreshParent) onRefreshParent();
                                     } catch {/**/ }
@@ -622,43 +586,18 @@ export default function TaskBoard({
                         )}
                     </div>
 
-                    {/* Progress slider */}
-                    <div style={{ marginBottom: 16 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Tiến độ</span>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>
-                                {openTask.progress || 0}%
-                            </span>
-                        </div>
-                        <input type="range" min={0} max={100} step={5}
-                            value={openTask.progress || 0}
-                            onChange={e => handleProgressUpdate(Number(e.target.value))}
-                            style={{ width: "100%", accentColor: "var(--color-primary)" }} />
-                        <div style={{
-                            height: 6, background: "var(--border-color)", borderRadius: 3,
-                            overflow: "hidden", marginTop: 4
-                        }}>
-                            <div style={{
-                                height: "100%",
-                                width: `${openTask.progress || 0}%`,
-                                background: `${openTask.progress === 100 ? "#10b981" : "var(--color-primary)"}`,
-                                transition: "width 0.3s"
-                            }} />
-                        </div>
-                    </div>
 
                     {/* Info grid */}
                     <div className="grid-2" style={{ marginBottom: 16, gap: 10 }}>
                         {[
                             { label: "Thuộc Deadline", value: openTask.deadline_title || "—", style: openTask.deadline_title ? { color: "var(--color-primary)", fontWeight: 800 } : {} },
-                            { label: "Người phụ trách", value: openTask.assigned_name || "Chưa giao" },
+                            { label: "Người phụ trách", value: openTask.assigned_name ? `${openTask.assigned_name} (${openTask.assigned_department_name || "N/A"})` : "Chưa giao" },
                             { label: "Ưu tiên", value: PRIORITY_CFG[openTask.priority]?.label || "—" },
                             { label: "Bắt đầu", value: fmtDT(openTask.start_date) || "—" },
                             {
                                 label: "Hạn chót", value: fmtDT(openTask.due_date) || "—",
                                 style: isOverdue(openTask.due_date, openTask.status) ? { color: "#dc2626", fontWeight: 700 } : {}
                             },
-                            { label: "Giai đoạn", value: openTask.phase_name || "—" },
                             { label: "Ước tính (giờ)", value: openTask.estimated_h ? `${openTask.estimated_h}h` : "—" },
                             { label: "Dự trù ngân sách", value: openTask.estimated_budget ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(openTask.estimated_budget) : "—" },
                         ].map(row => (
@@ -849,44 +788,55 @@ export default function TaskBoard({
                             onChange={e => setForm({ ...form, title: e.target.value })} required />
                     </div>
 
-                    <div className="grid-3" style={{ marginBottom: 16 }}>
+
+                    <div className="grid-2" style={{ marginBottom: 16 }}>
                         <div className="form-group">
-                            <label>Giai đoạn</label>
-                            <select className="form-control" value={form.phase_id}
-                                onChange={e => setForm({ ...form, phase_id: e.target.value })}>
-                                <option value="">Không có</option>
-                                {phases.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            <label>Người phụ trách cá nhân</label>
+                            <select className="form-control" value={form.assigned_to}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    const selectedStaff = staffList.find(s => String(s.user_id) === String(val) || String(s.id) === String(val));
+                                    console.log("Selected staff:", selectedStaff); // Debug
+                                    setForm(prev => ({ 
+                                        ...prev, 
+                                        assigned_to: val,
+                                        assigned_department_id: selectedStaff?.department_id || prev.assigned_department_id || ""
+                                    }));
+                                }}>
+                                <option value="">Chưa giao cá nhân</option>
+                                {staffList
+                                    .filter(s => {
+                                        // Giữ lại người hiện tại nếu đang sửa nhiệm vụ
+                                        const isCurrent = form.assigned_to && (String(s.user_id) === String(form.assigned_to) || String(s.id) === String(form.assigned_to));
+                                        if (isCurrent) return true;
+
+                                        // Chỉ hiện những người có role 'user'. 
+                                        // Nếu user_role chưa có (chưa restart server), tạm thời cho phép hiện để không bị trống.
+                                        const isUserRole = !s.user_role || s.user_role === 'user';
+                                        
+                                        // Loại bỏ những người đã được giao việc khác trong cùng sự kiện này
+                                        const isAlreadyAssigned = tasks.some(t => t.assigned_to && String(t.assigned_to) === String(s.user_id || s.id));
+                                        
+                                        return isUserRole && !isAlreadyAssigned;
+                                    })
+                                    .map(s => (
+                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                            {s.user_name || s.name} {s.department_name ? `[${s.department_name}]` : ""}
+                                        </option>
+                                    ))}
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Nhiệm vụ cha</label>
-                            <select className="form-control" value={form.parent_id}
-                                onChange={e => setForm({ ...form, parent_id: e.target.value })}>
-                                <option value="">Không có</option>
-                                {tasks.filter(t => t.id !== editId && !t.parent_id).map(t => (
-                                    <option key={t.id} value={t.id}>{t.title}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label>Liên kết với Deadline</label>
-                            <select className="form-control" value={form.deadline_id}
-                                onChange={e => setForm({ ...form, deadline_id: e.target.value })}>
-                                <option value="">Không liên kết</option>
-                                {deadlines.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}
+                            <label>Phòng ban thực hiện (Tự động theo nhân sự)</label>
+                            <select className="form-control" value={form.assigned_department_id}
+                                onChange={e => setForm({ ...form, assigned_department_id: e.target.value })}>
+                                <option value="">Không gán cho phòng ban</option>
+                                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </select>
                         </div>
                     </div>
 
                     <div className="grid-2" style={{ marginBottom: 16 }}>
-                        <div className="form-group">
-                            <label>Người phụ trách</label>
-                            <select className="form-control" value={form.assigned_to}
-                                onChange={e => setForm({ ...form, assigned_to: e.target.value })}>
-                                <option value="">Chưa giao</option>
-                                {staffList.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.user_name || s.name}</option>)}
-                            </select>
-                        </div>
                         <div className="form-group">
                             <label>Ưu tiên</label>
                             <select className="form-control" value={form.priority}
@@ -901,13 +851,13 @@ export default function TaskBoard({
                     <div className="grid-3" style={{ marginBottom: 16 }}>
                         <div className="form-group">
                             <label>Ngày bắt đầu</label>
-                            <input type="datetime-local" className="form-control" value={form.start_date}
+                            <input type="datetime-local" className="form-control" value={toInputDT(form.start_date)}
                                 onChange={e => setForm({ ...form, start_date: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>Hạn chót</label>
-                            <input type="datetime-local" className="form-control" value={form.due_date}
-                                onChange={e => setForm({ ...form, due_date: e.target.value })} />
+                            <label>Hạn chót *</label>
+                            <input type="datetime-local" className="form-control" value={toInputDT(form.due_date)}
+                                onChange={e => setForm({ ...form, due_date: e.target.value })} required />
                         </div>
                         <div className="form-group">
                             <label>Ước tính (giờ)</label>
@@ -945,55 +895,6 @@ export default function TaskBoard({
                 </form>
             </Modal>
 
-            {/* ════ MODAL: Phase ════ */}
-            <Modal title="Quản lý Giai đoạn" isOpen={phaseModal} onClose={() => setPhaseModal(false)}>
-                <div style={{ marginBottom: 24 }}>
-                    <h4 style={{ fontSize: 13, marginBottom: 12, color: "var(--text-muted)" }}>Danh sách giai đoạn hiện có:</h4>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {phases.map(p => (
-                            <div key={p.id} style={{ 
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                padding: "8px 12px", background: "var(--bg-secondary)", borderRadius: 10,
-                                border: "1px solid var(--border-color)"
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <div style={{ width: 12, height: 12, borderRadius: 3, background: p.color }} />
-                                    <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</span>
-                                </div>
-                                <button className="btn-delete-small" style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.6 }}
-                                    onClick={() => handleDeletePhase(p.id)} title="Xóa giai đoạn">
-                                    🗑
-                                </button>
-                            </div>
-                        ))}
-                        {phases.length === 0 && <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>Chưa có giai đoạn nào</p>}
-                    </div>
-                </div>
-
-                <hr style={{ border: "none", borderTop: "1px solid var(--border-color)", margin: "20px 0" }} />
-
-                <h4 style={{ fontSize: 13, marginBottom: 12, color: "var(--text-muted)" }}>Thêm giai đoạn mới:</h4>
-                <form onSubmit={handleCreatePhase}>
-                    <div className="form-group">
-                        <label>Tên giai đoạn *</label>
-                        <input className="form-control" placeholder="VD: Chuẩn bị, Triển khai..."
-                            value={phaseForm.name} onChange={e => setPhaseForm({ ...phaseForm, name: e.target.value })} required />
-                    </div>
-                    <div className="form-group">
-                        <label>Màu</label>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                            {PHASE_COLORS.map(c => (
-                                <div key={c} onClick={() => setPhaseForm({ ...phaseForm, color: c })}
-                                    style={{
-                                        width: 28, height: 28, borderRadius: 6, background: c,
-                                        cursor: "pointer", border: `3px solid ${phaseForm.color === c ? "#0f172a" : "transparent"}`,
-                                    }} />
-                            ))}
-                        </div>
-                    </div>
-                    <button type="submit" className="btn btn-primary w-full">+ Thêm giai đoạn</button>
-                </form>
-            </Modal>
         </div>
     );
 }
@@ -1007,166 +908,147 @@ function PhaseSection({ phase, tasks, canManage, onOpen, onEdit, onDelete, onAdd
 
     return (
         <div>
-            {/* Phase header */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, cursor: "pointer" }}
-                onClick={() => setCollapsed(!collapsed)}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: phase.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, fontWeight: 700 }}>{phase.name}</span>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                    {done}/{topTasks.length} hoàn thành
-                </span>
-                <div style={{ flex: 1, height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: phase.color, borderRadius: 2 }} />
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: phase.color }}>{pct}%</span>
-                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{collapsed ? "▶" : "▼"}</span>
-                {canManage && onAddTask && (
-                    <button className="btn btn-outline btn-sm"
-                        onClick={e => { e.stopPropagation(); onAddTask(); }}
-                        style={{ fontSize: 11, padding: "2px 8px" }}>+ Thêm</button>
-                )}
-            </div>
-
-            {!collapsed && (
-                <div className="data-table-wrapper">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Nhiệm vụ</th><th>Ưu tiên</th><th>Người phụ trách</th>
-                                <th>Hạn chót</th><th>Tiến độ</th><th>Trạng thái</th>
-                                {canManage && <th>Thao tác</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {topTasks.map(task => {
-                                const overdue = isOverdue(task.due_date, task.status);
-                                const p = PRIORITY_CFG[task.priority] || PRIORITY_CFG.medium;
-                                const s = STATUS_BADGE[task.status] || STATUS_BADGE.todo;
-                                const subtasks = tasks.filter(t => t.parent_id === task.id);
-                                return (
-                                    <>
-                                        <tr key={task.id} style={{ cursor: "pointer" }} onClick={() => onOpen(task)}>
-                                            <td>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                    {task.is_milestone && <span style={{ fontSize: 12 }}>🏁</span>}
-                                                    <span style={{ fontWeight: 600 }}>{task.title}</span>
-                                                    {task.comment_count > 0 && (
-                                                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>💬{task.comment_count}</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span style={{
-                                                    fontSize: 11, fontWeight: 600, color: p.color,
-                                                    background: p.bg, padding: "2px 8px", borderRadius: 999
-                                                }}>{p.label}</span>
-                                            </td>
-                                            <td>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <Avatar name={task.assigned_name} />
-                                                    <span style={{ fontSize: 12 }}>{task.assigned_name || "—"}</span>
-                                                </div>
-                                            </td>
-                                            <td style={{
-                                                fontSize: 12, color: overdue ? "#dc2626" : "var(--text-primary)",
-                                                fontWeight: overdue ? 700 : 400
-                                            }}>
-                                                {overdue && "⚠️ "}{fmtDate(task.due_date) || "—"}
-                                            </td>
-                                            <td style={{ minWidth: 100 }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <div style={{
-                                                        flex: 1, height: 5, background: "var(--border-color)",
-                                                        borderRadius: 3, overflow: "hidden"
-                                                    }}>
-                                                        <div style={{
-                                                            height: "100%", width: `${task.progress || 0}%`,
-                                                            background: task.progress === 100 ? "#10b981" : "var(--color-primary)"
-                                                        }} />
-                                                    </div>
-                                                    <span style={{
-                                                        fontSize: 10, fontWeight: 700, minWidth: 28,
-                                                        color: "var(--text-muted)"
-                                                    }}>{task.progress || 0}%</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span style={{
-                                                    fontSize: 11, fontWeight: 600, color: s.color,
-                                                    background: s.color + "20", padding: "2px 8px", borderRadius: 999
-                                                }}>
-                                                    {s.label}
+            <div className="data-table-wrapper">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nhiệm vụ</th><th>Ưu tiên</th><th>Người phụ trách</th>
+                            <th>Hạn chót</th><th>Tiến độ</th><th>Trạng thái</th>
+                            {canManage && <th>Thao tác</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {topTasks.map(task => {
+                            const overdue = isOverdue(task.due_date, task.status);
+                            const p = PRIORITY_CFG[task.priority] || PRIORITY_CFG.medium;
+                            const s = STATUS_BADGE[task.status] || STATUS_BADGE.todo;
+                            const subtasks = tasks.filter(t => t.parent_id === task.id);
+                            return (
+                                <>
+                                    <tr key={task.id} style={{ cursor: "pointer" }} onClick={() => onOpen(task)}>
+                                        <td>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                                {task.is_milestone && <span style={{ fontSize: 12 }}>🏁</span>}
+                                                <span style={{ fontWeight: 600 }}>{task.title}</span>
+                                                {task.comment_count > 0 && (
+                                                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>💬{task.comment_count}</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                fontSize: 11, fontWeight: 600, color: p.color,
+                                                background: p.bg, padding: "2px 8px", borderRadius: 999
+                                            }}>{p.label}</span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                <Avatar name={task.assigned_name} />
+                                                <span style={{ fontSize: 12 }}>
+                                                    {task.assigned_name || "—"} 
+                                                    {task.assigned_department_name && <small style={{ opacity: 0.6, marginLeft: 4 }}>[{task.assigned_department_name}]</small>}
                                                 </span>
+                                            </div>
+                                        </td>
+                                        <td style={{
+                                            fontSize: 12, color: overdue ? "#dc2626" : "var(--text-primary)",
+                                            fontWeight: overdue ? 700 : 400
+                                        }}>
+                                            {overdue && "⚠️ "}{fmtDate(task.due_date) || "—"}
+                                        </td>
+                                        <td style={{ minWidth: 100 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                <div style={{
+                                                    flex: 1, height: 5, background: "var(--border-color)",
+                                                    borderRadius: 3, overflow: "hidden"
+                                                }}>
+                                                    <div style={{
+                                                        height: "100%", width: `${task.status === "done" ? 100 : 0}%`,
+                                                        background: task.status === "done" ? "#10b981" : "var(--color-primary)"
+                                                    }} />
+                                                </div>
+                                                <span style={{
+                                                    fontSize: 10, fontWeight: 700, minWidth: 28,
+                                                    color: "var(--text-muted)"
+                                                }}>{task.status === "done" ? 100 : 0}%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                fontSize: 11, fontWeight: 600, color: s.color,
+                                                background: s.color + "20", padding: "2px 8px", borderRadius: 999
+                                            }}>
+                                                {s.label}
+                                            </span>
+                                        </td>
+                                        {canManage && (
+                                            <td onClick={e => e.stopPropagation()}>
+                                                <div className="actions">
+                                                    <button className="btn btn-outline btn-sm"
+                                                        onClick={() => onEdit(task)}>✎</button>
+                                                    <button className="btn btn-outline btn-sm"
+                                                        onClick={() => onAddSub && onAddSub(task.id)}
+                                                        title="Thêm công việc con">+↳</button>
+                                                    <button className="btn btn-danger btn-sm"
+                                                        onClick={() => onDelete(task.id)}>🗑</button>
+                                                </div>
                                             </td>
-                                            {canManage && (
-                                                <td onClick={e => e.stopPropagation()}>
-                                                    <div className="actions">
-                                                        <button className="btn btn-outline btn-sm"
-                                                            onClick={() => onEdit(task)}>✎</button>
-                                                        <button className="btn btn-outline btn-sm"
-                                                            onClick={() => onAddSub && onAddSub(task.id)}
-                                                            title="Thêm công việc con">+↳</button>
-                                                        <button className="btn btn-danger btn-sm"
-                                                            onClick={() => onDelete(task.id)}>🗑</button>
+                                        )}
+                                    </tr>
+                                    {/* Sub-tasks */}
+                                    {subtasks.map(sub => {
+                                        const sp = PRIORITY_CFG[sub.priority] || PRIORITY_CFG.medium;
+                                        const ss = STATUS_BADGE[sub.status] || STATUS_BADGE.todo;
+                                        const sOverdue = isOverdue(sub.due_date, sub.status);
+                                        return (
+                                            <tr key={sub.id} style={{ background: "rgba(0,0,0,0.01)", cursor: "pointer" }}
+                                                onClick={() => onOpen(sub)}>
+                                                <td style={{ paddingLeft: 32 }}>
+                                                    <span style={{ color: "var(--text-muted)", marginRight: 6 }}>↳</span>
+                                                    <span style={{ fontSize: 13 }}>{sub.title}</span>
+                                                </td>
+                                                <td><span style={{
+                                                    fontSize: 10, color: sp.color, background: sp.bg,
+                                                    padding: "1px 6px", borderRadius: 999
+                                                }}>{sp.label}</span></td>
+                                                <td style={{ fontSize: 12 }}>{sub.assigned_name || "—"}</td>
+                                                <td style={{ fontSize: 11, color: sOverdue ? "#dc2626" : "var(--text-muted)" }}>
+                                                    {fmtDate(sub.due_date) || "—"}
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                                        <div style={{ width: 60, height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden" }}>
+                                                            <div style={{ height: "100%", width: `${sub.status === "done" ? 100 : 0}%`, background: sub.status === "done" ? "#10b981" : "var(--color-primary)" }} />
+                                                        </div>
+                                                        <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub.status === "done" ? 100 : 0}%</span>
                                                     </div>
                                                 </td>
-                                            )}
-                                        </tr>
-                                        {/* Sub-tasks */}
-                                        {subtasks.map(sub => {
-                                            const sp = PRIORITY_CFG[sub.priority] || PRIORITY_CFG.medium;
-                                            const ss = STATUS_BADGE[sub.status] || STATUS_BADGE.todo;
-                                            const sOverdue = isOverdue(sub.due_date, sub.status);
-                                            return (
-                                                <tr key={sub.id} style={{ background: "rgba(0,0,0,0.01)", cursor: "pointer" }}
-                                                    onClick={() => onOpen(sub)}>
-                                                    <td style={{ paddingLeft: 32 }}>
-                                                        <span style={{ color: "var(--text-muted)", marginRight: 6 }}>↳</span>
-                                                        <span style={{ fontSize: 13 }}>{sub.title}</span>
-                                                    </td>
-                                                    <td><span style={{
-                                                        fontSize: 10, color: sp.color, background: sp.bg,
-                                                        padding: "1px 6px", borderRadius: 999
-                                                    }}>{sp.label}</span></td>
-                                                    <td style={{ fontSize: 12 }}>{sub.assigned_name || "—"}</td>
-                                                    <td style={{ fontSize: 11, color: sOverdue ? "#dc2626" : "var(--text-muted)" }}>
-                                                        {fmtDate(sub.due_date) || "—"}
-                                                    </td>
-                                                    <td>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                                            <div style={{ width: 60, height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden" }}>
-                                                                <div style={{ height: "100%", width: `${sub.progress || 0}%`, background: "var(--color-primary)" }} />
-                                                            </div>
-                                                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub.progress || 0}%</span>
+                                                <td><span style={{
+                                                    fontSize: 10, color: ss.color, background: ss.color + "20",
+                                                    padding: "1px 7px", borderRadius: 999
+                                                }}>{ss.label}</span></td>
+                                                {canManage && (
+                                                    <td onClick={e => e.stopPropagation()}>
+                                                        <div className="actions">
+                                                            <button className="btn btn-outline btn-sm" onClick={() => onEdit(sub)}>✎</button>
+                                                            <button className="btn btn-danger btn-sm" onClick={() => onDelete(sub.id)}>🗑</button>
                                                         </div>
                                                     </td>
-                                                    <td><span style={{
-                                                        fontSize: 10, color: ss.color, background: ss.color + "20",
-                                                        padding: "1px 7px", borderRadius: 999
-                                                    }}>{ss.label}</span></td>
-                                                    {canManage && (
-                                                        <td onClick={e => e.stopPropagation()}>
-                                                            <div className="actions">
-                                                                <button className="btn btn-outline btn-sm" onClick={() => onEdit(sub)}>✎</button>
-                                                                <button className="btn btn-danger btn-sm" onClick={() => onDelete(sub.id)}>🗑</button>
-                                                            </div>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })}
-                                    </>
-                                );
-                            })}
-                            {topTasks.length === 0 && (
-                                <tr><td colSpan={canManage ? 7 : 6} style={{ textAlign: "center", color: "var(--text-muted)", padding: 16 }}>
-                                    Chưa có nhiệm vụ trong giai đoạn này
-                                </td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </>
+                            );
+                        })}
+                        {topTasks.length === 0 && (
+                            <tr><td colSpan={canManage ? 7 : 6} style={{ textAlign: "center", color: "var(--text-muted)", padding: 16 }}>
+                                Chưa có nhiệm vụ nào
+                            </td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }
@@ -1322,10 +1204,10 @@ function GanttChart({ tasks, onUpdateDates, canManage }) {
                                     cursor: canManage ? "ew-resize" : "default"
                                 }} onMouseDown={(e) => handleMouseDown(e, task)}>
                                     {/* Progress fill */}
-                                    {task.progress > 0 && !task.is_milestone && (
+                                    {task.status === 'done' && !task.is_milestone && (
                                         <div style={{
                                             position: "absolute", left: 0, top: 0, bottom: 0,
-                                            width: `${task.progress}%`,
+                                            width: `100%`,
                                             background: "rgba(255,255,255,0.25)",
                                         }} />
                                     )}

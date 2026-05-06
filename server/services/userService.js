@@ -40,6 +40,15 @@ const changeRole = async (id, role) => {
 };
 
 /**
+ * Đổi phòng ban của user
+ */
+const changeDepartment = async (id, departmentId) => {
+    const user = await User.findById(id);
+    if (!user) throw { status: 404, message: "User not found" };
+    await User.updateDepartment(id, departmentId || null);
+};
+
+/**
  * Xóa user
  */
 const deleteUser = async (id) => {
@@ -62,4 +71,4 @@ const updateUserProfile = async (id, data) => {
     return await getUserById(id);
 };
 
-module.exports = { getAllUsers, getUserById, changeRole, deleteUser, updateUserProfile };
+module.exports = { getAllUsers, getUserById, changeRole, deleteUser, updateUserProfile, changeDepartment };

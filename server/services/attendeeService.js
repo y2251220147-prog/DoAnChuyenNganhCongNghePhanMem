@@ -4,6 +4,8 @@ const User = require("../models/userModel");
 const Notification = require("../models/notificationModel");
 const { generateQR } = require("./qrService");
 
+const { sendGuestInvitation } = require("./emailService");
+
 const isEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 exports.getAllAttendees = async () => await Attendee.getAll();
@@ -32,6 +34,65 @@ exports.addExternal = async (data, registeredBy) => {
         attendee_type: 'external', qr_code, registered_by: registeredBy
     });
     return { id, qr_code };
+};
+
+exports.bulkInvite = async (data, requesterId) => {
+    const { event_id, guests, subject, content } = data;
+
+    if (!event_id || !guests || !Array.isArray(guests) || guests.length === 0)
+        throw { status: 400, message: "event_id và danh sách khách mời là bắt buộc" };
+
+    const event = await Event.getById(event_id);
+    if (!event) throw { status: 404, message: "Không tìm thấy sự kiện" };
+
+    const stats = { total: guests.length, success: 0, failed: 0 };
+    const results = [];
+
+    for (const g of guests) {
+        try {
+            // Kiểm tra trùng email cho cùng sự kiện
+            const dup = await Attendee.findByEmailAndEvent(g.email, event_id);
+            if (dup) {
+                results.push({ email: g.email, status: 'skipped', message: 'Email đã tồn tại' });
+                continue;
+            }
+
+            const qr_code = generateQR(event_id, g.name);
+            const id = await Attendee.create({ 
+                event_id, 
+                user_id: null, 
+                name: g.name, 
+                email: g.email, 
+                qr_code, 
+                attendee_type: 'external',
+                registered_by: requesterId
+            });
+
+            await sendGuestInvitation({
+                name: g.name,
+                email: g.email,
+                qr_code,
+                custom_message: content, 
+                event: {
+                    name: event.name,
+                    start_date: event.start_date,
+                    end_date: event.end_date,
+                    location: event.location,
+                    venue_type: event.venue_type,
+                    event_type: event.event_type,
+                    description: event.description
+                }
+            });
+
+            stats.success++;
+            results.push({ email: g.email, status: 'success', id });
+        } catch (err) {
+            stats.failed++;
+            results.push({ email: g.email, status: 'error', message: err.message });
+        }
+    }
+
+    return { stats, results };
 };
 
 exports.selfRegister = async (eventId, userId) => {
@@ -76,3 +137,9 @@ exports.remove = async (attendeeId, requesterId, requesterRole) => {
         throw { status: 400, message: "Không thể huỷ sau khi đã check-in" };
     await Attendee.delete(attendeeId);
 };
+
+exports.lookup = async (email) => {
+    if (!email) throw { status: 400, message: "Email is required" };
+    return await Attendee.lookup(email);
+};
+

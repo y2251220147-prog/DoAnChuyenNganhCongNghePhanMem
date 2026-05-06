@@ -14,11 +14,22 @@ const User = {
         return result.insertId;
     },
     async getAllUsers() {
-        const [rows] = await db.query("SELECT id, name, email, role, avatar, phone, gender, address, created_at FROM users ORDER BY id DESC");
+        const [rows] = await db.query(`
+            SELECT u.id, u.name, u.email, u.role, u.avatar, u.phone, u.gender, u.address, u.created_at, 
+                   u.department_id, d.name AS department_name
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+            ORDER BY u.id DESC
+        `);
         return rows;
     },
     async findById(id) {
-        const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
+        const [rows] = await db.query(`
+            SELECT u.*, d.name AS department_name
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE u.id = ?
+        `, [id]);
         return rows[0] || null;
     },
     async updateRole(id, role) {
@@ -32,6 +43,9 @@ const User = {
     },
     async updateAvatar(id, avatarUrl) {
         await db.query("UPDATE users SET avatar = ? WHERE id = ?", [avatarUrl, id]);
+    },
+    async updateDepartment(id, departmentId) {
+        await db.query("UPDATE users SET department_id = ? WHERE id = ?", [departmentId, id]);
     },
     async updateProfile(id, data) {
         const { name, phone, gender, address } = data;

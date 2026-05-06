@@ -15,11 +15,14 @@ exports.addUser = async (req, res) => {
     if (role && !VALID_ROLES.includes(role))
         return res.status(400).json({ message: `Role must be one of: ${VALID_ROLES.join(", ")}` });
     try {
-        // Dùng register để tạo user (có đầy đủ validation: length, email exists, hash)
+        // Dùng register để tạo user (có đầy đủ validation)
         const result = await authService.register({ name, email, password });
-        // Nếu role khác "user", update role sau khi tạo
+        // Update role & department sau khi tạo
         if (role && role !== "user") {
             await userService.changeRole(result.userId, role);
+        }
+        if (req.body.department_id) {
+            await userService.changeDepartment(result.userId, req.body.department_id);
         }
         res.status(201).json({ message: "User created", id: result.userId });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
@@ -29,6 +32,13 @@ exports.changeRole = async (req, res) => {
     try {
         await userService.changeRole(req.params.id, req.body.role);
         res.json({ message: "Role updated" });
+    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
+};
+
+exports.changeDepartment = async (req, res) => {
+    try {
+        await userService.changeDepartment(req.params.id, req.body.department_id);
+        res.json({ message: "Department updated" });
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 

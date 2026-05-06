@@ -62,34 +62,3 @@ exports.deleteEvent = async (req, res) => {
     } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
 };
 
-// ── DEADLINES ─────────────────────────────────────────────────
-exports.getDeadlines = async (req, res) => {
-    try { res.json(await eventService.getDeadlines(req.params.id)); }
-    catch (err) { res.status(err.status || 500).json({ message: err.message }); }
-};
-
-exports.createDeadline = async (req, res) => {
-    try {
-        const result = await eventService.createDeadline(req.params.id, req.body);
-        res.status(201).json({ message: "Thêm deadline thành công", ...result });
-    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
-};
-
-exports.updateDeadlineStatus = async (req, res) => {
-    try {
-        await eventService.updateDeadlineStatus(
-            req.params.deadlineId, 
-            req.body.status, 
-            req.body.note,
-            req.user.role
-        );
-        res.json({ message: "Cập nhật deadline thành công" });
-    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
-};
-
-exports.deleteDeadline = async (req, res) => {
-    try {
-        await eventService.deleteDeadline(req.params.deadlineId);
-        res.json({ message: "Xóa deadline thành công" });
-    } catch (err) { res.status(err.status || 500).json({ message: err.message }); }
-};

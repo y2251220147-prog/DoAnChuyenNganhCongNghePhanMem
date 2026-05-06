@@ -2,7 +2,8 @@ import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import Layout from "../components/Layout/Layout";
 import Modal from "../components/UI/Modal";
-import { changeRole, createUser, deleteUser, getUsers } from "../services/userService";
+import { changeRole, changeDepartment, createUser, deleteUser, getUsers } from "../services/userService";
+import { getDepartments } from "../services/departmentService";
 import "../styles/global.css";
 
 const ROLES = ["user", "organizer", "admin"];
@@ -20,21 +21,26 @@ export default function AdminUsers() {
     const { getAvatarUrl } = useContext(AuthContext);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [departments, setDepartments] = useState([]);
     const [updating, setUpdating] = useState(null);
     const [isModalOpen, setModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "user" });
+    const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "user", department_id: "" });
     const [submitting, setSubmitting] = useState(false);
     const [search, setSearch] = useState("");
     const [formError, setFormError] = useState("");
 
-    const loadUsers = async () => {
+    const loadData = async () => {
         setLoading(true);
-        try { const res = await getUsers(); setUsers(res.data || []); }
+        try { 
+            const [userRes, deptRes] = await Promise.all([getUsers(), getDepartments()]);
+            setUsers(userRes.data || []); 
+            setDepartments(deptRes.data || []);
+        }
         catch {/***/ }
         finally { setLoading(false); }
     };
 
-    useEffect(() => { loadUsers(); }, []);
+    useEffect(() => { loadData(); }, []);
 
     const handleRoleChange = async (id, newRole) => {
         setUpdating(id);
@@ -45,13 +51,23 @@ export default function AdminUsers() {
         finally { setUpdating(null); }
     };
 
+    const handleDeptChange = async (id, deptId) => {
+        setUpdating(id);
+        try {
+            await changeDepartment(id, deptId);
+            const dept = departments.find(d => d.id === parseInt(deptId));
+            setUsers(prev => prev.map(u => u.id === id ? { ...u, department_id: deptId, department_name: dept?.name || null } : u));
+        } catch {/***/ }
+        finally { setUpdating(null); }
+    };
+
     const handleCreate = async (e) => {
         e.preventDefault(); setFormError(""); setSubmitting(true);
         try {
             await createUser(formData);
             setModalOpen(false);
-            setFormData({ name: "", email: "", password: "", role: "user" });
-            loadUsers();
+            setFormData({ name: "", email: "", password: "", role: "user", department_id: "" });
+            loadData();
         } catch (err) { setFormError(err.response?.data?.message || "Create failed"); }
         finally { setSubmitting(false); }
     };
@@ -105,7 +121,7 @@ export default function AdminUsers() {
                             <tr>
                                 <th style={{ paddingLeft: 24 }}>Thành viên</th>
                                 <th>Địa chỉ Email</th>
-                                <th>Ngày tham gia</th>
+                                <th>Phòng ban</th>
                                 <th>Vai trò</th>
                                 <th>Điều chỉnh quyền</th>
                                 <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>
@@ -136,8 +152,16 @@ export default function AdminUsers() {
                                         </div>
                                     </td>
                                     <td style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{u.email}</td>
-                                    <td style={{ color: "var(--text-secondary)", fontSize: 13 }}>
-                                        📅 {u.created_at ? new Date(u.created_at).toLocaleDateString("vi-VN") : "—"}
+                                    <td>
+                                        <select
+                                            value={u.department_id || ""}
+                                            onChange={e => handleDeptChange(u.id, e.target.value)}
+                                            className="form-control"
+                                            style={{ width: 140, padding: "8px 12px", fontSize: 13, borderRadius: 10, border: "1px solid #e2e8f0" }}
+                                        >
+                                            <option value="">Không có</option>
+                                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                        </select>
                                     </td>
                                     <td><span className={ROLE_BADGE[u.role] || "badge badge-default"} style={{ border: "none", padding: "6px 12px", borderRadius: 8 }}>{u.role?.toUpperCase()}</span></td>
                                     <td>
@@ -185,6 +209,13 @@ export default function AdminUsers() {
                             <option value="user">Người dùng (User)</option>
                             <option value="organizer">Người tổ chức (Organizer)</option>
                             <option value="admin">Quản trị viên (Admin)</option>
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Phòng ban trực thuộc</label>
+                        <select className="form-control" value={formData.department_id} onChange={e => setFormData({ ...formData, department_id: e.target.value })}>
+                            <option value="">Không có</option>
+                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                     </div>
                     <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 12 }}>

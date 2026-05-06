@@ -10,7 +10,7 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import EventDetail from "./pages/Events/EventDetail";
 import EventList from "./pages/Events/EventList";
 import Feedback from "./pages/Feedback/Feedback";
-import GuestList from "./pages/Guests/GuestList";
+import AttendeeList from "./pages/Attendees/AttendeeList";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Reports from "./pages/Reports/Reports";
@@ -20,8 +20,9 @@ import TimelineList from "./pages/Timeline/TimelineList";
 import VenueList from "./pages/Venues/VenueList";
 import NotificationCenter from "./pages/Notifications/NotificationCenter";
 import UserEventPortal from "./pages/Portal/UserEventPortal";
-import GuestPublicPortal from "./pages/Portal/GuestPublicPortal";
+import AttendeePublicPortal from "./pages/Portal/AttendeePublicPortal";
 import SearchPage from "./pages/Events/SearchPage";
+import DepartmentList from "./pages/Departments/DepartmentList";
 
 // ── Employee (User) pages ───────────────────────────────────────────────────
 import EmployeeDashboard from "./pages/Employee/EmployeeDashboard";
@@ -105,18 +106,19 @@ export default function App() {
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
 
         {/* Admin / Organizer only */}
-        <Route path="/guests" element={<RoleRoute roles={["admin","organizer"]}><GuestList /></RoleRoute>} />
+        <Route path="/attendees" element={<RoleRoute roles={["admin","organizer"]}><AttendeeList /></RoleRoute>} />
         <Route path="/staff" element={<RoleRoute roles={["admin","organizer"]}><StaffList /></RoleRoute>} />
         <Route path="/timeline" element={<RoleRoute roles={["admin","organizer"]}><TimelineList /></RoleRoute>} />
         <Route path="/budget" element={<RoleRoute roles={["admin","organizer"]}><BudgetList /></RoleRoute>} />
         <Route path="/checkin" element={<RoleRoute roles={["admin","organizer"]}><CheckinScanner /></RoleRoute>} />
         <Route path="/reports" element={<RoleRoute roles={["admin","organizer"]}><Reports /></RoleRoute>} />
         <Route path="/venues" element={<RoleRoute roles={["admin","organizer"]}><VenueList /></RoleRoute>} />
+        <Route path="/departments" element={<RoleRoute roles={["admin","organizer"]}><DepartmentList /></RoleRoute>} />
         <Route path="/admin/users" element={<RoleRoute roles={["admin"]}><AdminUsers /></RoleRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
 
         {/* Public */}
-        <Route path="/guest-portal" element={<GuestPublicPortal />} />
+        <Route path="/guest-portal" element={<AttendeePublicPortal />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

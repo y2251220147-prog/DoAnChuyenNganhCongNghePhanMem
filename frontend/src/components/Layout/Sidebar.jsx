@@ -16,11 +16,12 @@ const NAV = {
         {
             label: "Quản lý sự kiện", items: [
                 { to: "/events", icon: "🎪", text: "Tất cả sự kiện" },
-                { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Khách mời" },
+                { to: "/staff", icon: "👥", text: "Cơ cấu nhân sự" },
+                { to: "/attendees", icon: "🎟️", text: "Người tham dự" },
                 { to: "/venues", icon: "🏢", text: "Địa điểm" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
                 { to: "/budget", icon: "💰", text: "Ngân sách" },
-                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
+                { to: "/timeline", icon: "📅", text: "Lịch trình sự kiện" },
                 { to: "/checkin", icon: "✅", text: "Check-in" },
                 { to: "/feedback", icon: "💬", text: "Phản hồi" },
             ]
@@ -44,11 +45,12 @@ const NAV = {
         {
             label: "Tổ chức sự kiện", items: [
                 { to: "/events", icon: "🎪", text: "Quản lý sự kiện" },
-                { to: "/staff", icon: "👥", text: "Nhân sự tổ chức" },
-                { to: "/guests", icon: "🎟️", text: "Khách mời" },
+                { to: "/staff", icon: "👥", text: "Cơ cấu nhân sự" },
+                { to: "/attendees", icon: "🎟️", text: "Người tham dự" },
                 { to: "/venues", icon: "🏢", text: "Địa điểm" },
+                { to: "/departments", icon: "🏢", text: "Phòng ban" },
                 { to: "/budget", icon: "💰", text: "Ngân sách" },
-                { to: "/timeline", icon: "📅", text: "Tiến độ công việc" },
+                { to: "/timeline", icon: "📅", text: "Lịch trình sự kiện" },
                 { to: "/checkin", icon: "✅", text: "Check-in" },
                 { to: "/feedback", icon: "💬", text: "Phản hồi" },
             ]

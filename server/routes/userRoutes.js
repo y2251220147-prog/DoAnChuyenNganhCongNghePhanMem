@@ -12,6 +12,7 @@ router.get("/profile", auth, c.getProfile);
 router.put("/profile", auth, c.updateProfile);
 
 router.put("/:id/role", auth, authorize(["admin"]), c.changeRole);
+router.put("/:id/department", auth, authorize(["admin", "organizer"]), c.changeDepartment);
 router.delete("/:id", auth, authorize(["admin"]), c.deleteUser);
 
 module.exports = router;

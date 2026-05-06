@@ -25,26 +25,38 @@ const STATUS_VN = {
     running: "Đang diễn ra", completed: "Đã kết thúc", cancelled: "Đã hủy",
 };
 
-export default function GuestPublicPortal() {
+export default function AttendeePublicPortal() {
     const [email, setEmail] = useState("");
-    const [results, setResults] = useState(null); // array of { guest, event }
+    const [results, setResults] = useState(null); 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [qrModal, setQrModal] = useState(null);
 
     const handleLookup = async (e) => {
         e.preventDefault();
         if (!email.trim()) return;
         setLoading(true); setError(""); setResults(null);
         try {
-            const res = await fetch(`${API_BASE}/guests/lookup?email=${encodeURIComponent(email.trim())}`);
+            const res = await fetch(`${API_BASE}/attendees/public/lookup?email=${encodeURIComponent(email.trim())}`);
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body.message || "Không tìm thấy thông tin");
             }
             const data = await res.json();
-            if (!data || data.length === 0) throw new Error("Không tìm thấy thông tin khách mời với email này.");
-            setResults(data);
+            if (!data || data.length === 0) throw new Error("Không tìm thấy thông tin tham gia với email này.");
+            
+            // Map data format
+            const formatted = data.map(att => ({
+                attendee: att,
+                event: {
+                    id: att.event_id,
+                    name: att.event_name,
+                    start_date: att.start_date,
+                    end_date: att.end_date,
+                    location: att.location,
+                    status: att.event_status
+                }
+            }));
+            setResults(formatted);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -52,16 +64,17 @@ export default function GuestPublicPortal() {
         }
     };
 
-    const downloadQR = (qrValue, guestName) => {
+
+    const downloadQR = (qrValue, attendeeName) => {
         const url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrValue)}&margin=10`;
         const a = document.createElement("a");
         a.href = url;
-        a.download = `QR-${guestName.replace(/\s/g, "_")}.png`;
+        a.download = `QR-${attendeeName.replace(/\s/g, "_")}.png`;
         a.click();
     };
 
     return (
-        <div className="guest-portal-wrap" style={{ minHeight: "100vh", background: "#F7F6F3", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 16px" }}>
+        <div className="attendee-portal-wrap" style={{ minHeight: "100vh", background: "#F7F6F3", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 16px" }}>
 
             {/* ── Header ── */}
             <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -73,7 +86,7 @@ export default function GuestPublicPortal() {
             </div>
 
             {/* ── Lookup Card ── */}
-            <div className="guest-portal-card" style={{ width: "100%", maxWidth: 480, background: "#fff", borderRadius: 16, border: "1px solid #e2e0da", padding: "28px 28px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)", marginBottom: 24 }}>
+            <div className="attendee-portal-card" style={{ width: "100%", maxWidth: 480, background: "#fff", borderRadius: 16, border: "1px solid #e2e0da", padding: "28px 28px", boxShadow: "0 4px 24px rgba(0,0,0,0.06)", marginBottom: 24 }}>
                 <form onSubmit={handleLookup}>
                     <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6963", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                         Địa chỉ email
@@ -111,8 +124,8 @@ export default function GuestPublicPortal() {
 
             {/* ── Results ── */}
             {results && results.length > 0 && results.map((item, idx) => {
-                const { guest, event } = item;
-                const isCheckedIn = guest.checked_in;
+                const { attendee, event } = item;
+                const isCheckedIn = attendee.checked_in;
                 return (
                     <div key={idx} style={{
                         width: "100%", maxWidth: 480, background: "#fff", borderRadius: 16,
@@ -131,13 +144,13 @@ export default function GuestPublicPortal() {
                             {isCheckedIn ? "Đã Check-in" : "Chưa Check-in"}
                         </div>
 
-                        {/* Guest info */}
+                        {/* Attendee info */}
                         <div style={{ marginBottom: 20 }}>
                             <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1917", marginBottom: 4 }}>
-                                👤 {guest.name}
+                                👤 {attendee.name}
                             </div>
-                            <div style={{ fontSize: 13, color: "#6B6963" }}>{guest.email}</div>
-                            {guest.phone && <div style={{ fontSize: 13, color: "#6B6963" }}>📞 {guest.phone}</div>}
+                            <div style={{ fontSize: 13, color: "#6B6963" }}>{attendee.email}</div>
+                            {attendee.phone && <div style={{ fontSize: 13, color: "#6B6963" }}>📞 {attendee.phone}</div>}
                         </div>
 
                         {/* Event info */}
@@ -162,18 +175,18 @@ export default function GuestPublicPortal() {
                         )}
 
                         {/* QR Code */}
-                        {guest.qr_code && (
+                        {attendee.qr_code && (
                             <div style={{ textAlign: "center" }}>
                                 <div style={{ display: "inline-block", background: "white", padding: 16, borderRadius: 12, border: "1.5px solid #e2e0da", marginBottom: 12 }}>
-                                    <QRDisplay value={guest.qr_code} size={180} />
+                                    <QRDisplay value={attendee.qr_code} size={180} />
                                 </div>
                                 <div style={{ fontFamily: "monospace", fontSize: 11, color: "#A8A49E", marginBottom: 16, wordBreak: "break-all", padding: "6px 12px", background: "#F7F6F3", borderRadius: 6 }}>
-                                    {guest.qr_code}
+                                    {attendee.qr_code}
                                 </div>
                                 <div style={{ display: "flex", gap: 10 }}>
                                     <button
                                         style={{ flex: 1, padding: "10px", border: "1.5px solid #d1cec8", borderRadius: 10, background: "white", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
-                                        onClick={() => downloadQR(guest.qr_code, guest.name)}>
+                                        onClick={() => downloadQR(attendee.qr_code, attendee.name)}>
                                         ⬇️ Tải QR
                                     </button>
                                     <button
@@ -185,7 +198,7 @@ export default function GuestPublicPortal() {
                             </div>
                         )}
 
-                        {!guest.qr_code && (
+                        {!attendee.qr_code && (
                             <div style={{ textAlign: "center", padding: "16px", color: "#A8A49E", fontSize: 13 }}>
                                 ℹ️ Chưa có mã QR — Ban tổ chức sẽ gửi mã trước sự kiện
                             </div>

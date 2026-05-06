@@ -12,6 +12,18 @@ api.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // [CHỐNG CACHE TOÀN CỤC]: Ép trình duyệt luôn tải dữ liệu mới nhất từ Server cho TẤT CẢ các API GET
+    if (config.method === 'get') {
+        config.params = {
+            ...config.params,
+            _t: Date.now() // Thêm timestamp ngẫu nhiên
+        };
+        // Thêm các headers chống cache chuẩn HTTP
+        config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+        config.headers['Pragma'] = 'no-cache';
+        config.headers['Expires'] = '0';
+    }
+
     return config;
 
 });
@@ -28,4 +40,4 @@ api.interceptors.response.use(
     }
 );
 
-export default api;   
+export default api;

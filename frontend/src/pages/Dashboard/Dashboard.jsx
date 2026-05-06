@@ -20,7 +20,7 @@ export default function Dashboard() {
     const { user } = useContext(AuthContext);
     const [events, setEvents] = useState([]);
     const [staffCount, setStaffCount] = useState(0);
-    const [guestsCount, setGuestsCount] = useState(0);
+    const [attendeesCount, setAttendeesCount] = useState(0);
     const [budgetTotal, setBudgetTotal] = useState(0);
     const [checkedIn, setCheckedIn] = useState(0);
     const [myRegs, setMyRegs] = useState([]);
@@ -42,7 +42,7 @@ export default function Dashboard() {
                 
                 if (user.role !== 'user') {
                     setStaffCount(evList.reduce((n, e) => n + (e.staff_count || 0), 0));
-                    setGuestsCount(overview.attendees?.total || 0);
+                    setAttendeesCount(overview.attendees?.total || 0);
                     setCheckedIn(overview.attendees?.checkedIn || 0);
                     setBudgetTotal(overview.budget?.actual || 0);
                 }
@@ -65,9 +65,10 @@ export default function Dashboard() {
     ] : [
         { icon: "🎪", label: "Tổng sự kiện", value: events.length, color: "indigo", path: "/events" },
         { icon: "👥", label: "Nhân sự", value: staffCount, color: "cyan", path: "/staff" },
-        { icon: "🎟️", label: "Khách mời", value: guestsCount, color: "emerald", path: "/guests" },
+        { icon: "🎟️", label: "Người tham dự", value: attendeesCount, color: "emerald", path: "/attendees" },
         { icon: "✅", label: "Đã check-in", value: checkedIn, color: "rose", path: "/checkin" },
     ];
+
 
     return (
         <Layout>

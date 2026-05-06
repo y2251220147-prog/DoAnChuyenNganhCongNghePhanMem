@@ -3,10 +3,9 @@ import Modal from "../../components/UI/Modal";
 import { createTask, updateTaskStatus, deleteTask, updateTask } from "../../services/taskService";
 
 const COLS = [
-    { key: "todo", label: "Cần làm", color: "#94a3b8" },
+    { key: "todo", label: "Chuẩn bị", color: "#94a3b8" },
     { key: "in_progress", label: "Đang làm", color: "#f59e0b" },
-    { key: "done", label: "Đã xong", color: "#10b981" },
-    { key: "cancelled", label: "Đã hủy", color: "#ef4444" },
+    { key: "done", label: "Hoàn thành", color: "#10b981" },
 ];
 const PRIORITY_CFG = {
     high: { label: "Cao", color: "#ef4444", dot: "#ef4444" },
@@ -76,7 +75,7 @@ export default function TaskKanban({ tasks = [], eventId, canManage, onRefresh }
             {/* Kanban board */}
             <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
+                gridTemplateColumns: "repeat(3, 1fr)",
                 gap: 12, alignItems: "start"
             }}>
                 {COLS.map(col => {
@@ -176,10 +175,9 @@ export default function TaskKanban({ tasks = [], eventId, canManage, onRefresh }
                                                     style={{ fontSize: 11, padding: "2px 6px", height: 24 }}
                                                     value={task.status}
                                                     onChange={e => handleStatusChange(task.id, e.target.value)}>
-                                                    <option value="todo">Cần làm</option>
+                                                    <option value="todo">Chuẩn bị</option>
                                                     <option value="in_progress">Đang làm</option>
-                                                    <option value="done">Đã xong</option>
-                                                    <option value="cancelled">Hủy</option>
+                                                    <option value="done">Hoàn thành</option>
                                                 </select>
                                             </div>
                                         )}
@@ -221,9 +219,9 @@ export default function TaskKanban({ tasks = [], eventId, canManage, onRefresh }
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>Hạn chót</label>
-                            <input type="datetime-local" className="form-control"
-                                value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
+                            <label>Hạn chót (bắt buộc, dd/mm/yyyy HH:mm) *</label>
+                            <input type="text" placeholder="dd/mm/yyyy HH:mm" className="form-control"
+                                value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} required />
                         </div>
                     </div>
                     <button type="submit" className="btn btn-primary w-full" disabled={saving}>

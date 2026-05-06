@@ -120,7 +120,7 @@ export default function Reports() {
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetData), "Ngân sách");
 
-        // Sheet 2: Khách mời
+        // Sheet 2: Người tham dự
         const guestData = attendees.map(a => ({
             "Sự kiện": a.name,
             "Sức chứa": a.capacity,
@@ -128,7 +128,7 @@ export default function Reports() {
             "Đã có mặt": a.checked_in,
             "Tỉ lệ đi họp (%)": `${a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0}%`
         }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guestData), "Khách mời");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guestData), "Người tham dự");
 
         // Sheet 3: Công việc
         const taskData = [
@@ -310,7 +310,7 @@ export default function Reports() {
                         {/* ── Tỷ lệ tham dự ── */}
                         <div className="card" style={{ padding: 28, borderRadius: 24 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🎟️ TỔNG HỢP CHI TIẾT KHÁCH MỜI & CHECK-IN</h3>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🎟️ TỔNG HỢP CHI TIẾT NGƯỜI THAM DỰ & CHECK-IN</h3>
                                 <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(attendees, "Tham-du")}>⬇️ Excel</button>
                             </div>
                             {attendees.length === 0
@@ -367,7 +367,7 @@ export default function Reports() {
                                 <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(feedback, "Phan-hoi")}>⬇️ Excel</button>
                             </div>
                             {feedback.length === 0
-                                ? <div className="empty-state"><span>⭐</span><p>Chưa có phản hồi từ khách mời</p></div>
+                                ? <div className="empty-state"><span>⭐</span><p>Chưa có phản hồi từ người tham dự</p></div>
                                 : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16 }}>
                                     <table className="data-table">
                                         <thead><tr><th>Sự kiện</th><th style={{ textAlign: "center" }}>Phản hồi</th><th style={{ textAlign: "right" }}>Đánh giá</th></tr></thead>

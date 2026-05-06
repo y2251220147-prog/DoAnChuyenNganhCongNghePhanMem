@@ -10,6 +10,7 @@ import {
 } from "../../services/eventService";
 import { getAllUsers } from "../../services/userService";
 import { getVenues, getAllResources } from "../../services/venueService";
+import { getDepartments } from "../../services/departmentService";
 import "../../styles/global.css";
 
 // ── Workflow config ───────────────────────────────────────────
@@ -59,6 +60,7 @@ export default function EventList() {
     const [users, setUsers] = useState([]);
     const [venues, setVenues] = useState([]);
     const [resourcesList, setResourcesList] = useState([]);
+    const [departments, setDepartments] = useState([]);
 
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -81,14 +83,16 @@ export default function EventList() {
     useEffect(() => {
         const fetchInitial = async () => {
             try {
-                const [uR, vR, rR] = await Promise.all([
+                const [uR, vR, rR, dR] = await Promise.all([
                     getAllUsers(),
                     getVenues(),
-                    getAllResources()
+                    getAllResources(),
+                    getDepartments()
                 ]);
                 setUsers(uR.data || []);
                 setVenues(vR.data || []);
                 setResourcesList(rR.data || []);
+                setDepartments(dR.data || []);
             } catch (err) { console.error("Fetch initial data error:", err); }
         };
         fetchInitial();
@@ -104,7 +108,8 @@ export default function EventList() {
                 date_from: dateFrom,
                 date_to: dateTo,
                 page: currentPage,
-                limit
+                limit,
+                _t: Date.now() // Thêm timestamp để trình duyệt không cache kết quả cũ
             };
             const r = await searchEvents(params);
             setEvents(r.data?.data || []);
@@ -183,9 +188,15 @@ export default function EventList() {
         const label = STATUS_LABEL[newStatus];
         if (!window.confirm(`Chuyển trạng thái sang "${label}"?`)) return;
         try {
+            // Cập nhật giao diện ngay lập tức để tạo cảm giác mượt mà
+            setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, status: newStatus } : e));
+            
             await changeStatus(ev.id, newStatus);
-            load();
-        } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
+            load(); // Gọi lại load để đồng bộ các con số thống kê
+        } catch (err) { 
+            load(); // Reset lại nếu lỗi
+            alert(err.response?.data?.message || "Thất bại"); 
+        }
     };
 
     const fmtDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
@@ -257,10 +268,10 @@ export default function EventList() {
                     <div className="form-group" style={{ marginBottom: 0, flex: "1 1 150px" }}>
                         <label>Khoảng ngày</label>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            <input type="date" className="form-control" style={{ background: "white" }}
+                            <input type="text" placeholder="dd/mm/yyyy" className="form-control" style={{ background: "white" }}
                                 value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
                             <span style={{ color: "var(--text-muted)" }}>→</span>
-                            <input type="date" className="form-control" style={{ background: "white" }}
+                            <input type="text" placeholder="dd/mm/yyyy" className="form-control" style={{ background: "white" }}
                                 value={dateTo} onChange={e => setDateTo(e.target.value)} />
                         </div>
                     </div>
@@ -423,13 +434,13 @@ export default function EventList() {
                                 </div>
                                 <div className="grid-2">
                                     <div className="form-group">
-                                        <label>Ngày bắt đầu <span style={{ color: "red" }}>*</span></label>
-                                        <input type="datetime-local" className="form-control"
+                                        <label>Ngày bắt đầu (dd/mm/yyyy HH:mm) <span style={{ color: "red" }}>*</span></label>
+                                        <input type="text" placeholder="dd/mm/yyyy HH:mm" className="form-control"
                                             value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} required />
                                     </div>
                                     <div className="form-group">
-                                        <label>Ngày kết thúc <span style={{ color: "red" }}>*</span></label>
-                                        <input type="datetime-local" className="form-control"
+                                        <label>Ngày kết thúc (dd/mm/yyyy HH:mm) <span style={{ color: "red" }}>*</span></label>
+                                        <input type="text" placeholder="dd/mm/yyyy HH:mm" className="form-control"
                                             value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} required />
                                     </div>
                                 </div>
@@ -529,7 +540,9 @@ export default function EventList() {
                                         <select className="form-control" value={form.organizer_id}
                                             onChange={e => setForm({ ...form, organizer_id: e.target.value })}>
                                             <option value="">-- Chọn nhân sự --</option>
-                                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                                            {users.filter(u => ["admin", "organizer"].includes(u.role)).map(u => (
+                                                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="form-group">
@@ -551,9 +564,16 @@ export default function EventList() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>Đơn vị điều phối</label>
-                                        <input className="form-control" placeholder="VD: Phòng Hành chính, IT, ..."
-                                            value={form.coordination_unit} onChange={e => setForm({ ...form, coordination_unit: e.target.value })} />
+                                        <label>Phòng ban phụ trách</label>
+                                        <select className="form-control" 
+                                            value={form.coordination_unit} 
+                                            onChange={e => setForm({ ...form, coordination_unit: e.target.value })}>
+                                            <option value="">-- Chọn phòng ban --</option>
+                                            {departments.map(d => (
+                                                <option key={d.id} value={d.name}>{d.name}</option>
+                                            ))}
+                                            <option value="Khác">Phòng ban khác...</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>

@@ -18,7 +18,7 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` enum('admin','organizer','user') DEFAULT 'user',
-  `department` varchar(100) DEFAULT NULL,
+  `department_id` int DEFAULT NULL,
   `position` varchar(100) DEFAULT NULL,
   `avatar` varchar(300) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
@@ -30,6 +30,26 @@ CREATE TABLE `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------
+-- 1.5. BẢNG PHÒNG BAN (DEPARTMENTS)
+-- ----------------------------------------------------------
+DROP TABLE IF EXISTS `departments`;
+CREATE TABLE `departments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `description` text,
+  `manager_id` int DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  KEY `manager_id` (`manager_id`),
+  CONSTRAINT `departments_ibfk_1` FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Thêm Foreign Key từ users -> departments
+ALTER TABLE `users` ADD CONSTRAINT `users_ibfk_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL;
+
 
 
 -- ----------------------------------------------------------
@@ -94,27 +114,7 @@ CREATE TABLE `events` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
--- ----------------------------------------------------------
--- 4. BẢNG DEADLINE (EVENT_DEADLINES)
--- ----------------------------------------------------------
-DROP TABLE IF EXISTS `event_deadlines`;
-CREATE TABLE `event_deadlines` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `event_id` int NOT NULL,
-  `title` varchar(200) NOT NULL,
-  `due_date` datetime NOT NULL,
-  `assigned_to` int DEFAULT NULL,
-  `status` enum('pending','working','completed','done','problem') COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
-  `note` text COLLATE utf8mb4_unicode_ci,
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `event_id` (`event_id`),
-  KEY `assigned_to` (`assigned_to`),
-  CONSTRAINT `event_deadlines_ibfk_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `event_deadlines_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
+-- (BẢNG DEADLINE ĐÃ BỊ XÓA VÀ GỘP VÀO EVENT_TASKS)
 -- ----------------------------------------------------------
 -- 5. BẢNG GIAI ĐOẠN NHIỆM VỤ (TASK_PHASES)
 -- ----------------------------------------------------------
@@ -141,15 +141,15 @@ CREATE TABLE `event_tasks` (
   `event_id` int NOT NULL,
   `phase_id` int DEFAULT NULL,
   `parent_id` int DEFAULT NULL,
-  `deadline_id` int DEFAULT NULL,
   `title` varchar(255) NOT NULL,
   `description` text,
   `assigned_to` int DEFAULT NULL,
+  `assigned_department_id` int DEFAULT NULL,
   `supporters` json DEFAULT NULL,
-  `status` enum('todo','in_progress','review','done','cancelled') DEFAULT 'todo',
+  `status` enum('todo','in_progress','done') DEFAULT 'todo',
   `priority` enum('low','medium','high') DEFAULT 'medium',
   `start_date` datetime DEFAULT NULL,
-  `due_date` datetime DEFAULT NULL,
+  `due_date` datetime NOT NULL,
   `is_milestone` tinyint(1) DEFAULT '0',
   `position` int DEFAULT '0',
   `progress` int DEFAULT '0',
@@ -165,11 +165,12 @@ CREATE TABLE `event_tasks` (
   KEY `phase_id` (`phase_id`),
   KEY `parent_id` (`parent_id`),
   KEY `assigned_to` (`assigned_to`),
+  KEY `assigned_department_id` (`assigned_department_id`),
   CONSTRAINT `event_tasks_ibfk_event` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
   CONSTRAINT `event_tasks_ibfk_phase` FOREIGN KEY (`phase_id`) REFERENCES `task_phases` (`id`) ON DELETE SET NULL,
   CONSTRAINT `event_tasks_ibfk_parent` FOREIGN KEY (`parent_id`) REFERENCES `event_tasks` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `event_tasks_ibfk_deadline` FOREIGN KEY (`deadline_id`) REFERENCES `event_deadlines` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `event_tasks_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `event_tasks_ibfk_user` FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `event_tasks_ibfk_dept` FOREIGN KEY (`assigned_department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -213,23 +214,8 @@ CREATE TABLE `task_history` (
 
 
 -- ----------------------------------------------------------
--- 9. BẢNG KHÁCH MỜI (GUESTS)
+-- 9. (BỎ BẢNG GUESTS THEO YÊU CẦU MỚI)
 -- ----------------------------------------------------------
-DROP TABLE IF EXISTS `guests`;
-CREATE TABLE `guests` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `event_id` int NOT NULL,
-  `name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `phone` varchar(50) DEFAULT NULL,
-  `qr_code` varchar(255) DEFAULT NULL,
-  `checked_in` tinyint(1) DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `event_id` (`event_id`),
-  CONSTRAINT `guests_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 
 -- ----------------------------------------------------------
 -- 10. BẢNG NGƯỜI THAM GIA ĐĂNG KÝ (ATTENDEES)
