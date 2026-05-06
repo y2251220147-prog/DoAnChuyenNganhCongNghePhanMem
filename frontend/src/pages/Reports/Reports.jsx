@@ -288,10 +288,13 @@ export default function Reports() {
                                                         <td style={{ textAlign: "right", color: "var(--text-muted)" }}>{fmtVND(b.planned)}</td>
                                                         <td style={{ textAlign: "right", color: pct > 100 ? "#ef4444" : "#10b981", fontWeight: 800 }}>{fmtVND(b.actual)}</td>
                                                         <td style={{ textAlign: "right" }}>
-                                                            <span style={{
-                                                                fontSize: 11, fontWeight: 900, padding: "4px 8px", borderRadius: 8,
-                                                                background: pct > 100 ? "#fee2e2" : "#f0fdf4", color: pct > 100 ? "#ef4444" : "#10b981"
-                                                            }}>{pct}%</span>
+                                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                                                                <span style={{
+                                                                    fontSize: 11, fontWeight: 900, padding: "4px 8px", borderRadius: 8,
+                                                                    background: pct > 100 ? "#fee2e2" : "#f0fdf4", color: pct > 100 ? "#ef4444" : "#10b981"
+                                                                }}>{pct}%</span>
+                                                                {pct > 100 && <span style={{ fontSize: 9, color: "#dc2626", fontWeight: 800 }}>⚠️ VƯỢT HẠN MỨC</span>}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );

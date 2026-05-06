@@ -84,8 +84,8 @@ const Task = {
             INSERT INTO event_tasks
               (event_id,phase_id,parent_id,title,description,assigned_to,assigned_department_id,
                supporters,status,priority,due_date,start_date,is_milestone,position,progress,
-               estimated_h,estimated_budget,created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+               estimated_h,estimated_budget,actual_budget,created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         `, [
             d.event_id, d.phase_id || null, d.parent_id || null,
             d.title, d.description || null,
@@ -94,7 +94,7 @@ const Task = {
             d.status || 'todo', d.priority || 'medium',
             d.due_date, d.start_date || null,
             d.is_milestone ? 1 : 0, d.position || 0, d.progress || 0,
-            d.estimated_h || null, d.estimated_budget || 0, d.created_by || null
+            d.estimated_h || null, d.estimated_budget || 0, d.actual_budget || 0, d.created_by || null
         ]);
         return r.insertId;
     },
@@ -104,7 +104,7 @@ const Task = {
             UPDATE event_tasks SET
               phase_id=?,parent_id=?,title=?,description=?,assigned_to=?,assigned_department_id=?,
               supporters=?,status=?,priority=?,due_date=?,start_date=?,is_milestone=?,position=?,
-              progress=?,estimated_h=?,actual_h=?,estimated_budget=?,feedback_status=?,feedback_note=?
+              progress=?,estimated_h=?,actual_h=?,estimated_budget=?,actual_budget=?,feedback_status=?,feedback_note=?
             WHERE id=?
         `, [
             d.phase_id || null, d.parent_id || null,
@@ -115,7 +115,7 @@ const Task = {
             d.due_date, d.start_date || null,
             d.is_milestone ? 1 : 0, d.position || 0,
             d.progress || 0, d.estimated_h || null, d.actual_h || null,
-            d.estimated_budget || 0, d.feedback_status || 'none', d.feedback_note || null,
+            d.estimated_budget || 0, d.actual_budget || 0, d.feedback_status || 'none', d.feedback_note || null,
             id
         ]);
     },
@@ -133,6 +133,13 @@ const Task = {
         await db.query(
             "UPDATE event_tasks SET feedback_status=?, feedback_note=? WHERE id=?",
             [data.feedback_status || 'none', data.feedback_note || null, id]
+        );
+    },
+
+    updateActualBudget: async (id, amount) => {
+        await db.query(
+            "UPDATE event_tasks SET actual_budget=? WHERE id=?",
+            [Number(amount) || 0, id]
         );
     },
 
@@ -197,6 +204,17 @@ const Task = {
             WHERE event_id=? AND parent_id IS NULL
         `, [eventId]);
         return rows[0];
+    },
+
+    getAllTasksWithBudget: async () => {
+        const [rows] = await db.query(`
+            SELECT t.*, e.name AS event_name
+            FROM event_tasks t
+            LEFT JOIN events e ON t.event_id = e.id
+            WHERE t.estimated_budget > 0 OR t.actual_budget > 0
+            ORDER BY t.created_at DESC
+        `);
+        return rows;
     }
 };
 
