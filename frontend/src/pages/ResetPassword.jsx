@@ -4,12 +4,9 @@ import { AuthContext } from "../context/AuthContext";
 import Layout from "../components/Layout/Layout";
 import { resetPassword } from "../services/authService";
 import "../styles/global.css";
-import "../styles/employee-theme.css";
 
 export default function ResetPassword() {
     const { user } = useContext(AuthContext);
-    const isUser = user?.role === "user";
-
     const [oldPassword, setOld]     = useState("");
     const [newPassword, setNew]     = useState("");
     const [confirmNew, setConfirm]  = useState("");
@@ -18,11 +15,13 @@ export default function ResetPassword() {
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
-        e.preventDefault(); setMessage(null);
+        e.preventDefault(); 
+        setMessage(null);
         if (newPassword !== confirmNew)
             return setMessage({ type: "error", text: "Mật khẩu mới không khớp." });
         if (newPassword.length < 6)
             return setMessage({ type: "error", text: "Mật khẩu tối thiểu 6 ký tự." });
+        
         setLoading(true);
         try {
             await resetPassword({ oldPassword, newPassword });
@@ -34,122 +33,86 @@ export default function ResetPassword() {
         } finally { setLoading(false); }
     };
 
-    // ── User role: dark theme form ─────────────────────────────────────────
-    if (isUser) {
-        return (
-            <Layout title="Đổi mật khẩu" subtitle="Bảo mật tài khoản của bạn">
-                {/* Security banner */}
-                <div style={{
-                    background: "linear-gradient(135deg, var(--emp-surface2) 0%, rgba(108,114,255,0.06) 100%)",
-                    border: "1px solid var(--emp-border)",
-                    borderRadius: "var(--emp-radius)",
-                    padding: "22px 28px",
-                    marginBottom: 20,
-                    display: "flex", alignItems: "center", gap: 16,
-                }}>
-                    <div style={{ width: 52, height: 52, borderRadius: "var(--emp-radius)", background: "rgba(108,114,255,0.12)", border: "1px solid rgba(108,114,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>🔒</div>
-                    <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Bảo mật tài khoản</div>
-                        <div style={{ fontSize: 12, color: "var(--emp-text2)", lineHeight: 1.6 }}>
-                            Sử dụng ít nhất 6 ký tự, kết hợp chữ hoa, chữ thường và số để tăng độ bảo mật.
-                        </div>
-                    </div>
+    return (
+        <Layout>
+            <div className="page-header" style={{ marginBottom: 32 }}>
+                <div>
+                    <h2 style={{ fontSize: 28, fontWeight: 800 }}>🔐 Đổi mật khẩu</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>Bảo mật tài khoản của bạn bằng mật khẩu mạnh</p>
                 </div>
+            </div>
 
-                {/* Form */}
-                <div className="emp-panel" style={{ maxWidth: 460 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 32, maxWidth: 1000 }}>
+                <div className="card" style={{ padding: 32, borderRadius: 24 }}>
                     {message && (
-                        <div style={{
-                            marginBottom: 16, padding: "11px 14px", borderRadius: "var(--emp-radius-sm)", fontSize: 13,
-                            background: message.type === "success" ? "var(--emp-green-bg)" : "var(--emp-red-bg)",
-                            border: `1px solid ${message.type === "success" ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)"}`,
-                            color: message.type === "success" ? "var(--emp-green)" : "var(--emp-red)",
+                        <div style={{ 
+                            padding: '14px', borderRadius: 12, marginBottom: 24, fontSize: 14, fontWeight: 700,
+                            background: message.type === "success" ? "#f0fdf4" : "#fef2f2",
+                            color: message.type === "success" ? "#10b981" : "#ef4444",
+                            border: `1px solid ${message.type === "success" ? "#bbf7d0" : "#fecaca"}`
                         }}>
                             {message.text}
                         </div>
                     )}
-
+                    
                     <form onSubmit={handleSubmit}>
-                        <div className="emp-form-group">
-                            <label className="emp-form-label">Mật khẩu hiện tại</label>
-                            <input type="password" className="emp-form-input"
+                        <div className="form-group">
+                            <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 8, display: "block" }}>Mật khẩu hiện tại</label>
+                            <input type="password" className="form-control" style={{ borderRadius: 12, height: 48 }} 
                                 placeholder="Nhập mật khẩu hiện tại"
                                 value={oldPassword} onChange={e => setOld(e.target.value)} required />
                         </div>
-                        <div className="emp-divider" />
-                        <div className="emp-form-group">
-                            <label className="emp-form-label">Mật khẩu mới</label>
-                            <input type="password" className="emp-form-input"
+                        
+                        <div style={{ height: 1, background: "#f1f5f9", margin: "24px 0" }} />
+
+                        <div className="form-group">
+                            <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 8, display: "block" }}>Mật khẩu mới</label>
+                            <input type="password" className="form-control" style={{ borderRadius: 12, height: 48 }}
                                 placeholder="Tối thiểu 6 ký tự"
                                 value={newPassword} onChange={e => setNew(e.target.value)} required />
                         </div>
-                        <div className="emp-form-group">
-                            <label className="emp-form-label">Xác nhận mật khẩu mới</label>
-                            <input type="password" className="emp-form-input"
+                        
+                        <div className="form-group" style={{ marginBottom: 32 }}>
+                            <label style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)", marginBottom: 8, display: "block" }}>Xác nhận mật khẩu mới</label>
+                            <input type="password" className="form-control" style={{ borderRadius: 12, height: 48 }}
                                 placeholder="Nhập lại mật khẩu mới"
                                 value={confirmNew} onChange={e => setConfirm(e.target.value)} required />
                         </div>
 
-                        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                            <button type="submit" className="emp-btn emp-btn-primary"
-                                style={{ flex: 1, justifyContent: "center", padding: "11px", borderRadius: "var(--emp-radius-sm)" }}
-                                disabled={loading}>
-                                {loading ? "Đang cập nhật..." : "🔒 Cập nhật mật khẩu"}
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button type="submit" className="btn btn-primary" style={{ flex: 1, height: 52, borderRadius: 12, fontWeight: 800 }} disabled={loading}>
+                                {loading ? "Đang xử lý..." : "Cập nhật mật khẩu"}
                             </button>
-                            <button type="button" className="emp-btn emp-btn-outline"
-                                style={{ padding: "11px 18px", borderRadius: "var(--emp-radius-sm)" }}
-                                onClick={() => navigate("/profile")}>
-                                Huỷ
+                            <button type="button" className="btn btn-outline" style={{ height: 52, borderRadius: 12, padding: "0 24px", fontWeight: 700 }} onClick={() => navigate(-1)}>
+                                Huỷ bỏ
                             </button>
                         </div>
                     </form>
                 </div>
-            </Layout>
-        );
-    }
 
-    // ── Admin/Organizer: old light theme ────────────────────────────────────
-    return (
-        <Layout>
-            <div className="page-header">
-                <div>
-                    <h2>Đổi mật khẩu</h2>
-                    <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>Cập nhật mật khẩu tài khoản</p>
-                </div>
-            </div>
-            <div className="grid-2">
-                <div className="card">
-                    {message && (
-                        <div className={`alert ${message.type === "success" ? "alert-success" : "alert-error"}`}>{message.text}</div>
-                    )}
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-group">
-                            <label>Mật khẩu hiện tại</label>
-                            <input type="password" className="form-control" placeholder="Nhập mật khẩu hiện tại"
-                                value={oldPassword} onChange={e => setOld(e.target.value)} required />
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    <div className="card" style={{ padding: 28, borderRadius: 24, background: "var(--bg-main)", border: "none" }}>
+                        <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(99, 102, 241, 0.1)", color: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, marginBottom: 20 }}>🛡️</div>
+                        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 12 }}>Mẹo bảo mật</h3>
+                        <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
+                            {[
+                                "Sử dụng ít nhất 6 ký tự trở lên",
+                                "Kết hợp chữ cái, số và ký tự đặc biệt",
+                                "Không nên dùng thông tin cá nhân (ngày sinh, tên)",
+                                "Thay đổi mật khẩu định kỳ để tăng an toàn"
+                            ].map((tip, i) => (
+                                <li key={i} style={{ fontSize: 13, color: "var(--text-secondary)", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                                    <span style={{ color: "var(--color-primary)", fontWeight: 800 }}>•</span>
+                                    {tip}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="card" style={{ padding: 28, borderRadius: 24, background: "#fef2f2", border: "none" }}>
+                        <div style={{ fontSize: 13, color: "#991b1b", fontWeight: 700, lineHeight: 1.6 }}>
+                            ⚠️ Lưu ý: Sau khi đổi mật khẩu thành công, bạn sẽ được chuyển hướng về trang Dashboard.
                         </div>
-                        <div className="form-group">
-                            <label>Mật khẩu mới</label>
-                            <input type="password" className="form-control" placeholder="Tối thiểu 6 ký tự"
-                                value={newPassword} onChange={e => setNew(e.target.value)} required />
-                        </div>
-                        <div className="form-group">
-                            <label>Xác nhận mật khẩu mới</label>
-                            <input type="password" className="form-control" placeholder="Nhập lại mật khẩu mới"
-                                value={confirmNew} onChange={e => setConfirm(e.target.value)} required />
-                        </div>
-                        <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} disabled={loading}>
-                            {loading ? "Đang cập nhật..." : "🔒 Cập nhật mật khẩu"}
-                        </button>
-                    </form>
-                </div>
-                <div className="card-stat" style={{ alignSelf: "start" }}>
-                    <div className="card-stat-icon indigo">🔐</div>
-                    <div className="card-stat-info">
-                        <h3 style={{ fontSize: 16 }}>Mẹo bảo mật</h3>
-                        <p style={{ fontSize: 12, lineHeight: 1.6, marginTop: 8, textTransform: "none", letterSpacing: 0 }}>
-                            Dùng ít nhất 6 ký tự, kết hợp chữ hoa, chữ số và ký tự đặc biệt.
-                        </p>
                     </div>
                 </div>
             </div>

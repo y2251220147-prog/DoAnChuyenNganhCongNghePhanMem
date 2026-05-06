@@ -67,6 +67,56 @@ exports.createGuest = async (data) => {
     return { id, qr_code, emailSent };
 };
 
+exports.bulkInvite = async (data) => {
+    const { event_id, guests, subject, content } = data;
+
+    if (!event_id || !guests || !Array.isArray(guests) || guests.length === 0)
+        throw { status: 400, message: "event_id và danh sách khách mời là bắt buộc" };
+
+    const event = await Event.getById(event_id);
+    if (!event) throw { status: 404, message: "Không tìm thấy sự kiện" };
+
+    const stats = { total: guests.length, success: 0, failed: 0 };
+    const results = [];
+
+    for (const g of guests) {
+        try {
+            // Kiểm tra trùng email cho cùng sự kiện
+            const dup = await Guest.findByEmailAndEvent(g.email, event_id);
+            if (dup) {
+                results.push({ email: g.email, status: 'skipped', message: 'Email đã tồn tại' });
+                continue;
+            }
+
+            const qr_code = generateQR(event_id, g.name);
+            const id = await Guest.create({ event_id, name: g.name, email: g.email, qr_code });
+
+            await sendGuestInvitation({
+                name: g.name,
+                email: g.email,
+                qr_code,
+                custom_message: content, // Dùng content người dùng nhập
+                event: {
+                    name: event.name,
+                    start_date: event.start_date,
+                    location: event.location,
+                    venue_type: event.venue_type,
+                    event_type: event.event_type,
+                    description: event.description
+                }
+            });
+
+            stats.success++;
+            results.push({ email: g.email, status: 'success', id });
+        } catch (err) {
+            stats.failed++;
+            results.push({ email: g.email, status: 'error', message: err.message });
+        }
+    }
+
+    return { stats, results };
+};
+
 exports.deleteGuest = async (id) => {
     const guest = await Guest.findById(id);
     if (!guest) throw { status: 404, message: "Guest not found" };

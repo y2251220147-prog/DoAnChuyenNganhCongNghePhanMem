@@ -14,3 +14,9 @@ export const getDeadlines = (id) => api.get(`/events/${id}/deadlines`);
 export const createDeadline = (id, data) => api.post(`/events/${id}/deadlines`, data);
 export const toggleDeadline = (id, dlId, done) => api.patch(`/events/${id}/deadlines/${dlId}`, { done });
 export const deleteDeadline = (id, dlId) => api.delete(`/events/${id}/deadlines/${dlId}`);
+
+// Tìm kiếm nâng cao
+export const searchEvents = (params) => api.get("/events/search", { params });
+
+// Tìm kiếm toàn cục
+export const globalSearch = (params) => api.get("/search", { params });

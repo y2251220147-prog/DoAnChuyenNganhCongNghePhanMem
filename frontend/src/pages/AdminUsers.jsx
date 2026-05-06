@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { AuthContext } from "../context/AuthContext";
 import Layout from "../components/Layout/Layout";
 import Modal from "../components/UI/Modal";
 import { changeRole, createUser, deleteUser, getUsers } from "../services/userService";
@@ -16,6 +17,7 @@ function getInitials(name = "") {
 }
 
 export default function AdminUsers() {
+    const { getAvatarUrl } = useContext(AuthContext);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(null);
@@ -69,67 +71,91 @@ export default function AdminUsers() {
         <Layout>
             <div className="page-header">
                 <div>
-                    <h2>User Management</h2>
-                    <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
-                        {users.length} user{users.length !== 1 ? "s" : ""} registered
+                    <h2 className="gradient-text">👤 Quản trị thành viên</h2>
+                    <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginTop: "6px" }}>
+                        Quản lý quyền hạn và thông tin của {users.length} người dùng trong hệ thống.
                     </p>
-                    <span className="badge badge-admin" style={{ marginTop: 8, display: "inline-block" }}>🔧 Admin Only</span>
+                    <span className="badge badge-admin" style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                         🛡️ Tài khoản quản trị hệ thống
+                    </span>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setFormError(""); setModalOpen(true); }}>
-                    + Add User
+                <button className="btn btn-primary" onClick={() => { setFormError(""); setModalOpen(true); }} style={{ borderRadius: 12, padding: "10px 24px" }}>
+                    + Thêm thành viên mới
                 </button>
             </div>
 
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 24, display: "flex", gap: 12 }}>
                 <input
                     className="form-control"
-                    placeholder="🔍 Search by name or email..."
+                    placeholder="🔍 Tìm kiếm theo tên hoặc email thành viên..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    style={{ maxWidth: 300 }}
+                    style={{ maxWidth: 400, borderRadius: 12 }}
                 />
             </div>
 
-            <div className="data-table-wrapper">
+            <div className="data-table-wrapper" style={{ boxShadow: "var(--shadow-sm)", background: "#fff", borderRadius: 16, overflow: "hidden", border: "1px solid #f1f5f9" }}>
                 {loading ? (
-                    <div className="empty-state"><span>⏳</span><p>Loading users...</p></div>
+                    <div className="empty-state"><span>⏳</span><p>Đang tải danh sách...</p></div>
                 ) : filtered.length === 0 ? (
-                    <div className="empty-state"><span>👥</span><p>No users found</p></div>
+                    <div className="empty-state"><span>👥</span><p>Không tìm thấy thành viên nào</p></div>
                 ) : (
                     <table className="data-table">
                         <thead>
-                            <tr><th>User</th><th>Email</th><th>Joined</th><th>Current Role</th><th>Change Role</th><th>Actions</th></tr>
+                            <tr>
+                                <th style={{ paddingLeft: 24 }}>Thành viên</th>
+                                <th>Địa chỉ Email</th>
+                                <th>Ngày tham gia</th>
+                                <th>Vai trò</th>
+                                <th>Điều chỉnh quyền</th>
+                                <th style={{ textAlign: "right", paddingRight: 24 }}>Thao tác</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {filtered.map(u => (
                                 <tr key={u.id}>
-                                    <td>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                            <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#06b6d4)", color: "white", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                {getInitials(u.name)}
+                                    <td style={{ paddingLeft: 24 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                            <div style={{ 
+                                                width: 44, height: 44, borderRadius: "50%", 
+                                                background: "var(--color-primary)", 
+                                                color: "white", fontWeight: 700, fontSize: 14, 
+                                                display: "flex", alignItems: "center", justifyContent: "center", 
+                                                flexShrink: 0, overflow: "hidden",
+                                                border: "2px solid #fff",
+                                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                                            }}>
+                                                {u.avatar ? (
+                                                    <img src={getAvatarUrl(u.avatar)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                ) : getInitials(u.name)}
                                             </div>
-                                            <span style={{ fontWeight: 600 }}>{u.name}</span>
+                                            <div>
+                                                <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 15 }}>{u.name}</div>
+                                                <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600 }}>ID: #{u.id}</div>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td style={{ color: "var(--text-secondary)" }}>{u.email}</td>
-                                    <td style={{ color: "var(--text-muted)", fontSize: 12 }}>
-                                        {u.created_at ? new Date(u.created_at).toLocaleDateString("vi-VN") : "—"}
+                                    <td style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{u.email}</td>
+                                    <td style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+                                        📅 {u.created_at ? new Date(u.created_at).toLocaleDateString("vi-VN") : "—"}
                                     </td>
-                                    <td><span className={ROLE_BADGE[u.role] || "badge badge-default"}>{u.role}</span></td>
+                                    <td><span className={ROLE_BADGE[u.role] || "badge badge-default"} style={{ border: "none", padding: "6px 12px", borderRadius: 8 }}>{u.role?.toUpperCase()}</span></td>
                                     <td>
-                                        <select
-                                            value={u.role}
-                                            onChange={e => handleRoleChange(u.id, e.target.value)}
-                                            disabled={updating === u.id}
-                                            className="form-control"
-                                            style={{ width: 130, padding: "6px 10px", fontSize: 13 }}
-                                        >
-                                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                                        </select>
-                                        {updating === u.id && <span style={{ marginLeft: 8, fontSize: 12, color: "var(--text-muted)" }}>Saving…</span>}
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                            <select
+                                                value={u.role}
+                                                onChange={e => handleRoleChange(u.id, e.target.value)}
+                                                disabled={updating === u.id}
+                                                className="form-control"
+                                                style={{ width: 140, padding: "8px 12px", fontSize: 13, borderRadius: 10, border: "1px solid #e2e8f0" }}
+                                            >
+                                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                            </select>
+                                            {updating === u.id && <span className="loader-sm" style={{ width: 16, height: 16 }}></span>}
+                                        </div>
                                     </td>
-                                    <td>
-                                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(u.id, u.name)} title="Delete user">🗑</button>
+                                    <td style={{ textAlign: "right", paddingRight: 24 }}>
+                                        <button className="btn btn-outline btn-sm" onClick={() => handleDelete(u.id, u.name)} title="Xóa tài khoản" style={{ color: "#ef4444", border: "1px solid #fee2e2", borderRadius: 8 }}>🗑 Xóa</button>
                                     </td>
                                 </tr>
                             ))}
@@ -138,30 +164,35 @@ export default function AdminUsers() {
                 )}
             </div>
 
-            <Modal title="Create New User" isOpen={isModalOpen} onClose={() => setModalOpen(false)}>
-                <form onSubmit={handleCreate}>
+            <Modal title="✨ Tạo tài khoản thành viên" isOpen={isModalOpen} onClose={() => setModalOpen(false)}>
+                <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                     {formError && <div className="alert alert-error">{formError}</div>}
-                    <div className="form-group">
-                        <label>Full Name</label>
-                        <input className="form-control" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Họ và tên thành viên</label>
+                        <input className="form-control" placeholder="VD: Nguyễn Văn A" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                     </div>
-                    <div className="form-group">
-                        <label>Email Address</label>
-                        <input type="email" className="form-control" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required />
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Địa chỉ Email</label>
+                        <input type="email" className="form-control" placeholder="example@email.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required />
                     </div>
-                    <div className="form-group">
-                        <label>Password</label>
-                        <input type="password" className="form-control" placeholder="Min. 6 characters" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required />
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Mật khẩu đăng nhập</label>
+                        <input type="password" className="form-control" placeholder="Tối thiểu 6 ký tự" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required />
                     </div>
-                    <div className="form-group">
-                        <label>Role</label>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label>Phân quyền hệ thống</label>
                         <select className="form-control" value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                            <option value="user">Người dùng (User)</option>
+                            <option value="organizer">Người tổ chức (Organizer)</option>
+                            <option value="admin">Quản trị viên (Admin)</option>
                         </select>
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: "100%", marginTop: 10 }} disabled={submitting}>
-                        {submitting ? "Creating..." : "Create User"}
-                    </button>
+                    <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                        <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ borderRadius: 12, padding: "10px 24px" }}>Hủy</button>
+                        <button type="submit" className="btn btn-primary" style={{ borderRadius: 12, padding: "10px 32px" }} disabled={submitting}>
+                            {submitting ? "Đang xử lý..." : "✅ Xác nhận tạo tài khoản"}
+                        </button>
+                    </div>
                 </form>
             </Modal>
         </Layout>

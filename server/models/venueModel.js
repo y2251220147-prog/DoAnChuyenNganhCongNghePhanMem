@@ -24,6 +24,16 @@ const Venue = {
         );
     },
     delete: async (id) => { await db.query("DELETE FROM venues WHERE id=?", [id]); },
+    getBookingById: async (id) => {
+        const [r] = await db.query(`
+            SELECT b.*, v.name AS venue_name, e.owner_id, e.name AS event_name
+            FROM event_venue_bookings b
+            JOIN venues v ON b.venue_id = v.id
+            JOIN events e ON b.event_id = e.id
+            WHERE b.id = ?
+        `, [id]);
+        return r[0] || null;
+    },
 
     // Lấy bookings của venue
     getBookings: async (venueId) => {

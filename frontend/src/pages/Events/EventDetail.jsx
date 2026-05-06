@@ -1,14 +1,13 @@
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../../components/Layout/Layout";
 import Modal from "../../components/UI/Modal";
 import { AuthContext } from "../../context/AuthContext";
 import api from "../../services/api";
-import { getTasksByEvent, createTask, updateTaskStatus, deleteTask } from "../../services/taskService";
-import {
-    changeStatus,
-    createDeadline, deleteDeadline, getDeadlines, toggleDeadline
-} from "../../services/eventService";
+import { getTasksByEvent } from "../../services/taskService";
+import { changeStatus } from "../../services/eventService";
+import { getAllUsers } from "../../services/userService";
+import { getDepartments } from "../../services/departmentService";
 import "../../styles/global.css";
 import TaskBoard from "../Tasks/TaskBoard";
 
@@ -19,6 +18,14 @@ const STATUS_CFG = {
     running: { label: "Đang diễn ra", bg: "#d1fae5", color: "#059669" },
     completed: { label: "Hoàn thành", bg: "#dbeafe", color: "#2563eb" },
     cancelled: { label: "Đã hủy", bg: "#fee2e2", color: "#dc2626" },
+};
+
+
+
+const TASK_STATUS_CFG = {
+    todo:        { label: "Chuẩn Bị",  color: "#6366f1" },
+    in_progress: { label: "Đang Làm",  color: "#f59e0b" },
+    done:        { label: "Hoàn Thành", color: "#10b981" },
 };
 
 const WORKFLOW_NEXT = {
@@ -47,69 +54,79 @@ export default function EventDetail() {
     const { user } = useContext(AuthContext);
 
     const [event, setEvent] = useState(null);
-    const [guests, setGuests] = useState([]);
+    const [attendees, setAttendees] = useState([]);
     const [staff, setStaff] = useState([]);
     const [timeline, setTimeline] = useState([]);
     const [budget, setBudget] = useState({ items: [], total: 0 });
-    const [deadlines, setDeadlines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tasks, setTasks] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [error, setError] = useState("");
     const [tab, setTab] = useState("overview");
 
-    // Modal thêm deadline
-    const [dlModal, setDlModal] = useState(false);
-    const [dlForm, setDlForm] = useState({ title: "", due_date: "", note: "" });
-    const [dlSaving, setDlSaving] = useState(false);
+    // Modal Bulk Invite
+    const [bulkModal, setBulkModal] = useState(false);
+    const [bulkForm, setBulkForm] = useState({ guests: "", subject: "", content: "" });
+    const [bulkSending, setBulkSending] = useState(false);
 
-    const isAdmin = user?.role === "admin";
-    const canManage = user?.role === "admin" || user?.role === "organizer";
+    const role = user?.role?.toLowerCase();
+    const isAdmin = role === "admin";
+    const isOrganizer = role === "organizer";
+    const canManage = isAdmin || isOrganizer;
     const nextStatuses = event ? (WORKFLOW_NEXT[event.status] || []) : [];
 
-    useEffect(() => { loadAll(); loadTasks(); }, [id]);
-
-    const loadTasks = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
-            const r = await getTasksByEvent(id);
-            setTasks(r.data || []);
-        } catch {/**/ }
-    };
+            const r = await getAllUsers();
+            setUsers(r.data || []);
+        } catch (err) {
+            console.error("fetchUsers error:", err);
+        }
+    }, []);
 
-    const loadAll = async () => {
+
+    const loadAll = useCallback(async () => {
         setLoading(true); setError("");
         try {
-            const [evR, guR, stR, tlR, buR, dlR] = await Promise.allSettled([
+            const [evR, stR, tlR, buR, atR, deR, tkR] = await Promise.allSettled([
                 api.get(`/events/${id}`),
-                api.get(`/guests/event/${id}`),
                 api.get(`/staff/event/${id}`),
                 api.get(`/timeline/event/${id}`),
                 api.get(`/budgets/event/${id}`),
-                api.get(`/events/${id}/deadlines`),
-                api.get(`/tasks/event/${id}`),
+                api.get(`/attendees/event/${id}`),
+                getDepartments(),
+                getTasksByEvent(id),
             ]);
             if (evR.status === "rejected") { setError("Không tìm thấy sự kiện."); setLoading(false); return; }
             setEvent(evR.value.data);
-            setGuests(guR.status === "fulfilled" ? (guR.value.data || []) : []);
             setStaff(stR.status === "fulfilled" ? (stR.value.data || []) : []);
             setTimeline(tlR.status === "fulfilled" ? (tlR.value.data || []) : []);
             setBudget(buR.status === "fulfilled"
                 ? { items: buR.value.data.items || [], total: buR.value.data.total || 0 }
                 : { items: [], total: 0 });
-            setDeadlines(dlR.status === "fulfilled" ? (dlR.value.data || []) : []);
-            const taskR = arguments[6]; // handled below
-            setTasks([]);
-        } catch { setError("Lỗi khi tải dữ liệu."); }
+            setAttendees(atR.status === "fulfilled" ? (atR.value.data || []) : []);
+            setDepartments(deR.status === "fulfilled" ? (deR.value.data || []) : []);
+            setTasks(tkR.status === "fulfilled" ? (tkR.value.data || []) : []);
+        } catch (err) {
+            console.error("loadAll error:", err);
+            setError("Lỗi khi tải dữ liệu.");
+        }
         finally { setLoading(false); }
-    };
+    }, [id]);
+
+    useEffect(() => { loadAll(); fetchUsers(); }, [loadAll, fetchUsers]);
 
     const fmtVND = n => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
-    const fmtDate = d => d ? new Date(d).toLocaleDateString("vi-VN") : "—";
     const fmtDT = d => d ? new Date(d).toLocaleString("vi-VN") : "—";
 
-    const doneCount = deadlines.filter(d => d.done).length;
-    const dlProgress = deadlines.length > 0 ? Math.round((doneCount / deadlines.length) * 100) : 0;
-    const checkedIn = guests.filter(g => g.checked_in).length;
-    const checkinPct = guests.length > 0 ? Math.round((checkedIn / guests.length) * 100) : 0;
+    const externalGuests = attendees.filter(a => a.attendee_type === "external");
+    const internalStaff = attendees.filter(a => a.attendee_type === "internal");
+    const totalParticipants = attendees.length;
+    const checkedIn = attendees.filter(a => a.checked_in).length;
+    const checkinPct = totalParticipants > 0 ? Math.round((checkedIn / totalParticipants) * 100) : 0;
+    const taskDone = tasks.filter(t => t.status === 'done').length;
+    const taskProgress = tasks.length > 0 ? Math.round((taskDone / tasks.length) * 100) : 0;
 
     // ── Workflow ──────────────────────────────────────────────
     const handleChangeStatus = async (newStatus) => {
@@ -121,26 +138,34 @@ export default function EventDetail() {
         } catch (err) { alert(err.response?.data?.message || "Thất bại"); }
     };
 
-    // ── Deadlines ─────────────────────────────────────────────
-    const handleToggleDl = async (dlId, done) => {
-        try { await toggleDeadline(id, dlId, !done); loadAll(); }
-        catch { alert("Cập nhật thất bại"); }
-    };
 
-    const handleDeleteDl = async (dlId) => {
-        if (!window.confirm("Xóa deadline này?")) return;
-        try { await deleteDeadline(id, dlId); loadAll(); }
-        catch { alert("Xóa thất bại"); }
-    };
 
-    const handleAddDeadline = async (e) => {
-        e.preventDefault(); setDlSaving(true);
+    const handleBulkInvite = async (e) => {
+        e.preventDefault();
+        setBulkSending(true);
         try {
-            await createDeadline(id, dlForm);
-            setDlModal(false); setDlForm({ title: "", due_date: "", note: "" });
+            const lines = bulkForm.guests.split("\n").filter(l => l.trim());
+            const parsedGuests = lines.map(line => {
+                const parts = line.split(",").map(p => p.trim());
+                return { name: parts[0], email: parts[1] };
+            }).filter(g => g.name && g.email);
+
+            if (parsedGuests.length === 0) throw new Error("Danh sách khách mời không hợp lệ");
+
+            const r = await api.post("/attendees/bulk-external", {
+                event_id: Number(id),
+                guests: parsedGuests,
+                note: bulkForm.content
+            });
+            alert(`Đã hoàn thành! Thêm thành công ${r.data.count}/${r.data.total} khách mời.`);
+            setBulkModal(false);
+            setBulkForm({ guests: "", subject: "", content: "" });
             loadAll();
-        } catch (err) { alert(err.response?.data?.message || "Thêm thất bại"); }
-        finally { setDlSaving(false); }
+        } catch (err) {
+            alert(err.message || "Gửi mail hàng loạt thất bại");
+        } finally {
+            setBulkSending(false);
+        }
     };
 
     if (loading) return <Layout><div className="empty-state"><span>⏳</span><p>Đang tải...</p></div></Layout>;
@@ -155,8 +180,8 @@ export default function EventDetail() {
 
     const TABS = [
         { key: "overview", label: "📋 Tổng quan" },
-        { key: "deadlines", label: `🔥 Deadlines (${doneCount}/${deadlines.length})` },
-        { key: "guests", label: `🎟️ Khách (${guests.length})` },
+        { key: "tasks", label: `✅ Công việc (${tasks.length})` },
+        { key: "participants", label: `🎟️ Người tham gia (${totalParticipants})` },
         { key: "staff", label: `👥 Staff (${staff.length})` },
         { key: "timeline", label: `🗓️ Timeline (${timeline.length})` },
         { key: "budget", label: "💰 Ngân sách" },
@@ -164,93 +189,93 @@ export default function EventDetail() {
 
     return (
         <Layout>
-            {/* ── Header ── */}
-            <div className="page-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <button className="btn btn-outline btn-sm" onClick={() => navigate("/events")}>← Quay lại</button>
-                    <div>
-                        <h2>🎪 {event.name}</h2>
-                        <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>
-                            {event.event_type && <span style={{ marginRight: 8 }}>🏷️ {event.event_type}</span>}
-                            ID #{event.id}
-                        </p>
+            {/* ── Unified Premium Header Banner ── */}
+            <div style={{
+                background: "linear-gradient(135deg, var(--color-primary), #4338ca, var(--color-accent))",
+                margin: "-32px -40px 32px", padding: "40px", color: "white",
+                borderRadius: "0 0 32px 32px", boxShadow: "var(--shadow-lg)",
+                position: "relative", border: "none"
+            }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+                    <button className="btn btn-sm" style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.2)" }} onClick={() => navigate("/events")}>
+                        ← Quay lại danh sách
+                    </button>
+                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <StatusBadge status={event.status} />
+                        {canManage && nextStatuses.length > 0 && (
+                            <div style={{ display: "flex", gap: 8 }}>
+                                {nextStatuses.map(s => {
+                                    const btnCfg = {
+                                        planning: { label: "→ Lên kế hoạch", cls: "" },
+                                        approved: { label: "✅ Duyệt ngay", cls: "btn-primary" },
+                                        running: { label: "▶ Bắt đầu chạy", cls: "btn-success" },
+                                        completed: { label: "🏁 Hoàn thành", cls: "" },
+                                        cancelled: { label: "✕ Hủy bỏ", cls: "btn-danger" },
+                                    }[s] || { label: s, cls: "" };
+                                    return (
+                                        <button key={s} className={`btn btn-sm ${btnCfg.cls}`} 
+                                            style={{ background: btnCfg.cls ? undefined : "rgba(255,255,255,0.15)", color: "white", border: btnCfg.cls ? "none" : "1px solid rgba(255,255,255,0.3)" }} 
+                                            onClick={() => handleChangeStatus(s)}>
+                                            {btnCfg.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <StatusBadge status={event.status} />
-                    {/* Nút chuyển trạng thái */}
-                    {canManage && nextStatuses.length > 0 && (
-                        <div style={{ display: "flex", gap: 6 }}>
-                            {nextStatuses.map(s => {
-                                const isApprove = s === "approved";
-                                if (isApprove && !isAdmin) return (
-                                    <span key={s} className="btn btn-outline btn-sm"
-                                        style={{ opacity: 0.4, cursor: "not-allowed" }}
-                                        title="Chỉ Admin mới duyệt được">
-                                        ✅ Duyệt (cần Admin)
-                                    </span>
-                                );
-                                const btnCfg = {
-                                    planning: { label: "→ Lên kế hoạch", cls: "btn-outline" },
-                                    approved: { label: "✅ Duyệt", cls: "btn-primary" },
-                                    running: { label: "▶ Bắt đầu", cls: "btn-success" },
-                                    completed: { label: "🏁 Hoàn thành", cls: "btn-outline" },
-                                    cancelled: { label: "✕ Hủy", cls: "btn-danger" },
-                                }[s] || { label: s, cls: "btn-outline" };
-                                return (
-                                    <button key={s} className={`btn btn-sm ${btnCfg.cls}`}
-                                        onClick={() => handleChangeStatus(s)}>
-                                        {btnCfg.label}
-                                    </button>
-                                );
-                            })}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 24 }}>
+                    <div style={{ flex: 1, minWidth: 300 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                            <span style={{ background: "rgba(255,255,255,0.2)", padding: "4px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
+                                {event.event_type || "Sự kiện"}
+                            </span>
+                            <span style={{ opacity: 0.7, fontSize: 12 }}>ID #{event.id}</span>
                         </div>
-                    )}
+                        <h1 style={{ fontSize: 42, fontWeight: 900, marginBottom: 16, letterSpacing: "-0.04em", color: "white", lineHeight: 1 }}>
+                            {event.name}
+                        </h1>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 24px", opacity: 0.9, fontSize: 14 }}>
+                            <span>📅 {fmtDT(event.start_date)} → {fmtDT(event.end_date)}</span>
+                            {event.location && <span>📍 {event.location}</span>}
+                            {event.owner_name && <span>🧑‍💼 Phụ trách: <strong>{event.owner_name}</strong></span>}
+                        </div>
+                    </div>
+                    
+                    <div className="grid-3" style={{ gap: 12, background: "rgba(0,0,0,0.1)", padding: 16, borderRadius: 24, backdropFilter: "blur(10px)" }}>
+                        {[
+                            { icon: "✅", label: "Công việc", value: `${taskDone}/${tasks.length}` },
+                            { icon: "🎟️", label: "Tham gia", value: totalParticipants },
+                            { icon: "💰", label: "Ngân sách", value: fmtVND(event.total_budget || 0) },
+                        ].map(c => (
+                            <div key={c.label} style={{ textAlign: "center", minWidth: 90 }}>
+                                <div style={{ fontSize: 24, marginBottom: 4 }}>{c.icon}</div>
+                                <div style={{ fontWeight: 800, fontSize: 18, color: "white", lineHeight: 1 }}>{c.value}</div>
+                                <div style={{ opacity: 0.6, fontSize: 10, fontWeight: 700, textTransform: "uppercase", marginTop: 4 }}>{c.label}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {/* ── Hero Banner ── */}
-            <div style={{
-                background: "linear-gradient(135deg, var(--color-primary), #818cf8)",
-                borderRadius: 14, padding: "20px 28px", marginBottom: 24,
-                display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16,
-            }}>
-                <div>
-                    <p style={{
-                        color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 700,
-                        textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6
-                    }}>
-                        Thông tin sự kiện
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 20px", marginBottom: 4 }}>
-                        <span style={{ color: "white", fontSize: 13 }}>📅 {fmtDT(event.start_date)} → {fmtDT(event.end_date)}</span>
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
-                        {event.venue_type === "online"
-                            ? <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 13 }}>🌐 Online</span>
-                            : event.location && <span style={{ color: "rgba(255,255,255,0.85)", fontSize: 13 }}>📍 {event.location}</span>
-                        }
-                        {event.capacity && <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}>👤 Sức chứa: {event.capacity}</span>}
-                        {event.owner_name && <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}>🧑‍💼 Phụ trách: {event.owner_name}</span>}
-                    </div>
-                    {event.description && <p style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, marginTop: 8, maxWidth: 480 }}>{event.description}</p>}
+            {/* Quick Stats Grid */}
+            <div className="grid-4" style={{ marginBottom: 32 }}>
+                <div className="card-stat">
+                    <div className="card-stat-icon indigo">📋</div>
+                    <div className="card-stat-info"><h3>{tasks.length}</h3><p>Tổng công việc</p></div>
                 </div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {[
-                        { icon: "🔥", label: "Deadlines", value: `${doneCount}/${deadlines.length}` },
-                        { icon: "🎟️", label: "Khách", value: guests.length },
-                        { icon: "👥", label: "Staff", value: staff.length },
-                        { icon: "💰", label: "Ngân sách", value: fmtVND(event.total_budget || 0) },
-                    ].map(c => (
-                        <div key={c.label} style={{
-                            background: "rgba(255,255,255,0.15)", borderRadius: 10,
-                            padding: "10px 14px", textAlign: "center", minWidth: 70
-                        }}>
-                            <div style={{ fontSize: 18 }}>{c.icon}</div>
-                            <div style={{ color: "white", fontWeight: 800, fontSize: 15, lineHeight: 1.2 }}>{c.value}</div>
-                            <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>{c.label}</div>
-                        </div>
-                    ))}
+                <div className="card-stat">
+                    <div className="card-stat-icon emerald">✅</div>
+                    <div className="card-stat-info"><h3>{taskProgress}%</h3><p>Tiến độ công việc</p></div>
+                </div>
+                <div className="card-stat">
+                    <div className="card-stat-icon emerald">🎟️</div>
+                    <div className="card-stat-info"><h3>{checkinPct}%</h3><p>Tỷ lệ Check-in</p></div>
+                </div>
+                <div className="card-stat">
+                    <div className="card-stat-icon amber">👥</div>
+                    <div className="card-stat-info"><h3>{staff.length}</h3><p>Nhân sự phụ trách</p></div>
                 </div>
             </div>
 
@@ -267,9 +292,11 @@ export default function EventDetail() {
 
             {/* ════ TAB: OVERVIEW ════ */}
             {tab === "overview" && (
-                <div className="grid-2" style={{ alignItems: "start" }}>
+                <div className="grid-3" style={{ alignItems: "start" }}>
                     <div className="card">
-                        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>📋 Thông tin chung</h3>
+                        <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 20 }}>📋</span> Thông tin chung
+                        </h3>
                         {[
                             { label: "Tên sự kiện", value: event.name },
                             { label: "Loại", value: event.event_type || "—" },
@@ -278,171 +305,147 @@ export default function EventDetail() {
                             { label: "Kết thúc", value: fmtDT(event.end_date) },
                             { label: "Hình thức", value: event.venue_type === "online" ? "🌐 Online" : "🏢 Offline" },
                             { label: "Địa điểm", value: event.location || "—" },
+                            { label: "Địa chỉ cụ thể", value: (event.venue_type === 'offline' && event.venue_id) ? (event.detailed_location || event.venue_address || "Đang cập nhật địa chỉ...") : "—" },
+                            { label: "Phòng ban phụ trách", value: event.department_name || "—" },
                             { label: "Sức chứa", value: event.capacity ? `${event.capacity} người` : "—" },
-                            { label: "Ngân sách dự kiến", value: fmtVND(event.total_budget || 0) },
+                            { label: "Ngân sách dự kiến", value: <strong style={{color:"var(--color-primary)"}}>{fmtVND(event.total_budget || 0)}</strong> },
                             { label: "Trạng thái", value: <StatusBadge status={event.status} /> },
-                            { label: "Người duyệt", value: event.approver_name || "—" },
-                            { label: "Ngày duyệt", value: fmtDate(event.approved_at) },
-                            { label: "Ngày tạo", value: fmtDate(event.created_at) },
+                            { label: "Người tổ chức", value: event.organizer_name || "—" },
+
+                            { label: "Admin duyệt", value: event.approver_name || "—" },
                         ].map(row => (
                             <div key={row.label} style={{
                                 display: "flex", justifyContent: "space-between",
-                                alignItems: "flex-start", padding: "9px 0",
-                                borderBottom: "1px solid var(--border-color)", gap: 12
+                                padding: "12px 0", borderBottom: "1px solid #f1f5f9", gap: 12
                             }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>{row.label}</span>
-                                <span style={{ fontSize: 13, color: "var(--text-primary)", textAlign: "right" }}>{row.value}</span>
+                                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>{row.label}</span>
+                                <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500, textAlign: "right" }}>{row.value}</span>
                             </div>
                         ))}
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        {/* Tiến độ deadline */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>🔥 Tiến độ Deadline nội bộ</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{doneCount}/{deadlines.length} hoàn thành</span>
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{dlProgress}%</span>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                        {/* Tiến độ công việc */}
+                        <div className="card" style={{ background: "linear-gradient(to bottom right, #ffffff, #f8fafc)" }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 18 }}>✅ Tiến độ công việc</h3>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700 }}>{taskDone}/{tasks.length} hoàn thành</span>
+                                <span style={{ fontSize: 18, fontWeight: 900, color: "var(--color-primary)" }}>{taskProgress}%</span>
                             </div>
-                            <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
-                                <div style={{
-                                    height: "100%", width: `${dlProgress}%`,
-                                    background: "linear-gradient(90deg, #f59e0b, #ef4444)",
-                                    borderRadius: 5, transition: "width 0.6s ease"
-                                }} />
+                            <div style={{ height: 12, background: "#e2e8f0", borderRadius: 6, overflow: "hidden", marginBottom: 16 }}>
+                                <div style={{ height: "100%", width: `${taskProgress}%`, background: "linear-gradient(90deg, var(--color-primary), var(--color-accent))", borderRadius: 6, transition: "width 1s ease-out" }} />
                             </div>
-                            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-                                {deadlines.map(dl => {
-                                    const overdue = !dl.done && new Date(dl.due_date) < new Date();
-                                    return (
-                                        <div key={dl.id} style={{
-                                            display: "flex", alignItems: "center", gap: 8,
-                                            padding: "6px 10px", borderRadius: 8,
-                                            background: dl.done ? "rgba(16,185,129,0.07)" : overdue ? "rgba(239,68,68,0.07)" : "var(--bg-main)"
-                                        }}>
-                                            <span style={{ fontSize: 14 }}>{dl.done ? "✅" : overdue ? "🔴" : "⏳"}</span>
-                                            <span style={{
-                                                flex: 1, fontSize: 13, fontWeight: dl.done ? 400 : 600,
-                                                textDecoration: dl.done ? "line-through" : "none",
-                                                color: dl.done ? "var(--text-muted)" : "var(--text-primary)"
-                                            }}>
-                                                {dl.title}
-                                            </span>
-                                            <span style={{ fontSize: 11, color: overdue ? "#dc2626" : "var(--text-muted)" }}>
-                                                {fmtDate(dl.due_date)}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                {[
+                                    { label: "📋 Chuẩn Bị",  count: tasks.filter(t => t.status === 'todo').length,        color: "#6366f1" },
+                                    { label: "⚡ Đang Làm",  count: tasks.filter(t => t.status === 'in_progress').length,  color: "#f59e0b" },
+                                    { label: "✅ Hoàn Thành", count: tasks.filter(t => t.status === 'done').length,         color: "#10b981" },
+                                ].map(s => (
+                                    <div key={s.label} style={{ flex: 1, textAlign: "center", padding: "8px", borderRadius: 8, background: s.color + "12" }}>
+                                        <div style={{ fontWeight: 800, fontSize: 18, color: s.color }}>{s.count}</div>
+                                        <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600 }}>{s.label}</div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
-                        {/* Check-in */}
-                        <div className="card">
-                            <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>✅ Tỷ lệ Check-in</h3>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                                <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} khách</span>
-                                <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)" }}>{checkinPct}%</span>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                        {/* Check-in Card */}
+                        <div className="card" style={{ border: "2px solid var(--color-primary)", position: "relative" }}>
+                            <div style={{ position: "absolute", top: 12, right: 12, fontSize: 24 }}>📈</div>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 18 }}>✅ Tỷ lệ Check-in</h3>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700 }}>{checkedIn}/{totalParticipants} khách</span>
+                                <span style={{ fontSize: 18, fontWeight: 900, color: "var(--color-primary)" }}>{checkinPct}%</span>
                             </div>
-                            <div style={{ height: 10, background: "var(--border-color)", borderRadius: 5, overflow: "hidden" }}>
+                            <div style={{ height: 12, background: "#f1f5f9", borderRadius: 6, overflow: "hidden" }}>
                                 <div style={{
                                     height: "100%", width: `${checkinPct}%`,
-                                    background: "linear-gradient(90deg, var(--color-primary), #818cf8)",
-                                    borderRadius: 5, transition: "width 0.6s ease"
+                                    background: "linear-gradient(90deg, #6366f1, #06b6d4)",
+                                    borderRadius: 6, transition: "width 1s ease-out"
                                 }} />
+                            </div>
+                        </div>
+                        
+                        {/* Quick Actions */}
+                        <div className="card" style={{ background: "var(--text-primary)", color: "white" }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: "white" }}>⚡ Thao tác nhanh</h3>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                <button className="btn btn-primary w-full" style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)" }}
+                                    onClick={() => setBulkModal(true)}>
+                                    💌 Mời khách hàng loạt
+                                </button>
+                                <button className="btn btn-primary w-full" style={{ background: "rgba(255,255,255,0.1)", border: "none" }}
+                                    onClick={() => setTab("tasks")}>
+                                    ✅ Xem công việc
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ════ TAB: DEADLINES ════ */}
-            {tab === "deadlines" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <div>
-                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🔥 Deadlines nội bộ</h3>
-                            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
-                                Các mốc quan trọng trước ngày diễn ra sự kiện
-                            </p>
-                        </div>
-                        {canManage && (
-                            <button className="btn btn-primary btn-sm" onClick={() => setDlModal(true)}>+ Thêm deadline</button>
-                        )}
-                    </div>
-                    {deadlines.length === 0 ? (
-                        <div className="empty-state"><span>🔥</span><p>Chưa có deadline nào</p></div>
-                    ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr><th>Hạng mục</th><th>Hạn chót</th><th>Ghi chú</th><th>Trạng thái</th>
-                                    {canManage && <th>Thao tác</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {deadlines.map(dl => {
-                                    const overdue = !dl.done && new Date(dl.due_date) < new Date();
-                                    return (
-                                        <tr key={dl.id}>
-                                            <td style={{ fontWeight: 600 }}>{dl.title}</td>
-                                            <td style={{ color: overdue ? "#dc2626" : "var(--text-primary)", fontWeight: overdue ? 700 : 400 }}>
-                                                {fmtDT(dl.due_date)} {overdue && "⚠️"}
-                                            </td>
-                                            <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>{dl.note || "—"}</td>
-                                            <td>
-                                                {dl.done
-                                                    ? <span className="badge badge-success">✅ Hoàn thành</span>
-                                                    : overdue
-                                                        ? <span className="badge badge-danger">🔴 Trễ hạn</span>
-                                                        : <span className="badge badge-default">⏳ Chờ</span>
-                                                }
-                                            </td>
-                                            {canManage && (
-                                                <td>
-                                                    <div className="actions">
-                                                        <button className={`btn btn-sm ${dl.done ? "btn-outline" : "btn-success"}`}
-                                                            onClick={() => handleToggleDl(dl.id, dl.done)}>
-                                                            {dl.done ? "↩ Hoàn tác" : "✓ Xong"}
-                                                        </button>
-                                                        <button className="btn btn-danger btn-sm"
-                                                            onClick={() => handleDeleteDl(dl.id)}>🗑</button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            )}
 
-            {/* ════ TAB: GUESTS ════ */}
-            {tab === "guests" && (
-                <div className="card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700 }}>🎟️ Danh sách khách mời</h3>
-                        <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{checkedIn}/{guests.length} đã check-in</span>
+            {/* ════ TAB: PARTICIPANTS (GUESTS & ATTENDEES) ════ */}
+            {tab === "participants" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    <div className="card">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🎟️ Khách mời bên ngoài</h3>
+                            {canManage && (
+                                <button className="btn btn-primary btn-sm" onClick={() => setBulkModal(true)}>
+                                    💌 Mời khách hàng loạt
+                                </button>
+                            )}
+                        </div>
+                        {externalGuests.length === 0
+                            ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời bên ngoài</p></div>
+                            : <table className="data-table">
+                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban / Công ty</th><th>Trạng thái</th></tr></thead>
+                                <tbody>
+                                    {externalGuests.map((g, i) => (
+                                        <tr key={g.id}>
+                                            <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                                            <td style={{ fontWeight: 600 }}>{g.checked_in ? "✅" : "⏳"} {g.name}</td>
+                                            <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
+                                            <td>{g.organization || "—"}</td>
+                                            <td>{g.checked_in
+                                                ? <span className="badge badge-success">Đã check-in</span>
+                                                : <span className="badge badge-default">Chờ</span>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        }
                     </div>
-                    {guests.length === 0
-                        ? <div className="empty-state"><span>🎟️</span><p>Chưa có khách mời</p></div>
-                        : <table className="data-table">
-                            <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>SĐT</th><th>Trạng thái</th></tr></thead>
-                            <tbody>
-                                {guests.map((g, i) => (
-                                    <tr key={g.id}>
-                                        <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                                        <td style={{ fontWeight: 600 }}>{g.checked_in ? "✅" : "⏳"} {g.name}</td>
-                                        <td style={{ color: "var(--text-secondary)" }}>{g.email}</td>
-                                        <td>{g.phone || "—"}</td>
-                                        <td>{g.checked_in
-                                            ? <span className="badge badge-success">Đã check-in</span>
-                                            : <span className="badge badge-default">Chờ</span>}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    }
+
+                    <div className="card">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 15, fontWeight: 700 }}>🏢 Nhân viên tham gia (Nội bộ)</h3>
+                        </div>
+                        {internalStaff.length === 0
+                            ? <div className="empty-state"><span>🏢</span><p>Chưa có nhân viên đăng ký tham gia</p></div>
+                            : <table className="data-table">
+                                <thead><tr><th>#</th><th>Tên</th><th>Email</th><th>Phòng ban</th><th>Trạng thái</th></tr></thead>
+                                <tbody>
+                                    {internalStaff.map((a, i) => (
+                                        <tr key={a.id}>
+                                            <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                                            <td style={{ fontWeight: 600 }}>{a.checked_in ? "✅" : "⏳"} {a.name}</td>
+                                            <td style={{ color: "var(--text-secondary)" }}>{a.email}</td>
+                                            <td>{a.user_department || "—"}</td>
+                                            <td>{a.checked_in
+                                                ? <span className="badge badge-success">Đã check-in</span>
+                                                : <span className="badge badge-default">Chờ</span>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        }
+                    </div>
                 </div>
             )}
 
@@ -570,28 +573,44 @@ export default function EventDetail() {
 
             {/* ════ TAB: TASKS (Kanban) ════ */}
             {tab === "tasks" && (
-                <TaskBoard eventId={id} staffList={staff} canManage={canManage} />
+                <TaskBoard 
+                    eventId={id} 
+                    eventStaff={staff} 
+                    allUsers={users}
+                    departments={departments}
+                    canManage={canManage} 
+                    onRefreshParent={loadAll}
+                />
             )}
-            {/* ── Modal thêm deadline ── */}
-            <Modal title="Thêm Deadline" isOpen={dlModal} onClose={() => setDlModal(false)}>
-                <form onSubmit={handleAddDeadline}>
-                    <div className="form-group">
-                        <label>Tiêu đề <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control" placeholder="VD: Chốt danh sách khách mời"
-                            value={dlForm.title} onChange={e => setDlForm({ ...dlForm, title: e.target.value })} required />
+
+            {/* ── Modal Bulk Invite ── */}
+            <Modal title="💌 Mời khách hàng loạt" isOpen={bulkModal} onClose={() => setBulkModal(false)} maxWidth="800px">
+                <form onSubmit={handleBulkInvite}>
+                    <div className="grid-2" style={{ gap: 24 }}>
+                        <div className="form-group">
+                            <label>Danh sách khách mời <span style={{ color: "red" }}>*</span></label>
+                            <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+                                Nhập mỗi dòng: <strong>Tên, Email</strong> (ngăn cách bởi dấu phẩy)
+                            </p>
+                            <textarea className="form-control" rows="6"
+                                placeholder={"Nguyễn Văn A, anguyen@gmail.com\nTrần Thị B, btran@gmail.com"}
+                                value={bulkForm.guests}
+                                onChange={e => setBulkForm({ ...bulkForm, guests: e.target.value })}
+                                required />
+                        </div>
+                        <div className="form-group">
+                            <label>Lời nhắn trong thư mời</label>
+                            <textarea className="form-control" style={{ height: "calc(100% - 28px)" }}
+                                placeholder="VD: Trân trọng kính mời bạn đến tham dự buổi lễ ra mắt sản phẩm mới..."
+                                value={bulkForm.content}
+                                onChange={e => setBulkForm({ ...bulkForm, content: e.target.value })} />
+                        </div>
                     </div>
-                    <div className="form-group">
-                        <label>Hạn chót <span style={{ color: "red" }}>*</span></label>
-                        <input type="datetime-local" className="form-control"
-                            value={dlForm.due_date} onChange={e => setDlForm({ ...dlForm, due_date: e.target.value })} required />
+                    <div style={{ background: "rgba(99,102,241,0.07)", padding: 12, borderRadius: 8, fontSize: 12, marginBottom: 16 }}>
+                        💡 Hệ thống sẽ tự động tạo mã QR Check-in duy nhất cho từng khách mời và gửi kèm trong email.
                     </div>
-                    <div className="form-group">
-                        <label>Ghi chú</label>
-                        <textarea className="form-control" rows="2"
-                            value={dlForm.note} onChange={e => setDlForm({ ...dlForm, note: e.target.value })} />
-                    </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={dlSaving}>
-                        {dlSaving ? "Đang lưu..." : "Thêm deadline"}
+                    <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={bulkSending}>
+                        {bulkSending ? "Đang gửi email..." : "🚀 Gửi lời mời hàng loạt"}
                     </button>
                 </form>
             </Modal>

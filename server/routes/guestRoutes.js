@@ -10,6 +10,7 @@ router.get("/lookup", guestController.lookupByEmail);
 router.get("/", authMiddleware, guestController.getAllGuests);
 router.get("/event/:eventId", authMiddleware, guestController.getGuestsByEvent);
 router.post("/", authMiddleware, authorize(["admin", "organizer"]), guestController.createGuest);
+router.post("/bulk-invite", authMiddleware, authorize(["admin", "organizer"]), guestController.bulkInvite);
 router.delete("/:id", authMiddleware, authorize(["admin", "organizer"]), guestController.deleteGuest);
 
 module.exports = router;

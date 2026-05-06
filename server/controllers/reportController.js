@@ -8,3 +8,4 @@ exports.getAttendeesByEvent = async (req, res) => { try { ok(res, await svc.getA
 exports.getBudgetByEvent = async (req, res) => { try { ok(res, await svc.getBudgetByEvent()); } catch (e) { err(res, e); } };
 exports.getTaskStats = async (req, res) => { try { ok(res, await svc.getTaskStats()); } catch (e) { err(res, e); } };
 exports.getEventsByType = async (req, res) => { try { ok(res, await svc.getEventsByType()); } catch (e) { err(res, e); } };
+exports.getFeedbackStats = async (req, res) => { try { ok(res, await svc.getFeedbackStats()); } catch (e) { err(res, e); } };

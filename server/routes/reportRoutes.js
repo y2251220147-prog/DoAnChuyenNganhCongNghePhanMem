@@ -9,5 +9,6 @@ r.get("/attendees", auth, can(["admin", "organizer"]), c.getAttendeesByEvent);
 r.get("/budget", auth, can(["admin", "organizer"]), c.getBudgetByEvent);
 r.get("/tasks", auth, can(["admin", "organizer"]), c.getTaskStats);
 r.get("/events-by-type", auth, can(["admin", "organizer"]), c.getEventsByType);
+r.get("/feedbacks", auth, can(["admin", "organizer"]), c.getFeedbackStats);
 
 module.exports = r;
