@@ -22,6 +22,7 @@ export default function Dashboard() {
     const [staffCount, setStaffCount] = useState(0);
     const [guestsCount, setGuestsCount] = useState(0);
     const [budgetTotal, setBudgetTotal] = useState(0);
+    const [overBudgetCount, setOverBudgetCount] = useState(0);
     const [checkedIn, setCheckedIn] = useState(0);
     const [myRegs, setMyRegs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -45,6 +46,7 @@ export default function Dashboard() {
                     setGuestsCount(overview.attendees?.total || 0);
                     setCheckedIn(overview.attendees?.checkedIn || 0);
                     setBudgetTotal(overview.budget?.actual || 0);
+                    setOverBudgetCount(overview.budget?.overBudgetCount || 0);
                 }
             } catch {/**/ }
             finally { setLoading(false); }
@@ -125,17 +127,18 @@ export default function Dashboard() {
                 ))}
             </div>
 
-            {/* Budget summary */}
+            {/* Budget summary and Alerts */}
             {(role === "admin" || role === "organizer") && !loading && (
-                <div className="card" 
-                    style={{ 
-                        marginBottom: 32, cursor: "pointer", padding: 32, borderRadius: 24, 
-                        background: "linear-gradient(135deg, #fffbeb 0%, #fff 100%)", 
-                        border: "1px solid #fef3c7",
-                        boxShadow: "0 10px 30px -10px rgba(245,158,11,0.15)"
-                    }}
-                    onClick={() => navigate("/budget")}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: overBudgetCount > 0 ? "2fr 1fr" : "1fr", gap: 20, marginBottom: 32 }}>
+                    <div className="card" 
+                        style={{ 
+                            cursor: "pointer", padding: "28px 32px", borderRadius: 24, 
+                            background: "linear-gradient(135deg, #fffbeb 0%, #fff 100%)", 
+                            border: "1px solid #fef3c7",
+                            boxShadow: "0 10px 30px -10px rgba(245,158,11,0.15)",
+                            display: "flex", justifyContent: "space-between", alignItems: "center"
+                        }}
+                        onClick={() => navigate("/budget")}>
                         <div>
                             <p style={{
                                 fontSize: "11px", color: "#b45309", fontWeight: 800,
@@ -147,8 +150,27 @@ export default function Dashboard() {
                                 {formatVND(budgetTotal)}
                             </h3>
                         </div>
-                        <div className="card-stat-icon amber" style={{ width: 72, height: 72, fontSize: 32, borderRadius: 20, boxShadow: "0 10px 20px -5px rgba(245,158,11,0.3)" }}>💰</div>
+                        <div className="card-stat-icon amber" style={{ width: 64, height: 64, fontSize: 28, borderRadius: 18 }}>💰</div>
                     </div>
+
+                    {overBudgetCount > 0 && (
+                        <div className="card" 
+                            style={{ 
+                                cursor: "pointer", padding: "28px 32px", borderRadius: 24, 
+                                background: "linear-gradient(135deg, #fef2f2 0%, #fff 100%)", 
+                                border: "1px solid #fecaca",
+                                boxShadow: "0 10px 30px -10px rgba(220,38,38,0.1)",
+                                display: "flex", justifyContent: "space-between", alignItems: "center"
+                            }}
+                            onClick={() => navigate("/budget")}>
+                            <div>
+                                <p style={{ fontSize: "11px", color: "#991b1b", fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>⚠️ CẢNH BÁO TÀI CHÍNH</p>
+                                <h3 style={{ fontSize: "28px", fontWeight: 900, color: "#dc2626" }}>{overBudgetCount} Sự kiện</h3>
+                                <p style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>Đã chi vượt ngân sách dự kiến!</p>
+                            </div>
+                            <div className="card-stat-icon rose" style={{ width: 64, height: 64, fontSize: 28, borderRadius: 18 }}>🔥</div>
+                        </div>
+                    )}
                 </div>
             )}
 

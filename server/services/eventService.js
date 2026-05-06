@@ -48,16 +48,7 @@ const createEvent = async (data, userId) => {
 
     const id = await Event.create(payload);
 
-    // Tự động đặt địa điểm
-    if (payload.venue_id && payload.venue_type === 'offline') {
-        try {
-            await Venue.createBooking({
-                event_id: id, venue_id: payload.venue_id,
-                start_time: start_date, end_time: end_date,
-                note: `Đặt chỗ tự động từ sự kiện: ${name}`, status: 'confirmed'
-            });
-        } catch (e) { console.error("Lỗi tự động đặt địa điểm:", e); }
-    }
+    // Tự động đặt địa điểm (Bỏ qua vì bảng event_venue_bookings đã bị xóa)
 
     // Tự động đặt tài nguyên
     if (data.resources && Array.isArray(data.resources)) {
@@ -111,21 +102,7 @@ const updateEvent = async (id, data) => {
         status: event.status,
     });
 
-    // Cập nhật venue booking nếu đổi thời gian hoặc địa điểm
-    const newVenueId = data.venue_id ?? event.venue_id;
-    const newStart = data.start_date ?? event.start_date;
-    const newEnd = data.end_date ?? event.end_date;
-
-    if (newVenueId && (data.venue_id || data.start_date || data.end_date)) {
-        try {
-            const db = require("../config/database");
-            await db.query("DELETE FROM event_venue_bookings WHERE event_id = ?", [id]);
-            await Venue.createBooking({
-                event_id: id, venue_id: newVenueId,
-                start_time: newStart, end_time: newEnd, status: 'confirmed'
-            });
-        } catch (e) { console.error("Lỗi cập nhật booking địa điểm:", e); }
-    }
+    // Cập nhật venue booking (Bỏ qua vì bảng đã bị xóa trong quá trình dọn dẹp)
 
     // Thông báo attendees về thay đổi
     if (['approved', 'planning', 'running'].includes(event.status)) {

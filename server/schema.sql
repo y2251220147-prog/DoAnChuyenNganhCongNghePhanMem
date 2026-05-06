@@ -3,7 +3,15 @@
 -- PHIÊN BẢN 4.0 - CẬP NHẬT 5 RÀNG BUỘC NGHIỆP VỤ
 -- ==========================================================
 
-CREATE DATABASE IF NOT EXISTS event_management;
+-- Đảm bảo đọc/ghi đúng UTF-8 (tiếng Việt)
+SET NAMES utf8mb4;
+SET character_set_client = utf8mb4;
+SET character_set_connection = utf8mb4;
+SET character_set_results = utf8mb4;
+
+CREATE DATABASE IF NOT EXISTS event_management
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 USE event_management;
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -154,6 +162,7 @@ CREATE TABLE `event_tasks` (
   `estimated_h` decimal(5,2) DEFAULT NULL,
   `actual_h` decimal(5,2) DEFAULT NULL,
   `estimated_budget` decimal(18,2) DEFAULT '0.00',
+  `actual_budget` decimal(18,2) DEFAULT '0.00',
   `feedback_status` enum('none','approved','rejected') DEFAULT 'none',
   `feedback_note` text,
   `created_by` int DEFAULT NULL,
@@ -242,18 +251,28 @@ CREATE TABLE `attendees` (
 
 -- ----------------------------------------------------------
 -- 9. BẢNG CHI PHÍ SỰ KIỆN (EVENT_BUDGET)
+--    category: phân loại chi phí (f_b, venue, marketing, technical, staff, other)
+--    status: trạng thái thanh toán (paid = đã chi, pending = dự kiến/chờ)
+--    task_id: liên kết tùy chọn tới nhiệm vụ cụ thể trong sự kiện
 -- ----------------------------------------------------------
 DROP TABLE IF EXISTS `event_budget`;
 CREATE TABLE `event_budget` (
   `id` int NOT NULL AUTO_INCREMENT,
   `event_id` int NOT NULL,
-  `item` varchar(255) NOT NULL,
-  `cost` decimal(18,2) NOT NULL,
-  `note` text,
+  `task_id` int DEFAULT NULL COMMENT 'Liên kết tới nhiệm vụ (tùy chọn)',
+  `item` varchar(255) NOT NULL COMMENT 'Tên khoản chi (VD: Thuê âm thanh, In ấn banner...)',
+  `category` enum('f_b','venue','marketing','technical','staff','other') DEFAULT 'other' COMMENT 'Danh mục chi phí',
+  `cost` decimal(18,2) NOT NULL DEFAULT '0.00' COMMENT 'Số tiền (VND)',
+  `status` enum('paid','pending') DEFAULT 'pending' COMMENT 'paid=đã thanh toán, pending=dự kiến/chờ',
+  `note` text COMMENT 'Ghi chú thêm',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `event_id` (`event_id`),
-  CONSTRAINT `event_budget_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE
+  KEY `task_id` (`task_id`),
+  KEY `idx_event_status` (`event_id`, `status`),
+  CONSTRAINT `event_budget_ibfk_1` FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `event_budget_ibfk_task` FOREIGN KEY (`task_id`) REFERENCES `event_tasks` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -406,3 +425,76 @@ INSERT INTO `users` (`name`, `email`, `password`, `role`, `department_id`) VALUE
 -- Địa điểm mẫu
 INSERT INTO `venues` (`name`, `type`, `location`, `capacity`, `description`, `status`) VALUES
 ('Hội trường A1', 'hall', 'Tầng 1, Tòa nhà trung tâm', 200, 'Hội trường lớn với đầy đủ thiết bị âm thanh, ánh sáng', 'available');
+
+-- ==========================================================
+-- SCRIPT TẠO DỮ LIỆU MẪU CHUẨN (CONSISTENT DEMO SEED)
+-- ==========================================================
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- 1. TẠO PHÒNG BAN (Lấy ID vào biến @dept_id)
+INSERT INTO `departments` (`name`, `description`) 
+VALUES ('Ban Công Nghệ & Sáng Tạo', 'Phòng ban chuyên trách kỹ thuật và demo hệ thống')
+ON DUPLICATE KEY UPDATE name=name;
+SET @dept_id = (SELECT id FROM `departments` WHERE name = 'Ban Công Nghệ & Sáng Tạo');
+
+-- 2. TẠO NGƯỜI DÙNG (Lấy ID vào biến @user_id)
+-- Password: admin123 (Hash: $2b$10$FB5o8rQZbp9tzPXMKlh/Rukfllf.i7vR1ADQe6A4C9jiQjLUdaYgC)
+INSERT INTO `users` (`name`, `email`, `password`, `role`, `department_id`, `position`, `phone`)
+VALUES ('Nguyễn Văn Demo', 'demo_admin@eventpro.com', '$2b$10$FB5o8rQZbp9tzPXMKlh/Rukfllf.i7vR1ADQe6A4C9jiQjLUdaYgC', 'organizer', @dept_id, 'Quản lý dự án mẫu', '0911222333')
+ON DUPLICATE KEY UPDATE email=email;
+SET @user_id = (SELECT id FROM `users` WHERE email = 'demo_admin@eventpro.com');
+
+-- 3. ĐỊA ĐIỂM
+INSERT INTO `venues` (`name`, `type`, `location`, `capacity`, `description`, `status`)
+VALUES ('Trung tâm Hội nghị Demo Center', 'hall', 'Toà nhà Innovation, Công viên Phần mềm Quang Trung', 300, 'Phòng họp tiêu chuẩn quốc tế, đầy đủ thiết bị', 'available');
+SET @venue_id = LAST_INSERT_ID();
+
+-- 4. SỰ KIỆN CHÍNH
+INSERT INTO `events` (`name`, `description`, `event_type`, `owner_id`, `organizer_id`, `department_id`, `venue_id`, `start_date`, `end_date`, `total_budget`, `status`, `venue_type`)
+VALUES (
+    'Hội nghị Thượng đỉnh Tech 2026', 
+    'Sự kiện trình diễn các công nghệ mới nhất về AI và Blockchain. Quy tụ 50+ diễn giả đầu ngành.', 
+    'Hội thảo Công nghệ', 
+    @user_id, @user_id, @dept_id, @venue_id, 
+    '2026-08-20 08:30:00', '2026-08-21 17:30:00', 
+    500000000.00, 'planning', 'offline'
+);
+SET @event_id = LAST_INSERT_ID();
+
+-- 5. PHÂN BỔ NHÂN SỰ VÀO SỰ KIỆN (Quan trọng để hiển thị trong danh sách của User)
+INSERT IGNORE INTO `event_staff` (`event_id`, `user_id`, `role`) VALUES (@event_id, @user_id, 'organizer');
+INSERT IGNORE INTO `event_departments` (`event_id`, `department_id`, `role`) VALUES (@event_id, @dept_id, 'Chủ trì tổ chức');
+
+-- 6. GIAI ĐOẠN (PHASES)
+INSERT INTO `task_phases` (`event_id`, `name`, `color`, `position`) VALUES (@event_id, 'Khởi động dự án', '#6366f1', 1);
+SET @phase_1 = LAST_INSERT_ID();
+INSERT INTO `task_phases` (`event_id`, `name`, `color`, `position`) VALUES (@event_id, 'Truyền thông & Mời khách', '#10b981', 2);
+SET @phase_2 = LAST_INSERT_ID();
+
+-- 7. NHIỆM VỤ (TASKS)
+INSERT INTO `event_tasks` (`event_id`, `phase_id`, `title`, `description`, `assigned_to`, `status`, `priority`, `due_date`, `progress`, `estimated_budget`)
+VALUES (@event_id, @phase_1, 'Khảo sát và đặt chỗ địa điểm', 'Hoàn thành ký hợp đồng với Demo Center', @user_id, 'done', 'high', '2026-06-01 17:00:00', 100, 100000000.00);
+
+INSERT INTO `event_tasks` (`event_id`, `phase_id`, `title`, `description`, `assigned_to`, `status`, `priority`, `due_date`, `progress`, `estimated_budget`)
+VALUES (@event_id, @phase_2, 'Gửi thư mời diễn giả quốc tế', 'Liên hệ với 5 diễn giả từ Silicon Valley', @user_id, 'in_progress', 'medium', '2026-07-15 09:00:00', 60, 20000000.00);
+
+-- 8. CHI PHÍ (BUDGET)
+INSERT INTO `event_budget` (`event_id`, `item`, `category`, `cost`, `status`, `note`)
+VALUES (@event_id, 'Chi phí thuê Hội trường 2 ngày', 'venue', 90000000.00, 'paid', 'Đã chuyển khoản tiền cọc 50%');
+INSERT INTO `event_budget` (`event_id`, `item`, `category`, `cost`, `status`, `note`)
+VALUES (@event_id, 'Thiết kế website sự kiện', 'marketing', 15000000.00, 'pending', 'Chờ nghiệm thu giao diện');
+
+-- 9. KHÁCH MỜI (ATTENDEES)
+INSERT INTO `attendees` (`event_id`, `name`, `email`, `phone`, `organization`, `attendee_type`)
+VALUES (@event_id, 'Lê Thị Chuyên Gia', 'chuyengia@example.com', '0901112223', 'Hiệp hội Công nghệ VN', 'external');
+INSERT INTO `attendees` (`event_id`, `name`, `email`, `phone`, `organization`, `attendee_type`)
+VALUES (@event_id, 'Trần Văn Khách', 'khachhang@example.com', '0905556667', 'Tập đoàn ABC', 'external');
+
+-- 10. LỊCH TRÌNH (TIMELINE)
+INSERT INTO `event_timeline` (`event_id`, `title`, `start_time`, `end_time`, `description`)
+VALUES (@event_id, 'Đón tiếp & Tea-break buổi sáng', '2026-08-20 08:30:00', '2026-08-20 09:15:00', 'Phục vụ cà phê và bánh ngọt tại sảnh');
+
+SET FOREIGN_KEY_CHECKS = 1;
+
