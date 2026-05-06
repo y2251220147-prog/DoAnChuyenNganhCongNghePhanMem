@@ -10,7 +10,8 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import EventDetail from "./pages/Events/EventDetail";
 import EventList from "./pages/Events/EventList";
 import Feedback from "./pages/Feedback/Feedback";
-import GuestList from "./pages/Guests/GuestList";
+import AttendeeList from "./pages/Attendees/AttendeeList";
+import DepartmentList from "./pages/Departments/DepartmentList";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Reports from "./pages/Reports/Reports";
@@ -21,6 +22,7 @@ import VenueList from "./pages/Venues/VenueList";
 import NotificationCenter from "./pages/Notifications/NotificationCenter";
 import UserEventPortal from "./pages/Portal/UserEventPortal";
 import GuestPublicPortal from "./pages/Portal/GuestPublicPortal";
+import SearchPage from "./pages/Events/SearchPage";
 
 // ── Employee (User) pages ───────────────────────────────────────────────────
 import EmployeeDashboard from "./pages/Employee/EmployeeDashboard";
@@ -28,7 +30,7 @@ import { EmployeeExplore, EmployeeMyEvents } from "./pages/Employee/EmployeeEven
 import EmployeeEventDetail from "./pages/Employee/EmployeeEventDetail";
 import EmployeeCalendar from "./pages/Employee/EmployeeCalendar";
 import EmployeeNotifications from "./pages/Employee/EmployeeNotifications";
-import EmployeeProfile from "./pages/Employee/EmployeeProfile";
+import ProfilePage from "./pages/Profile/ProfilePage";
 
 // ── Route guards ─────────────────────────────────────────────────────────────
 function ProtectedRoute({ children }) {
@@ -96,7 +98,7 @@ export default function App() {
           {/* Calendar: user → employee calendar; others → redirect to dashboard */}
           <EmployeeCalendar />
         </ProtectedRoute>} />
-        <Route path="/profile" element={<RoleRoute roles={["user"]}><EmployeeProfile /></RoleRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
         {/* Shared */}
         <Route path="/events/:id" element={<ProtectedRoute><SmartEventDetail /></ProtectedRoute>} />
@@ -104,7 +106,9 @@ export default function App() {
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
 
         {/* Admin / Organizer only */}
-        <Route path="/guests" element={<RoleRoute roles={["admin","organizer"]}><GuestList /></RoleRoute>} />
+        <Route path="/guests" element={<RoleRoute roles={["admin","organizer"]}><AttendeeList /></RoleRoute>} />
+        <Route path="/attendees" element={<RoleRoute roles={["admin","organizer"]}><AttendeeList /></RoleRoute>} />
+        <Route path="/departments" element={<RoleRoute roles={["admin","organizer"]}><DepartmentList /></RoleRoute>} />
         <Route path="/staff" element={<RoleRoute roles={["admin","organizer"]}><StaffList /></RoleRoute>} />
         <Route path="/timeline" element={<RoleRoute roles={["admin","organizer"]}><TimelineList /></RoleRoute>} />
         <Route path="/budget" element={<RoleRoute roles={["admin","organizer"]}><BudgetList /></RoleRoute>} />
@@ -112,6 +116,7 @@ export default function App() {
         <Route path="/reports" element={<RoleRoute roles={["admin","organizer"]}><Reports /></RoleRoute>} />
         <Route path="/venues" element={<RoleRoute roles={["admin","organizer"]}><VenueList /></RoleRoute>} />
         <Route path="/admin/users" element={<RoleRoute roles={["admin"]}><AdminUsers /></RoleRoute>} />
+        <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
 
         {/* Public */}
         <Route path="/guest-portal" element={<GuestPublicPortal />} />

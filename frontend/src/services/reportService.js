@@ -5,3 +5,4 @@ export const getAttendeeReport = () => api.get("/reports/attendees");
 export const getBudgetReport = () => api.get("/reports/budget");
 export const getTaskStats = () => api.get("/reports/tasks");
 export const getEventsByType = () => api.get("/reports/events-by-type");
+export const getFeedbackStats = () => api.get("/reports/feedbacks");

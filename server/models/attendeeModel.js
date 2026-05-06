@@ -2,10 +2,11 @@ const db = require("../config/database");
 const Attendee = {
     getAll: async () => {
         const [r] = await db.query(`
-            SELECT a.*, e.name AS event_name, u.role AS user_role
+            SELECT a.*, e.name AS event_name, u.role AS user_role, u.position, d.name AS user_department
             FROM attendees a
             LEFT JOIN events e ON a.event_id = e.id
             LEFT JOIN users u  ON a.user_id  = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
             ORDER BY a.created_at DESC
         `);
         return r;
@@ -22,8 +23,10 @@ const Attendee = {
     },
     getByEvent: async (eventId) => {
         const [r] = await db.query(`
-            SELECT a.*, u.role AS user_role, u.department
-            FROM attendees a LEFT JOIN users u ON a.user_id = u.id
+            SELECT a.*, u.role AS user_role, d.name AS user_department, u.position, u.role_in_dept
+            FROM attendees a
+            LEFT JOIN users u ON a.user_id = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
             WHERE a.event_id=? ORDER BY a.checked_in DESC, a.name ASC
         `, [eventId]);
         return r;
@@ -54,11 +57,17 @@ const Attendee = {
         );
         return r[0] || null;
     },
+    findByEmail: async (email) => {
+        const [r] = await db.query(
+            "SELECT * FROM attendees WHERE email=?", [email]
+        );
+        return r;
+    },
     create: async (d) => {
         const [r] = await db.query(`
-            INSERT INTO attendees (event_id,user_id,name,email,phone,attendee_type,qr_code,registered_by)
-            VALUES (?,?,?,?,?,?,?,?)
-        `, [d.event_id, d.user_id || null, d.name, d.email, d.phone || null,
+            INSERT INTO attendees (event_id,user_id,name,email,phone,organization,attendee_type,qr_code,registered_by)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        `, [d.event_id, d.user_id || null, d.name, d.email, d.phone || null, d.organization || null,
         d.attendee_type || (d.user_id ? 'internal' : 'external'), d.qr_code || null, d.registered_by || null]);
         return r.insertId;
     },

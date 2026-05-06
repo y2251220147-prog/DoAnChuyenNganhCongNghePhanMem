@@ -8,7 +8,7 @@ import "../../styles/global.css";
 
 // ── Helpers ───────────────────────────────────────────────────
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : null;
-const fmtDT = (d) => d ? new Date(d).toLocaleString("vi-VN") : "—";
+
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("vi-VN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) : "—";
 
 // Tính trạng thái của từng mục timeline
@@ -117,16 +117,15 @@ export default function TimelineList() {
 
     return (
         <Layout>
-            {/* ── Header ── */}
             <div className="page-header">
                 <div>
-                    <h2>🗓️ Lịch trình sự kiện</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        Chương trình chi tiết theo từng mốc thời gian trong ngày diễn ra
+                    <h2 className="gradient-text">🗓️ Lịch trình sự kiện</h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6 }}>
+                        Quản lý chi tiết kịch bản chương trình theo từng mốc thời gian {timeline.length > 0 && `(${timeline.length} đầu mục)`}
                     </p>
                 </div>
                 {canManage && (
-                    <button className="btn btn-primary"
+                    <button className="btn btn-primary" style={{ borderRadius: 12, padding: "10px 24px" }}
                         onClick={() => { setForm(EMPTY_FORM); setError(""); setModalOpen(true); }}>
                         + Thêm mục lịch trình
                     </button>
@@ -134,19 +133,19 @@ export default function TimelineList() {
             </div>
 
             {/* ── Thống kê nhanh ── */}
-            <div className="grid-4" style={{ marginBottom: 20 }}>
+            <div className="grid-4" style={{ marginBottom: 28, gap: 20 }}>
                 {[
-                    { icon: "📋", label: "Tổng mục", value: totalItems, color: "#6366f1" },
-                    { icon: "🔥", label: "Đang diễn ra", value: activeItems, color: "#10b981" },
-                    { icon: "⏳", label: "Sắp diễn ra", value: upcomingItems, color: "#f59e0b" },
-                    { icon: "✅", label: "Đã hoàn thành", value: doneItems, color: "#64748b" },
+                    { icon: "📋", label: "Tổng hạng mục", value: totalItems, color: "#6366f1", bg: "linear-gradient(135deg, #fff 0%, #f5f3ff 100%)" },
+                    { icon: "🔥", label: "Đang diễn ra", value: activeItems, color: "#10b981", bg: "linear-gradient(135deg, #fff 0%, #f0fdf4 100%)" },
+                    { icon: "⏳", label: "Sắp diễn ra", value: upcomingItems, color: "#f59e0b", bg: "linear-gradient(135deg, #fff 0%, #fffbeb 100%)" },
+                    { icon: "✅", label: "Đã hoàn tất", value: doneItems, color: "#64748b", bg: "linear-gradient(135deg, #fff 0%, #f8fafc 100%)" },
                 ].map(s => (
-                    <div key={s.label} className="card-stat">
+                    <div key={s.label} className="card-stat" style={{ background: s.bg, border: "1px solid #e2e8f0" }}>
                         <div className="card-stat-icon"
-                            style={{ background: s.color + "22", fontSize: 20 }}>{s.icon}</div>
+                            style={{ background: "#fff", color: s.color, fontSize: 22, boxShadow: "var(--shadow-sm)" }}>{s.icon}</div>
                         <div className="card-stat-info">
-                            <h3 style={{ color: s.color }}>{s.value}</h3>
-                            <p>{s.label}</p>
+                            <h3 style={{ color: s.color, fontSize: 24, fontWeight: 800 }}>{s.value}</h3>
+                            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
                         </div>
                     </div>
                 ))}
@@ -356,79 +355,74 @@ export default function TimelineList() {
 
             {/* ── Modal thêm mục lịch trình ── */}
             <Modal
-                title="Thêm mục lịch trình"
+                title="✨ Thêm mục lịch trình mới"
                 isOpen={isModalOpen}
-                onClose={() => { setModalOpen(false); setError(""); }}>
-                <form onSubmit={handleCreate}>
+                onClose={() => { setModalOpen(false); setError(""); }}
+                maxWidth="920px">
+                <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 24, padding: "10px 0" }}>
                     {error && <div className="alert alert-error">{error}</div>}
 
-                    <div className="form-group">
-                        <label>Sự kiện <span style={{ color: "red" }}>*</span></label>
-                        <select className="form-control"
-                            value={form.event_id}
-                            onChange={e => setForm({ ...form, event_id: e.target.value })}
-                            required>
-                            <option value="">-- Chọn sự kiện --</option>
-                            {events.map(ev => (
-                                <option key={ev.id} value={ev.id}>{ev.name}</option>
-                            ))}
-                        </select>
+                    <div className="grid-2" style={{ gap: 24 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Sự kiện tiếp nhận <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                            <select className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                                value={form.event_id}
+                                onChange={e => setForm({ ...form, event_id: e.target.value })}
+                                required>
+                                <option value="">-- Chọn sự kiện từ danh sách --</option>
+                                {events.map(ev => (
+                                    <option key={ev.id} value={ev.id}>{ev.name} ({new Date(ev.start_date).toLocaleDateString()})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Tiêu đề hoạt động <span style={{ color: "var(--color-danger)" }}>*</span></label>
+                            <input className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
+                                placeholder="VD: Khai mạc, Phát biểu, Tiệc tối..."
+                                value={form.title}
+                                onChange={e => setForm({ ...form, title: e.target.value })}
+                                required />
+                        </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>Tiêu đề <span style={{ color: "red" }}>*</span></label>
-                        <input className="form-control"
-                            placeholder="VD: Khai mạc, Giải lao, Trao giải..."
-                            value={form.title}
-                            onChange={e => setForm({ ...form, title: e.target.value })}
-                            required />
-                    </div>
-
-                    <div className="grid-2">
-                        <div className="form-group">
-                            <label>Giờ bắt đầu <span style={{ color: "red" }}>*</span></label>
+                    <div className="grid-2" style={{ gap: 24 }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Thời điểm bắt đầu <span style={{ color: "var(--color-danger)" }}>*</span></label>
                             <input type="datetime-local" className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
                                 value={form.start_time}
                                 onChange={e => setForm({ ...form, start_time: e.target.value })}
                                 required />
                         </div>
-                        <div className="form-group">
-                            <label>Giờ kết thúc</label>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: 15, fontWeight: 700 }}>Thời điểm kết thúc (tùy chọn)</label>
                             <input type="datetime-local" className="form-control"
+                                style={{ height: 50, fontSize: 15, borderRadius: 12 }}
                                 value={form.end_time}
                                 onChange={e => setForm({ ...form, end_time: e.target.value })} />
                         </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>Mô tả (tùy chọn)</label>
-                        <textarea className="form-control" rows="2"
-                            placeholder="Nội dung chi tiết của mục này..."
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label style={{ fontSize: 15, fontWeight: 700 }}>Ghi chú nội dung kịch bản</label>
+                        <textarea className="form-control" rows="4"
+                            style={{ fontSize: 15, padding: 16, borderRadius: 12, lineHeight: 1.6 }}
+                            placeholder="Chi tiết diễn biến, nhân sự phụ trách, lưu ý kỹ thuật..."
                             value={form.description}
                             onChange={e => setForm({ ...form, description: e.target.value })} />
                     </div>
 
-                    {/* Preview khung giờ */}
-                    {form.start_time && (
-                        <div style={{
-                            background: "rgba(99,102,241,0.07)",
-                            borderRadius: 8, padding: "10px 14px",
-                            marginBottom: 14, fontSize: 13,
-                            color: "var(--text-secondary)",
-                        }}>
-                            🕐 Xem trước: <strong>
-                                {fmtTime(form.start_time)}
-                                {form.end_time ? ` → ${fmtTime(form.end_time)}` : ""}
-                            </strong>
-                            {" — "}{form.title || "(chưa có tiêu đề)"}
-                        </div>
-                    )}
-
-                    <button type="submit" className="btn btn-primary"
-                        style={{ width: "100%", marginTop: 8 }}
-                        disabled={submitting}>
-                        {submitting ? "Đang thêm..." : "Thêm vào lịch trình"}
-                    </button>
+                    <div style={{ padding: "16px 0 0", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "flex-end", gap: 16 }}>
+                        <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)} style={{ borderRadius: 12, padding: "12px 32px", fontSize: 15 }}>Hủy</button>
+                        <button type="submit" className="btn btn-primary"
+                            style={{ borderRadius: 12, padding: "12px 40px", fontSize: 15, fontWeight: 800, boxShadow: "0 8px 20px -5px rgba(79,70,229,0.3)" }}
+                            disabled={submitting}>
+                            {submitting ? "Đang xử lý..." : "✅ Lưu lịch trình"}
+                        </button>
+                    </div>
                 </form>
             </Modal>
         </Layout>

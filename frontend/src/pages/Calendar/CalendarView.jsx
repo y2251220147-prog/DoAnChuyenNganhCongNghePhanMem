@@ -59,28 +59,36 @@ export default function CalendarView() {
 
     return (
         <Layout>
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 40 }}>
                 <div>
-                    <h2>📅 Lịch sự kiện của tôi</h2>
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-                        Theo dõi lịch trình các sự kiện bạn đã đăng ký tham gia.
+                    <h2 style={{ fontSize: 32, fontWeight: 900 }}>
+                        <span className="gradient-text">Lịch trình & Lộ trình</span>
+                    </h2>
+                    <p style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 6, fontWeight: 500 }}>
+                        Trực quan hóa lộ trình các sự kiện chiến lược bạn sẽ tham gia hoặc giám sát.
                     </p>
                 </div>
-                <div className="calendar-controls">
-                    <button className="btn btn-outline btn-sm" onClick={prevMonth}>◀</button>
-                    <span style={{ fontWeight: 800, fontSize: 16, minWidth: 140, textAlign: "center", textTransform: "capitalize" }}>
+                <div style={{ 
+                    display: "flex", alignItems: "center", gap: 16, background: "#fff", 
+                    padding: "8px 16px", borderRadius: 16, border: "1px solid #f1f5f9",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.03)"
+                }}>
+                    <button className="btn btn-outline" style={{ border: "none", background: "#f8fafc", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={prevMonth}>◀</button>
+                    <span style={{ fontWeight: 900, fontSize: 16, minWidth: 150, textAlign: "center", textTransform: "uppercase", color: "var(--color-primary)", letterSpacing: "0.05em" }}>
                         {monthName} {year}
                     </span>
-                    <button className="btn btn-outline btn-sm" onClick={nextMonth}>▶</button>
+                    <button className="btn btn-outline" style={{ border: "none", background: "#f8fafc", borderRadius: 10, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={nextMonth}>▶</button>
                 </div>
             </div>
 
             {loading ? (
-                <div className="empty-state"><span>⏳</span><p>Đang tải lịch trình...</p></div>
+                <div className="empty-state" style={{ padding: 100 }}><span>⏳</span><p>Đang đồng bộ dữ liệu lịch trình...</p></div>
             ) : (
-                <div className="calendar-container">
-                    <div className="calendar-header">
-                        {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map(d => <div key={d}>{d}</div>)}
+                <div className="calendar-container" style={{ border: "1px solid #f1f5f9", boxShadow: "0 20px 40px -10px rgba(0,0,0,0.05)", borderRadius: 24, overflow: "hidden", background: "#fff" }}>
+                    <div className="calendar-header" style={{ background: "linear-gradient(to right, #f8fafc, #f1f5f9)", borderBottom: "1px solid #e2e8f0" }}>
+                        {["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"].map(d => (
+                            <div key={d} style={{ padding: "16px", color: "var(--color-primary)", fontWeight: 800, textTransform: "uppercase", fontSize: 12, letterSpacing: "0.05em" }}>{d}</div>
+                        ))}
                     </div>
                     <div className="calendar-grid">
                         {dayCells}
@@ -89,68 +97,61 @@ export default function CalendarView() {
             )}
 
             <style>{`
-                .calendar-controls { display: flex; align-items: center; gap: 15px; }
-                .calendar-container {
-                    background: var(--bg-card);
-                    border: 1px solid var(--border-color);
-                    border-radius: 12px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+                .calendar-grid {
+                    display: grid;
+                    grid-template-columns: repeat(7, 1fr);
+                    grid-auto-rows: minmax(130px, auto);
                 }
                 .calendar-header {
                     display: grid;
                     grid-template-columns: repeat(7, 1fr);
-                    background: var(--bg-hover);
-                    border-bottom: 1px solid var(--border-color);
                 }
                 .calendar-header div {
-                    padding: 12px;
                     text-align: center;
-                    font-size: 12px;
-                    font-weight: 800;
-                    color: var(--text-muted);
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-                .calendar-grid {
-                    display: grid;
-                    grid-template-columns: repeat(7, 1fr);
-                    grid-auto-rows: minmax(110px, auto);
                 }
                 .calendar-day {
-                    border-right: 1px solid var(--border-color);
-                    border-bottom: 1px solid var(--border-color);
-                    padding: 8px;
-                    background: var(--bg-card);
+                    border-right: 1px solid #f1f5f9;
+                    border-bottom: 1px solid #f1f5f9;
+                    padding: 12px;
+                    background: #fff;
                     transition: all 0.2s;
                     position: relative;
                 }
                 .calendar-day:nth-child(7n) { border-right: none; }
-                .calendar-day.empty { background: var(--bg-secondary); opacity: 0.3; }
-                .calendar-day:not(.empty):hover { background: var(--bg-hover); }
-                .calendar-day.today { background: rgba(99,102,241,0.03); }
+                .calendar-day:nth-last-child(-n+7) { border-bottom: none; }
+                .calendar-day.empty { background: #fcfcfd; opacity: 0.5; }
+                .calendar-day:not(.empty):hover { background: #f8fafc; }
+                .calendar-day.today { background: rgba(99,102,241,0.04); }
                 .calendar-day.today .day-num {
                     background: var(--color-primary);
                     color: white;
-                    width: 24px;
-                    height: 24px;
+                    width: 28px;
+                    height: 28px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     border-radius: 50%;
+                    box-shadow: 0 4px 10px rgba(99,102,241,0.3);
                 }
-                .day-num { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: inline-block; }
-                .day-events { display: flex; flex-direction: column; gap: 4px; }
+                .day-num { font-size: 14px; font-weight: 700; color: #64748b; margin-bottom: 10px; display: inline-block; }
+                .day-events { display: flex; flex-direction: column; gap: 6px; }
                 .event-tag {
                     font-size: 11px;
-                    padding: 3px 6px;
-                    background: var(--color-primary);
-                    color: white;
-                    border-radius: 4px;
-                    font-weight: 500;
+                    padding: 6px 10px;
+                    background: rgba(99,102,241,0.1);
+                    color: var(--color-primary-dark);
+                    border-left: 3px solid var(--color-primary);
+                    border-radius: 6px;
+                    font-weight: 700;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                    transition: all 0.2s;
+                    cursor: pointer;
+                }
+                .event-tag:hover {
+                    background: rgba(99,102,241,0.2);
+                    transform: translateX(2px);
                 }
             `}</style>
         </Layout>

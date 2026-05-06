@@ -1,20 +1,47 @@
 const Task = require("../models/taskModel");
+const Event = require("../models/eventModel");
+const Attendee = require("../models/attendeeModel");
+const Staff = require("../models/staffModel");
 const Notification = require("../models/notificationModel");
 
-const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done', 'cancelled'];
+const VALID_STATUSES = ['todo', 'in_progress', 'done'];
 const STATUS_LABEL = {
-    todo: 'Chưa bắt đầu', in_progress: 'Đang làm',
-    review: 'Chờ duyệt', done: 'Hoàn thành', cancelled: 'Đã hủy'
+    todo: 'Chuẩn bị',
+    in_progress: 'Đang làm',
+    done: 'Hoàn thành'
 };
 
-// ── Phases ────────────────────────────────────────────────────
-exports.getPhases = async (eid) => await Task.getPhases(eid);
-exports.createPhase = async (d) => {
-    if (!d.event_id || !d.name) throw { status: 400, message: "event_id và name là bắt buộc" };
-    return { id: await Task.createPhase(d) };
+// Nếu user X đã đăng ký tham gia sự kiện đó → không được gán task
+const checkAttendeeConflict = async (eventId, userId) => {
+    if (!userId) return;
+    const att = await Attendee.findByUserAndEvent(userId, eventId);
+    if (att) {
+        throw {
+            status: 400,
+            message: "Nhân viên đã đăng ký tham gia sự kiện không thể được gán công việc"
+        };
+    }
 };
-exports.updatePhase = async (id, d) => await Task.updatePhase(id, d);
-exports.deletePhase = async (id) => await Task.deletePhase(id);
+
+// Đảm bảo user có trong event_staff (nhân sự tổ chức)
+const ensureEventStaff = async (eventId, userId) => {
+    if (!userId) return;
+    
+    // 1. Kiểm tra xem user này có đang là "người tham gia" (attendee) không
+    const att = await Attendee.findByUserAndEvent(userId, eventId);
+    if (att) {
+        // Nếu đã là người tham gia thì không tự động thêm vào ban tổ chức
+        return;
+    }
+
+    // 2. Nếu chưa là nhân sự tổ chức thì mới thêm
+    const existing = await Staff.findByEventAndUser(eventId, userId);
+    if (!existing) {
+        await Staff.assign({ event_id: eventId, user_id: userId, role: 'support' });
+    }
+};
+
+
 
 // ── Tasks ─────────────────────────────────────────────────────
 exports.getByEvent = async (eid) => await Task.getByEvent(eid);
@@ -24,10 +51,19 @@ exports.getById = async (id) => {
     return t;
 };
 exports.getEventStats = async (eid) => await Task.getEventStats(eid);
+exports.getMyTasks = async (userId) => await Task.getMyTasks(userId);
 
 exports.create = async (data, creatorId) => {
     if (!data.event_id || !data.title)
         throw { status: 400, message: "event_id và title là bắt buộc" };
+    if (!data.due_date)
+        throw { status: 400, message: "Deadline (due_date) là bắt buộc khi tạo nhiệm vụ" };
+
+    // Kiểm tra attendee conflict và đảm bảo là staff
+    if (data.assigned_to) {
+        await checkAttendeeConflict(data.event_id, data.assigned_to);
+        await ensureEventStaff(data.event_id, data.assigned_to);
+    }
 
     const id = await Task.create({ ...data, created_by: creatorId });
 
@@ -44,6 +80,21 @@ exports.create = async (data, creatorId) => {
             link: `/events/${data.event_id}?tab=tasks`
         });
     }
+
+    // Thông báo cho Người sở hữu sự kiện (nếu người tạo không phải là chủ sở hữu)
+    try {
+        const event = await Event.getById(data.event_id);
+        if (event && event.owner_id && String(event.owner_id) !== String(creatorId)) {
+            await Notification.create({
+                user_id: event.owner_id,
+                type: 'task_assigned',
+                title: 'Nhiệm vụ mới trong sự kiện',
+                message: `Một nhiệm vụ mới "${data.title}" vừa được tạo trong sự kiện của bạn.`,
+                link: `/events/${data.event_id}?tab=tasks`
+            });
+        }
+    } catch (e) { console.error("Lỗi thông báo Organizer (task create):", e); }
+
     return { id };
 };
 
@@ -56,9 +107,8 @@ exports.update = async (id, data, userId) => {
     // Theo dõi thay đổi status
     if (data.status && data.status !== task.status) {
         if (!VALID_STATUSES.includes(data.status))
-            throw { status: 400, message: "Trạng thái không hợp lệ" };
+            throw { status: 400, message: "Trạng thái không hợp lệ. Chỉ chấp nhận: todo, in_progress, done" };
         changes.push({ action: 'status_change', old_value: STATUS_LABEL[task.status], new_value: STATUS_LABEL[data.status] });
-        // Comment tự động
         await Task.addComment({
             task_id: id, user_id: userId,
             content: `Chuyển trạng thái: ${STATUS_LABEL[task.status]} → ${STATUS_LABEL[data.status]}`,
@@ -66,8 +116,10 @@ exports.update = async (id, data, userId) => {
         });
     }
 
-    // Theo dõi thay đổi người phụ trách
+    // Kiểm tra attendee conflict khi thay đổi người phụ trách
     if (data.assigned_to && String(data.assigned_to) !== String(task.assigned_to)) {
+        await checkAttendeeConflict(task.event_id, data.assigned_to);
+        await ensureEventStaff(task.event_id, data.assigned_to);
         changes.push({ action: 'assign', old_value: task.assigned_name || '', new_value: data.assigned_to });
         if (String(data.assigned_to) !== String(userId)) {
             await Notification.create({
@@ -87,14 +139,14 @@ exports.update = async (id, data, userId) => {
 
     await Task.update(id, { ...task, ...data });
 
-    // Ghi tất cả history
     for (const ch of changes) {
         await Task.addHistory({ task_id: id, user_id: userId, ...ch });
     }
 };
 
 exports.updateStatus = async (id, status, userId) => {
-    if (!VALID_STATUSES.includes(status)) throw { status: 400, message: "Trạng thái không hợp lệ" };
+    if (!VALID_STATUSES.includes(status))
+        throw { status: 400, message: "Trạng thái không hợp lệ. Chỉ chấp nhận: todo, in_progress, done" };
     const task = await Task.getById(id);
     if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
 
@@ -109,15 +161,27 @@ exports.updateStatus = async (id, status, userId) => {
         type: 'status_change'
     });
 
-    // Nếu done → thông báo creator
-    if (status === 'done' && task.created_by && String(task.created_by) !== String(userId)) {
-        await Notification.create({
-            user_id: task.created_by,
-            type: 'task_done',
-            title: 'Nhiệm vụ đã hoàn thành',
-            message: `"${task.title}" đã được đánh dấu hoàn thành`,
-            link: `/events/${task.event_id}?tab=tasks`
-        });
+    // Thông báo creator và owner khi hoàn thành hoặc đang làm
+    const notifyIds = new Set();
+    if (task.created_by && String(task.created_by) !== String(userId)) notifyIds.add(task.created_by);
+    if (task.event_owner_id && String(task.event_owner_id) !== String(userId)) notifyIds.add(task.event_owner_id);
+
+    if (notifyIds.size > 0) {
+        let title = '';
+        if (status === 'done') title = 'Nhiệm vụ đã hoàn thành ✅';
+        else if (status === 'in_progress') title = 'Công việc đang được thực hiện 🔨';
+
+        if (title) {
+            for (const uid of notifyIds) {
+                await Notification.create({
+                    user_id: uid,
+                    type: 'task_status',
+                    title,
+                    message: `"${task.title}": ${STATUS_LABEL[status]}`,
+                    link: `/events/${task.event_id}?tab=tasks`
+                });
+            }
+        }
     }
 };
 
@@ -129,10 +193,89 @@ exports.updateProgress = async (id, progress, userId) => {
         task_id: id, user_id: userId, action: 'progress',
         old_value: `${task.progress}%`, new_value: `${progress}%`
     });
+
+    // Thông báo creator và owner về tiến độ
+    const notifyIds = new Set();
+    if (task.created_by && String(task.created_by) !== String(userId)) notifyIds.add(task.created_by);
+    if (task.event_owner_id && String(task.event_owner_id) !== String(userId)) notifyIds.add(task.event_owner_id);
+
+    if (notifyIds.size > 0 && progress > task.progress) {
+        for (const uid of notifyIds) {
+            await Notification.create({
+                user_id: uid,
+                type: 'task_progress',
+                title: 'Tiến độ công việc mới',
+                message: `"${task.title}" đã đạt ${progress}%`,
+                link: `/events/${task.event_id}?tab=tasks`
+            });
+        }
+    }
+};
+
+exports.reportIssue = async (id, note, userId) => {
+    const task = await Task.getById(id);
+    if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
+    
+    // Thêm comment loại issue
+    await Task.addComment({
+        task_id: id,
+        user_id: userId,
+        content: `⚠️ BÁO CÁO SỰ CỐ: ${note}`,
+        type: 'comment'
+    });
+
+    // Ghi lịch sử
+    await Task.addHistory({
+        task_id: id,
+        user_id: userId,
+        action: 'issue_reported',
+        new_value: note
+    });
+
+    // Thông báo creator và owner
+    const notifyIds = new Set();
+    if (task.created_by && String(task.created_by) !== String(userId)) notifyIds.add(task.created_by);
+    if (task.event_owner_id && String(task.event_owner_id) !== String(userId)) notifyIds.add(task.event_owner_id);
+
+    if (notifyIds.size > 0) {
+        for (const uid of notifyIds) {
+            await Notification.create({
+                user_id: uid,
+                type: 'task_issue',
+                title: '⚠️ Báo cáo sự cố công việc',
+                message: `Nhiệm vụ "${task.title}": ${note}`,
+                link: `/events/${task.event_id}?tab=tasks`
+            });
+        }
+    }
+};
+
+exports.updateFeedback = async (id, data, userId) => {
+    const task = await Task.getById(id);
+    if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
+    await Task.updateFeedback(id, data);
+    await Task.addHistory({
+        task_id: id, user_id: userId, action: 'feedback',
+        new_value: `Trạng thái: ${data.feedback_status}, Ghi chú: ${data.feedback_note}`
+    });
+
+    if (task.assigned_to && String(task.assigned_to) !== String(userId)) {
+        let title = 'Phản hồi mới từ quản lý';
+        if (data.feedback_status === 'approved') title = 'Nhiệm vụ đã được duyệt ✅';
+        if (data.feedback_status === 'rejected') title = 'Nhiệm vụ cần chỉnh sửa ⚠️';
+        await Notification.create({
+            user_id: task.assigned_to,
+            type: 'task_feedback',
+            title,
+            message: `Nhiệm vụ "${task.title}": ${data.feedback_note || 'Quản lý đã để lại nhận xét'}`,
+            link: `/events/${task.event_id}?tab=tasks`
+        });
+    }
 };
 
 exports.delete = async (id) => {
-    if (!(await Task.getById(id))) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
+    const task = await Task.getById(id);
+    if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
     await Task.delete(id);
 };
 
@@ -143,10 +286,7 @@ exports.addComment = async (taskId, content, userId) => {
     if (!content?.trim()) throw { status: 400, message: "Nội dung không được trống" };
     const task = await Task.getById(taskId);
     if (!task) throw { status: 404, message: "Không tìm thấy nhiệm vụ" };
-
     const id = await Task.addComment({ task_id: taskId, user_id: userId, content });
-
-    // Thông báo người phụ trách (nếu khác commenter)
     if (task.assigned_to && String(task.assigned_to) !== String(userId)) {
         await Notification.create({
             user_id: task.assigned_to,
@@ -163,18 +303,3 @@ exports.deleteComment = async (id) => await Task.deleteComment(id);
 
 // ── History ───────────────────────────────────────────────────
 exports.getHistory = async (taskId) => await Task.getHistory(taskId);
-
-// ── Auto reminder (gọi từ cron/scheduler) ────────────────────
-exports.sendDeadlineReminders = async () => {
-    const tasks = await Task.getUpcomingDeadlines(24);
-    for (const t of tasks) {
-        await Notification.create({
-            user_id: t.assignee_id,
-            type: 'task_deadline',
-            title: `⚠️ Nhiệm vụ sắp đến hạn`,
-            message: `"${t.title}" trong sự kiện "${t.event_name}" — hạn: ${new Date(t.due_date).toLocaleString('vi-VN')}`,
-            link: `/events/${t.event_id}?tab=tasks`
-        });
-    }
-    return tasks.length;
-};

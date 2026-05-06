@@ -20,7 +20,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     position: relative;
-    transition: width 0.3s ease;
+    transition: var(--transition);
 }
 
 .sidebar::after {
@@ -302,8 +302,9 @@
 .content {
     flex: 1;
     overflow-y: auto;
-    padding: 28px;
+    padding: 24px 20px; /* REDUCED FOR WIDER UI */
     min-width: 0;
+    background: var(--bg-main);
 }
 
 /* ═══════════════════════════════════════════════
