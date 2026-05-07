@@ -137,16 +137,20 @@ const Budget = {
     getSummaryByEvent: async (eventId) => {
         const [rows] = await db.query(`
             SELECT
-                (SELECT COUNT(*) FROM event_budget WHERE event_id = ?) + 
-                (SELECT COUNT(*) FROM event_tasks t WHERE t.event_id = ? AND t.estimated_budget > 0 AND NOT EXISTS (SELECT 1 FROM event_budget eb WHERE eb.task_id = t.id)) AS item_count,
+                -- 1. Tổng số hạng mục (Nhiệm vụ + Khoản chi trực tiếp)
+                (SELECT COUNT(*) FROM event_tasks WHERE event_id = ?) + 
+                (SELECT COUNT(*) FROM event_budget WHERE event_id = ? AND task_id IS NULL) AS item_count,
 
-                (SELECT COALESCE(SUM(cost), 0) FROM event_budget WHERE event_id = ?) +
-                (SELECT COALESCE(SUM(estimated_budget), 0) FROM event_tasks t WHERE t.event_id = ? AND t.estimated_budget > 0 AND NOT EXISTS (SELECT 1 FROM event_budget eb WHERE eb.task_id = t.id)) AS total_estimated,
+                -- 2. Tổng dự trù (Ước tính) = Tổng dự kiến của Tasks + Tổng chi phí của các khoản trực tiếp
+                (SELECT COALESCE(SUM(estimated_budget), 0) FROM event_tasks WHERE event_id = ?) +
+                (SELECT COALESCE(SUM(cost), 0) FROM event_budget WHERE event_id = ? AND task_id IS NULL) AS total_estimated,
 
+                -- 3. Thực tế đã chi = Tổng các khoản trong Budget có trạng thái 'paid'
                 (SELECT COALESCE(SUM(cost), 0) FROM event_budget WHERE event_id = ? AND status='paid') AS total_paid,
 
-                (SELECT COALESCE(SUM(cost), 0) FROM event_budget WHERE event_id = ? AND status='pending') +
-                (SELECT COALESCE(SUM(estimated_budget), 0) FROM event_tasks t WHERE t.event_id = ? AND t.estimated_budget > 0 AND NOT EXISTS (SELECT 1 FROM event_budget eb WHERE eb.task_id = t.id)) AS total_pending
+                -- 4. Chưa chi (Dự kiến còn lại) = (Các task chưa có phiếu chi) + (Các phiếu chi đang 'pending')
+                (SELECT COALESCE(SUM(estimated_budget), 0) FROM event_tasks t WHERE t.event_id = ? AND NOT EXISTS (SELECT 1 FROM event_budget eb WHERE eb.task_id = t.id)) +
+                (SELECT COALESCE(SUM(cost), 0) FROM event_budget WHERE event_id = ? AND status='pending') AS total_pending
         `, [eventId, eventId, eventId, eventId, eventId, eventId, eventId]);
         return rows[0];
     }
