@@ -199,7 +199,7 @@ const Task = {
                 SUM(status='in_progress') AS in_progress,
                 SUM(status='done')        AS done,
                 SUM(status != 'done' AND due_date < NOW()) AS overdue,
-                ROUND(AVG(progress), 0)   AS avg_progress
+                ROUND(COALESCE((SUM(status='done') / NULLIF(COUNT(*), 0)) * 100, 0)) AS avg_progress
             FROM event_tasks
             WHERE event_id=? AND parent_id IS NULL
         `, [eventId]);

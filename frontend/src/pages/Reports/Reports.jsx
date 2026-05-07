@@ -1,16 +1,19 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Layout from "../../components/Layout/Layout";
 import {
     getAttendeeReport,
+    getAttendeeDetail,
     getBudgetReport,
     getEventsByMonth,
     getEventsByType,
     getFeedbackStats,
+    getFeedbackDetail,
     getOverview,
-    getTaskStats
+    getTaskStats,
+    getTaskDetail
 } from "../../services/reportService";
 import "../../styles/global.css";
 
@@ -63,10 +66,13 @@ export default function Reports() {
     const [overview, setOverview] = useState(null);
     const [byMonth, setByMonth] = useState([]);
     const [attendees, setAttendees] = useState([]);
+    const [attendeeDetails, setAttendeeDetails] = useState([]);
     const [budgets, setBudgets] = useState([]);
     const [taskStats, setTaskStats] = useState([]);
+    const [taskDetails, setTaskDetails] = useState([]);
     const [byType, setByType] = useState([]);
     const [feedback, setFeedback] = useState([]);
+    const [feedbackDetails, setFeedbackDetails] = useState([]);
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
     const year = new Date().getFullYear();
@@ -76,10 +82,11 @@ export default function Reports() {
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [ovR, mnR, atR, buR, tkR, tyR, fbR] = await Promise.allSettled([
+            const [ovR, mnR, atR, buR, tkR, tyR, fbR, tkDR, atDR, fbDR] = await Promise.allSettled([
                 getOverview(), getEventsByMonth(year), getAttendeeReport(),
                 getBudgetReport(), getTaskStats(), getEventsByType(),
-                getFeedbackStats()
+                getFeedbackStats(), getTaskDetail(), getAttendeeDetail(),
+                getFeedbackDetail()
             ]);
             if (ovR.status === "fulfilled") setOverview(ovR.value.data);
             if (mnR.status === "fulfilled") {
@@ -92,6 +99,9 @@ export default function Reports() {
             if (tkR.status === "fulfilled") setTaskStats(tkR.value.data || []);
             if (tyR.status === "fulfilled") setByType(tyR.value.data || []);
             if (fbR.status === "fulfilled") setFeedback(fbR.value.data || []);
+            if (tkDR.status === "fulfilled") setTaskDetails(tkDR.value.data || []);
+            if (atDR.status === "fulfilled") setAttendeeDetails(atDR.value.data || []);
+            if (fbDR.status === "fulfilled") setFeedbackDetails(fbDR.value.data || []);
         } catch {/**/ }
         finally { setLoading(false); }
     };
@@ -111,40 +121,56 @@ export default function Reports() {
     const handleExportAll = () => {
         const wb = XLSX.utils.book_new();
 
-        // Sheet 1: Ngân sách & Sự kiện
+        // Sheet 1: Ngân sách & Sự kiện (Chi tiết)
         const budgetData = budgets.map(b => ({
-            "Sự kiện": b.name,
-            "Ngân sách Dự kiến (VND)": b.planned,
-            "Chi phí Thực tế (VND)": b.actual,
+            "Sự kiện": b.event_name,
+            "Hạng mục": b.item_name,
+            "Dự kiến (VND)": b.planned,
+            "Thực chi (VND)": b.actual,
+            "Trạng thái": b.status === "paid" ? "Đã chi" : "Dự kiến",
             "Tỉ lệ (%)": `${b.planned > 0 ? Math.round((b.actual / b.planned) * 100) : 0}%`
         }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetData), "Ngân sách");
+        const totalPlanned = budgets.reduce((a, b) => a + (b.planned || 0), 0);
+        const totalActual = budgets.reduce((a, b) => a + (b.actual || 0), 0);
+        
+        budgetData.push({
+            "Sự kiện": "TỔNG CỘNG",
+            "Hạng mục": "",
+            "Dự kiến (VND)": totalPlanned,
+            "Thực chi (VND)": totalActual,
+            "Trạng thái": "",
+            "Tỉ lệ (%)": `${totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0}%`
+        });
 
-        // Sheet 2: Khách mời
-        const guestData = attendees.map(a => ({
-            "Sự kiện": a.name,
-            "Sức chứa": a.capacity,
-            "Đã đăng ký": a.registered,
-            "Đã có mặt": a.checked_in,
-            "Tỉ lệ đi họp (%)": `${a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0}%`
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(budgetData), "Ngân sách chi tiết");
+
+        // Sheet 2: Khách mời (Chi tiết)
+        const guestData = attendeeDetails.map(a => ({
+            "Sự kiện": a.event_name,
+            "Họ tên": a.attendee_name,
+            "Phân loại": a.attendee_type === "internal" ? "Nhân viên" : "Khách mời",
+            "Trạng thái": a.checked_in ? "Đã Check-in" : "Chưa Check-in"
         }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guestData), "Khách mời");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(guestData), "Chi tiết khách mời");
 
-        // Sheet 3: Công việc
-        const taskData = [
-            { "Trạng thái": "Chuẩn Bị", "Số lượng": taskMap.todo || 0 },
-            { "Trạng thái": "Đang Làm", "Số lượng": taskMap.in_progress || 0 },
-            { "Trạng thái": "Hoàn Thành", "Số lượng": taskMap.done || 0 },
-        ];
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), "Công việc");
-
-        // Sheet 4: Phản hồi
-        const fbData = feedback.map(f => ({
-            "Sự kiện": f.name,
-            "Tổng số phản hồi": f.total_feedback,
-            "Đánh giá trung bình": (Number(f.avg_rating) || 0).toFixed(1) + " / 5.0"
+        // Sheet 3: Công việc (Chi tiết)
+        const taskData = taskDetails.map(t => ({
+            "Sự kiện": t.event_name,
+            "Nhiệm vụ": t.task_name,
+            "Người phụ trách": t.assignee || "Chưa phân công",
+            "Trạng thái": t.status === "done" ? "Hoàn Thành" : t.status === "in_progress" ? "Đang Làm" : "Chuẩn Bị"
         }));
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fbData), "Phản hồi");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(taskData), "Chi tiết công việc");
+
+        // Sheet 4: Phản hồi (Chi tiết)
+        const fbData = feedbackDetails.map(f => ({
+            "Sự kiện": f.event_name,
+            "Người đánh giá": f.reviewer_name || "Ẩn danh",
+            "Điểm": f.rating,
+            "Nội dung": f.content,
+            "Ngày gửi": new Date(f.created_at).toLocaleDateString("vi-VN")
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fbData), "Chi tiết phản hồi");
 
         XLSX.writeFile(wb, `Bao-cao-tong-hop-${year}.xlsx`);
     };
@@ -244,27 +270,71 @@ export default function Reports() {
                     </div>
 
                     <div className="grid-2" style={{ marginBottom: 32, gap: 28 }}>
-                        {/* ── Tasks ── */}
+                        {/* ── Công việc chi tiết ── */}
                         <div className="card" style={{ padding: 28, borderRadius: 24 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>📋 TIẾN ĐỘ NHIỆM VỤ TỔNG THỂ</h3>
-                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(Object.entries(taskMap).map(([k, v]) => ({ Trạng_thái: k, Số_lượng: v })), "Tien-do-cong-viec")}>⬇️ Excel</button>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>📋 TIẾN ĐỘ NHIỆM VỤ CHI TIẾT</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} 
+                                    onClick={() => exportExcel(taskDetails.map(t => ({
+                                        "Sự kiện": t.event_name,
+                                        "Nhiệm vụ": t.task_name,
+                                        "Người phụ trách": t.assignee || "Chưa phân công",
+                                        "Trạng thái": t.status === "done" ? "Hoàn Thành" : t.status === "in_progress" ? "Đang Làm" : "Chuẩn Bị"
+                                    })), "Tien-do-nhiem-vu-chi-tiet")}>⬇️ Excel</button>
                             </div>
-                            {totalTasks === 0
+                            {taskDetails.length === 0
                                 ? <div className="empty-state"><span>📋</span><p>Chưa có nhiệm vụ nào</p></div>
-                                : <>
-                                    {[
-                                        { key: "todo", label: "Chuẩn Bị", color: "#6366f1" },
-                                        { key: "in_progress", label: "Đang Làm", color: "#f59e0b" },
-                                        { key: "done", label: "Hoàn Thành", color: "#10b981" },
-                                    ].map(s => (
-                                        <ProgressRow key={s.key} label={s.label}
-                                            value={taskMap[s.key] || 0} max={totalTasks} color={s.color} />
-                                    ))}
-                                    <div style={{ textAlign: "right", fontSize: 13, color: "var(--text-muted)", marginTop: 12, fontWeight: 600 }}>
-                                        Tổng cộng: {totalTasks} nhiệm vụ đang quản lý
-                                    </div>
-                                </>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 8, maxHeight: 380, overflowY: "auto" }}>
+                                    <table className="data-table" style={{ fontSize: 11, tableLayout: "fixed", width: "100%" }}>
+                                        <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#fff", boxShadow: "0 1px 0 var(--border-color)" }}>
+                                            <tr style={{ height: 32 }}>
+                                                <th style={{ width: "35%", paddingLeft: 12 }}>Nhiệm vụ</th>
+                                                <th style={{ width: "35%" }}>Phụ trách</th>
+                                                <th style={{ width: "30%", textAlign: "center", paddingRight: 12 }}>Trạng thái</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {taskDetails.map((t, i) => {
+                                                const isFirstOfEvent = i === 0 || taskDetails[i - 1].event_name !== t.event_name;
+                                                const statusLabel = t.status === 'done' ? 'HOÀN THÀNH' : t.status === 'in_progress' ? 'ĐANG LÀM' : 'CHUẨN BỊ';
+                                                const statusColor = t.status === 'done' ? '#10b981' : t.status === 'in_progress' ? '#f59e0b' : '#6366f1';
+                                                const statusBg = t.status === 'done' ? '#ecfdf5' : t.status === 'in_progress' ? '#fff7ed' : '#f5f3ff';
+                                                
+                                                return (
+                                                    <React.Fragment key={t.id}>
+                                                        {isFirstOfEvent && (
+                                                            <tr style={{ background: "#f8fafc", height: 26 }}>
+                                                                <td colSpan={3} style={{ padding: "0 12px", fontWeight: 800, color: "var(--color-primary)", fontSize: 10, textTransform: "uppercase" }}>
+                                                                    📁 {t.event_name}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        <tr style={{ height: 28 }}>
+                                                            <td style={{ paddingLeft: 16, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.task_name}>
+                                                                {t.task_name}
+                                                            </td>
+                                                            <td style={{ color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={t.assignee || "Chưa phân công"}>
+                                                                👤 {t.assignee || "—"}
+                                                            </td>
+                                                            <td style={{ textAlign: "center", paddingRight: 12 }}>
+                                                                <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 3, background: statusBg, color: statusColor }}>
+                                                                    {statusLabel}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "2px solid var(--border-color)", fontWeight: 900 }}>
+                                            <tr style={{ height: 32 }}>
+                                                <td colSpan={3} style={{ textAlign: "right", color: "var(--text-secondary)", paddingRight: 12, fontSize: 10 }}>
+                                                    TỔNG CỘNG: {taskDetails.length} NHIỆM VỤ
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
                             }
                         </div>
 
@@ -272,34 +342,87 @@ export default function Reports() {
                         <div className="card" style={{ padding: 28, borderRadius: 24 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
                                 <h3 style={{ fontSize: 17, fontWeight: 800 }}>💰 THỐNG KÊ CHI PHÍ KẾ HOẠCH & THỰC TẾ</h3>
-                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(budgets, "Ngan-sach")}>⬇️ Excel</button>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} 
+                                    onClick={() => {
+                                        const totalP = budgets.reduce((a, b) => a + (b.planned || 0), 0);
+                                        const totalA = budgets.reduce((a, b) => a + (b.actual || 0), 0);
+                                        const dataWithTotal = [
+                                            ...budgets.map(b => ({
+                                                "Sự kiện": b.event_name,
+                                                "Hạng mục / Công việc": b.item_name,
+                                                "Dự kiến (VND)": b.planned,
+                                                "Thực chi (VND)": b.actual,
+                                                "Trạng thái": b.status === "paid" ? "Đã chi" : "Dự kiến",
+                                                "Tỉ lệ (%)": `${b.planned > 0 ? Math.round((b.actual / b.planned) * 100) : 0}%`
+                                            })),
+                                            {
+                                                "Sự kiện": "TỔNG CỘNG",
+                                                "Hạng mục / Công việc": "",
+                                                "Dự kiến (VND)": totalP,
+                                                "Thực chi (VND)": totalA,
+                                                "Trạng thái": "",
+                                                "Tỉ lệ (%)": `${totalP > 0 ? Math.round((totalA / totalP) * 100) : 0}%`
+                                            }
+                                        ];
+                                        exportExcel(dataWithTotal, "Ngan-sach-chi-tiet");
+                                    }}>⬇️ Excel</button>
                             </div>
                             {budgets.length === 0
                                 ? <div className="empty-state"><span>💰</span><p>Chưa có dữ liệu ngân sách</p></div>
-                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16 }}>
-                                    <table className="data-table" style={{ fontSize: 13 }}>
-                                        <thead><tr><th>Sự kiện</th><th style={{ textAlign: "right" }}>Kế hoạch</th><th style={{ textAlign: "right" }}>Thực tế</th><th style={{ textAlign: "right" }}>%</th></tr></thead>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 8, maxHeight: 380, overflowY: "auto" }}>
+                                    <table className="data-table" style={{ fontSize: 11, tableLayout: "fixed", width: "100%" }}>
+                                        <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#fff", boxShadow: "0 1px 0 var(--border-color)" }}>
+                                            <tr style={{ height: 32 }}>
+                                                <th style={{ width: "35%", paddingLeft: 12 }}>Hạng mục</th>
+                                                <th style={{ width: "20%", textAlign: "right" }}>Dự kiến</th>
+                                                <th style={{ width: "20%", textAlign: "right" }}>Thực chi</th>
+                                                <th style={{ width: "15%", textAlign: "center" }}>Trạng thái</th>
+                                                <th style={{ width: "10%", textAlign: "right", paddingRight: 12 }}>%</th>
+                                            </tr>
+                                        </thead>
                                         <tbody>
-                                            {budgets.map(b => {
+                                            {budgets.map((b, i) => {
+                                                const isFirstOfEvent = i === 0 || budgets[i - 1].event_name !== b.event_name;
                                                 const pct = b.planned > 0 ? Math.round((b.actual / b.planned) * 100) : 0;
+                                                const isPaid = b.status === 'paid';
                                                 return (
-                                                    <tr key={b.id}>
-                                                        <td style={{ fontWeight: 800, color: "var(--text-primary)" }}>{b.name}</td>
-                                                        <td style={{ textAlign: "right", color: "var(--text-muted)" }}>{fmtVND(b.planned)}</td>
-                                                        <td style={{ textAlign: "right", color: pct > 100 ? "#ef4444" : "#10b981", fontWeight: 800 }}>{fmtVND(b.actual)}</td>
-                                                        <td style={{ textAlign: "right" }}>
-                                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                                                                <span style={{
-                                                                    fontSize: 11, fontWeight: 900, padding: "4px 8px", borderRadius: 8,
-                                                                    background: pct > 100 ? "#fee2e2" : "#f0fdf4", color: pct > 100 ? "#ef4444" : "#10b981"
-                                                                }}>{pct}%</span>
-                                                                {pct > 100 && <span style={{ fontSize: 9, color: "#dc2626", fontWeight: 800 }}>⚠️ VƯỢT HẠN MỨC</span>}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                    <React.Fragment key={i}>
+                                                        {isFirstOfEvent && (
+                                                            <tr style={{ background: "#f8fafc", height: 26 }}>
+                                                                <td colSpan={5} style={{ padding: "0 12px", fontWeight: 800, color: "var(--color-primary)", fontSize: 10, textTransform: "uppercase" }}>
+                                                                    📁 {b.event_name}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        <tr style={{ height: 28 }}>
+                                                            <td style={{ paddingLeft: 16, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={b.item_name}>
+                                                                {b.item_name}
+                                                            </td>
+                                                            <td style={{ textAlign: "right", color: "var(--text-muted)" }}>{fmtVND(b.planned)}</td>
+                                                            <td style={{ textAlign: "right", color: isPaid ? "#10b981" : "var(--text-muted)", fontWeight: isPaid ? 700 : 400 }}>
+                                                                {isPaid ? fmtVND(b.actual) : "—"}
+                                                            </td>
+                                                            <td style={{ textAlign: "center" }}>
+                                                                <span style={{ fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 3, background: isPaid ? "#ecfdf5" : "#fff7ed", color: isPaid ? "#059669" : "#d97706" }}>
+                                                                    {isPaid ? "ĐÃ CHI" : "DỰ KIẾN"}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ textAlign: "right", paddingRight: 12 }}>
+                                                                <span style={{ fontSize: 9, fontWeight: 700, color: pct > 100 ? "#ef4444" : "#94a3b8" }}>{pct}%</span>
+                                                            </td>
+                                                        </tr>
+                                                    </React.Fragment>
                                                 );
                                             })}
                                         </tbody>
+                                        <tfoot style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "2px solid var(--border-color)", fontWeight: 900 }}>
+                                            <tr style={{ height: 32 }}>
+                                                <td style={{ textAlign: "right", color: "var(--text-secondary)", paddingRight: 8, fontSize: 10 }}>TỔNG:</td>
+                                                <td style={{ textAlign: "right", color: "var(--text-primary)" }}>{fmtVND(budgets.reduce((a, b) => a + (b.planned || 0), 0))}</td>
+                                                <td style={{ textAlign: "right", color: "#10b981" }}>{fmtVND(budgets.reduce((a, b) => a + (b.actual || 0), 0))}</td>
+                                                <td colSpan={2}></td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             }
@@ -307,84 +430,140 @@ export default function Reports() {
                     </div>
 
                     <div className="grid-2" style={{ marginBottom: 32, gap: 28 }}>
-                        {/* ── Tỷ lệ tham dự ── */}
+                        {/* ── Khách mời chi tiết ── */}
                         <div className="card" style={{ padding: 28, borderRadius: 24 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🎟️ TỔNG HỢP CHI TIẾT KHÁCH MỜI & CHECK-IN</h3>
-                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(attendees, "Tham-du")}>⬇️ Excel</button>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🎟️ CHI TIẾT KHÁCH MỜI & CHECK-IN</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} 
+                                    onClick={() => exportExcel(attendeeDetails.map(a => ({
+                                        "Sự kiện": a.event_name,
+                                        "Họ tên": a.attendee_name,
+                                        "Phân loại": a.attendee_type === "internal" ? "Nhân viên" : "Khách mời",
+                                        "Trạng thái": a.checked_in ? "Đã Check-in" : "Chưa Check-in"
+                                    })), "Tham-du-chi-tiet")}>⬇️ Excel</button>
                             </div>
-                            {attendees.length === 0
+                            {attendeeDetails.length === 0
                                 ? <div className="empty-state"><span>🎟️</span><p>Chưa có dữ liệu người tham dự</p></div>
-                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16, overflow: "hidden" }}>
-                                    <table className="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th style={{ paddingLeft: 24 }}>Tên Sự kiện</th>
-                                                <th>Sức chứa</th>
-                                                <th>Đăng ký</th>
-                                                <th>Có mặt</th>
-                                                <th>Tỉ lệ lấp đầy</th>
-                                                <th style={{ textAlign: "right", paddingRight: 24 }}>Tiến độ Check-in</th>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 8, maxHeight: 380, overflowY: "auto" }}>
+                                    <table className="data-table" style={{ fontSize: 11, tableLayout: "fixed", width: "100%" }}>
+                                        <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#fff", boxShadow: "0 1px 0 var(--border-color)" }}>
+                                            <tr style={{ height: 32 }}>
+                                                <th style={{ width: "35%", paddingLeft: 12 }}>Họ tên</th>
+                                                <th style={{ width: "30%" }}>Phân loại</th>
+                                                <th style={{ width: "35%", textAlign: "center", paddingRight: 12 }}>Check-in</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {attendees.map(a => {
-                                                const regPct = a.capacity ? Math.round((a.registered / a.capacity) * 100) : null;
-                                                const ciPct = a.registered > 0 ? Math.round((a.checked_in / a.registered) * 100) : 0;
+                                            {attendeeDetails.map((a, i) => {
+                                                const isFirstOfEvent = i === 0 || attendeeDetails[i - 1].event_name !== a.event_name;
+                                                const isInternal = a.attendee_type === 'internal';
+                                                const isCheckedIn = a.checked_in === 1;
+
                                                 return (
-                                                    <tr key={a.id}>
-                                                        <td style={{ fontWeight: 800, paddingLeft: 24, fontSize: 15 }}>{a.name}</td>
-                                                        <td style={{ color: "var(--text-muted)", fontWeight: 700 }}>{a.capacity || "—"}</td>
-                                                        <td style={{ fontWeight: 800, color: "var(--color-primary)" }}>{a.registered}</td>
-                                                        <td style={{ fontWeight: 800, color: "#10b981" }}>{a.checked_in || 0}</td>
-                                                        <td>
-                                                            {regPct !== null
-                                                                ? <span style={{ fontWeight: 900, color: regPct >= 100 ? "#ef4444" : "#10b981" }}>{regPct}%</span>
-                                                                : <span style={{ color: "#94a3b8" }}>—</span>
-                                                            }
-                                                        </td>
-                                                        <td style={{ textAlign: "right", paddingRight: 24 }}>
-                                                            <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
-                                                                <div style={{ width: 120, height: 10, background: "#f1f5f9", borderRadius: 5, overflow: "hidden" }}>
-                                                                    <div style={{ height: "100%", width: `${ciPct}%`, background: "linear-gradient(90deg, #10b981, #34d399)", borderRadius: 5 }} />
-                                                                </div>
-                                                                <span style={{ fontSize: 14, fontWeight: 900, color: "#059669", minWidth: 45 }}>{ciPct}%</span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                    <React.Fragment key={i}>
+                                                        {isFirstOfEvent && (
+                                                            <tr style={{ background: "#f8fafc", height: 26 }}>
+                                                                <td colSpan={3} style={{ padding: "0 12px", fontWeight: 800, color: "var(--color-primary)", fontSize: 10, textTransform: "uppercase" }}>
+                                                                    📁 {a.event_name}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        <tr style={{ height: 28 }}>
+                                                            <td style={{ paddingLeft: 16, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={a.attendee_name}>
+                                                                {a.attendee_name}
+                                                            </td>
+                                                            <td style={{ color: "var(--text-muted)" }}>
+                                                                <span style={{ fontSize: 9, fontWeight: 700, color: isInternal ? "#6366f1" : "#f59e0b" }}>
+                                                                    {isInternal ? "💼 NHÂN VIÊN" : "👤 KHÁCH MỜI"}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ textAlign: "center", paddingRight: 12 }}>
+                                                                <span style={{ 
+                                                                    fontSize: 8, fontWeight: 800, padding: "1px 4px", borderRadius: 3, 
+                                                                    background: isCheckedIn ? "#ecfdf5" : "#fef2f2", 
+                                                                    color: isCheckedIn ? "#10b981" : "#ef4444" 
+                                                                }}>
+                                                                    {isCheckedIn ? "ĐÃ CÓ MẶT" : "CHƯA ĐẾN"}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    </React.Fragment>
                                                 );
                                             })}
                                         </tbody>
+                                        <tfoot style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "2px solid var(--border-color)", fontWeight: 900 }}>
+                                            <tr style={{ height: 32 }}>
+                                                <td colSpan={3} style={{ textAlign: "right", color: "var(--text-secondary)", paddingRight: 12, fontSize: 10 }}>
+                                                    TỔNG CỘNG: {attendeeDetails.length} NGƯỜI
+                                                </td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             }
                         </div>
 
-                        {/* ── Feedback ── */}
+                        {/* ── Feedback chi tiết ── */}
                         <div className="card" style={{ padding: 28, borderRadius: 24 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🌟 ĐÁNH GIÁ & MỨC ĐỘ HÀI LÒNG</h3>
-                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => exportExcel(feedback, "Phan-hoi")}>⬇️ Excel</button>
+                                <h3 style={{ fontSize: 17, fontWeight: 800 }}>🌟 CHI TIẾT ĐÁNH GIÁ & PHẢN HỒI</h3>
+                                <button className="btn btn-outline btn-sm" style={{ fontSize: 11, padding: "4px 10px" }} 
+                                    onClick={() => exportExcel(feedbackDetails.map(f => ({
+                                        "Sự kiện": f.event_name,
+                                        "Người đánh giá": f.reviewer_name || "Ẩn danh",
+                                        "Điểm": f.rating,
+                                        "Nội dung": f.content,
+                                        "Ngày gửi": new Date(f.created_at).toLocaleDateString("vi-VN")
+                                    })), "Phan-hoi-chi-tiet")}>⬇️ Excel</button>
                             </div>
-                            {feedback.length === 0
+                            {feedbackDetails.length === 0
                                 ? <div className="empty-state"><span>⭐</span><p>Chưa có phản hồi từ khách mời</p></div>
-                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 16 }}>
-                                    <table className="data-table">
-                                        <thead><tr><th>Sự kiện</th><th style={{ textAlign: "center" }}>Phản hồi</th><th style={{ textAlign: "right" }}>Đánh giá</th></tr></thead>
+                                : <div className="data-table-wrapper" style={{ border: "1px solid #f1f5f9", borderRadius: 8, maxHeight: 380, overflowY: "auto" }}>
+                                    <table className="data-table" style={{ fontSize: 11, tableLayout: "fixed", width: "100%" }}>
+                                        <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#fff", boxShadow: "0 1px 0 var(--border-color)" }}>
+                                            <tr style={{ height: 32 }}>
+                                                <th style={{ width: "25%", paddingLeft: 12 }}>Người đánh giá</th>
+                                                <th style={{ width: "60%" }}>Nội dung phản hồi</th>
+                                                <th style={{ width: "15%", textAlign: "right", paddingRight: 12 }}>Đánh giá</th>
+                                            </tr>
+                                        </thead>
                                         <tbody>
-                                            {feedback.map((f, i) => (
-                                                <tr key={i}>
-                                                    <td style={{ fontWeight: 800 }}>{f.name}</td>
-                                                    <td style={{ textAlign: "center", fontWeight: 700, color: "var(--color-primary)" }}>{f.total_feedback} lượt</td>
-                                                    <td style={{ textAlign: "right" }}>
-                                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                                                            <span style={{ fontWeight: 900, fontSize: 15, color: "#f59e0b" }}>{(Number(f.avg_rating) || 0).toFixed(1)}</span>
-                                                            <span style={{ color: "#f59e0b" }}>⭐</span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {feedbackDetails.map((f, i) => {
+                                                const isFirstOfEvent = i === 0 || feedbackDetails[i - 1].event_name !== f.event_name;
+                                                return (
+                                                    <React.Fragment key={i}>
+                                                        {isFirstOfEvent && (
+                                                            <tr style={{ background: "#f8fafc", height: 26 }}>
+                                                                <td colSpan={3} style={{ padding: "0 12px", fontWeight: 800, color: "var(--color-primary)", fontSize: 10, textTransform: "uppercase" }}>
+                                                                    📁 {f.event_name}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                        <tr style={{ minHeight: 40 }}>
+                                                            <td style={{ paddingLeft: 16, fontWeight: 600, color: "var(--text-primary)", verticalAlign: "top", paddingTop: 8 }}>
+                                                                {f.reviewer_name || "Ẩn danh"}
+                                                            </td>
+                                                            <td style={{ color: "var(--text-secondary)", fontSize: 10.5, lineHeight: 1.4, padding: "8px 0", wordBreak: "break-word" }}>
+                                                                {f.content}
+                                                            </td>
+                                                            <td style={{ textAlign: "right", paddingRight: 12, verticalAlign: "top", paddingTop: 8 }}>
+                                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                                                                    <span style={{ fontWeight: 800, color: "#f59e0b" }}>{f.rating}</span>
+                                                                    <span style={{ color: "#f59e0b", fontSize: 12 }}>⭐</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </React.Fragment>
+                                                );
+                                            })}
                                         </tbody>
+                                        <tfoot style={{ position: "sticky", bottom: 0, background: "#fff", borderTop: "2px solid var(--border-color)", fontWeight: 900 }}>
+                                            <tr style={{ height: 32 }}>
+                                                <td colSpan={3} style={{ textAlign: "right", color: "var(--text-secondary)", paddingRight: 12, fontSize: 10 }}>
+                                                    TỔNG CỘNG: {feedbackDetails.length} LƯỢT ĐÁNH GIÁ
+                                                </td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 </div>
                             }
