@@ -183,7 +183,7 @@ exports.update = async (id, data, userId) => {
             data.status, data.priority,
             data.due_date, data.start_date || null,
             data.is_milestone ? 1 : 0, data.position || 0,
-            data.progress || 0, data.estimated_h || null, data.actual_h || null,
+            data.status === 'done' ? 100 : 0, data.estimated_h || null, data.actual_h || null,
             data.estimated_budget || 0, data.actual_budget || 0, data.feedback_status || 'none', data.feedback_note || null,
             id
         ]);
@@ -228,7 +228,7 @@ exports.updateStatus = async (id, status, userId) => {
     try {
         await conn.beginTransaction();
 
-        await conn.query("UPDATE event_tasks SET status=? WHERE id=?", [status, id]);
+        await conn.query("UPDATE event_tasks SET status=?, progress=? WHERE id=?", [status, status === 'done' ? 100 : 0, id]);
         
         await conn.query(
             "INSERT INTO task_history (task_id,user_id,action,old_value,new_value) VALUES (?,?,?,?,?)",

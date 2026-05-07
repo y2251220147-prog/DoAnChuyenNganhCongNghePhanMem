@@ -107,20 +107,6 @@ function TaskCard({ task, canManage, onOpen, onStatusChange, onDragStart }) {
                 {task.title}
             </div>
 
-            {/* Progress bar */}
-            {task.progress > 0 && (
-                <div style={{
-                    height: 4, background: "var(--border-color)", borderRadius: 2,
-                    overflow: "hidden", marginBottom: 7
-                }}>
-                    <div style={{
-                        height: "100%", width: `${task.progress}%`,
-                        background: task.progress === 100 ? "#10b981" : "var(--color-primary)",
-                        borderRadius: 2, transition: "width 0.4s"
-                    }} />
-                </div>
-            )}
-
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
@@ -251,13 +237,6 @@ export default function TaskBoard({
         finally { setSending(false); }
     };
 
-    const handleProgressUpdate = async (progress) => {
-        try {
-            await updateTaskProgress(openTask.id, progress);
-            setOpenTask(prev => ({ ...prev, progress }));
-            setTasks(prev => prev.map(t => t.id === openTask.id ? { ...t, progress } : t));
-        } catch {/**/ }
-    };
 
     const handleFeedbackUpdate = async (e) => {
         e.preventDefault();
@@ -509,7 +488,7 @@ export default function TaskBoard({
                         <thead>
                             <tr>
                                 <th>Nhiệm vụ</th><th>Ưu tiên</th><th>Người phụ trách</th>
-                                <th>Hạn chót</th><th>Tiến độ</th><th>Trạng thái</th>
+                                <th>Hạn chót</th><th>Trạng thái</th>
                                 {canManage && <th>Thao tác</th>}
                             </tr>
                         </thead>
@@ -543,14 +522,6 @@ export default function TaskBoard({
                                             <td style={{ fontSize: 12, color: overdue ? "#dc2626" : "var(--text-primary)", fontWeight: overdue ? 700 : 400 }}>
                                                 {overdue && "⚠️ "}{fmtDate(task.due_date) || "—"}
                                             </td>
-                                            <td style={{ minWidth: 100 }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <div style={{ flex: 1, height: 5, background: "var(--border-color)", borderRadius: 3, overflow: "hidden" }}>
-                                                        <div style={{ height: "100%", width: `${task.progress || 0}%`, background: task.progress === 100 ? "#10b981" : "var(--color-primary)" }} />
-                                                    </div>
-                                                    <span style={{ fontSize: 10, fontWeight: 700, minWidth: 28, color: "var(--text-muted)" }}>{task.progress || 0}%</span>
-                                                </div>
-                                            </td>
                                             <td>
                                                 <span style={{ fontSize: 11, fontWeight: 600, color: s.color, background: s.color + "20", padding: "2px 8px", borderRadius: 999 }}>
                                                     {s.label}
@@ -579,14 +550,6 @@ export default function TaskBoard({
                                                     <td><span style={{ fontSize: 10, color: sp.color, background: sp.bg, padding: "1px 6px", borderRadius: 999 }}>{sp.label}</span></td>
                                                     <td style={{ fontSize: 12 }}>{sub.assigned_dept_name || sub.assigned_name || "—"}</td>
                                                     <td style={{ fontSize: 11, color: sOverdue ? "#dc2626" : "var(--text-muted)" }}>{fmtDate(sub.due_date) || "—"}</td>
-                                                    <td>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                                            <div style={{ width: 60, height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden" }}>
-                                                                <div style={{ height: "100%", width: `${sub.progress || 0}%`, background: "var(--color-primary)" }} />
-                                                            </div>
-                                                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub.progress || 0}%</span>
-                                                        </div>
-                                                    </td>
                                                     <td><span style={{ fontSize: 10, color: ss.color, background: ss.color + "20", padding: "1px 7px", borderRadius: 999 }}>{ss.label}</span></td>
                                                     {canManage && (
                                                         <td onClick={e => e.stopPropagation()}>
@@ -663,30 +626,6 @@ export default function TaskBoard({
                         )}
                     </div>
 
-                    {/* Progress slider */}
-                    <div style={{ marginBottom: 16 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>Tiến độ</span>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--color-primary)" }}>
-                                {openTask.progress || 0}%
-                            </span>
-                        </div>
-                        <input type="range" min={0} max={100} step={5}
-                            value={openTask.progress || 0}
-                            onChange={e => handleProgressUpdate(Number(e.target.value))}
-                            style={{ width: "100%", accentColor: "var(--color-primary)" }} />
-                        <div style={{
-                            height: 6, background: "var(--border-color)", borderRadius: 3,
-                            overflow: "hidden", marginTop: 4
-                        }}>
-                            <div style={{
-                                height: "100%",
-                                width: `${openTask.progress || 0}%`,
-                                background: `${openTask.progress === 100 ? "#10b981" : "var(--color-primary)"}`,
-                                transition: "width 0.3s"
-                            }} />
-                        </div>
-                    </div>
 
                     {/* Info grid */}
                     <div className="grid-2" style={{ marginBottom: 16, gap: 10 }}>
@@ -1023,7 +962,7 @@ function PhaseSection({ phase, tasks, canManage, onOpen, onEdit, onDelete, onAdd
                         <thead>
                             <tr>
                                 <th>Nhiệm vụ</th><th>Ưu tiên</th><th>Người phụ trách</th>
-                                <th>Hạn chót</th><th>Tiến độ</th><th>Trạng thái</th>
+                                <th>Hạn chót</th><th>Trạng thái</th>
                                 {canManage && <th>Thao tác</th>}
                             </tr>
                         </thead>
@@ -1062,23 +1001,6 @@ function PhaseSection({ phase, tasks, canManage, onOpen, onEdit, onDelete, onAdd
                                                 fontWeight: overdue ? 700 : 400
                                             }}>
                                                 {overdue && "⚠️ "}{fmtDate(task.due_date) || "—"}
-                                            </td>
-                                            <td style={{ minWidth: 100 }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                    <div style={{
-                                                        flex: 1, height: 5, background: "var(--border-color)",
-                                                        borderRadius: 3, overflow: "hidden"
-                                                    }}>
-                                                        <div style={{
-                                                            height: "100%", width: `${task.progress || 0}%`,
-                                                            background: task.progress === 100 ? "#10b981" : "var(--color-primary)"
-                                                        }} />
-                                                    </div>
-                                                    <span style={{
-                                                        fontSize: 10, fontWeight: 700, minWidth: 28,
-                                                        color: "var(--text-muted)"
-                                                    }}>{task.progress || 0}%</span>
-                                                </div>
                                             </td>
                                             <td>
                                                 <span style={{
@@ -1121,14 +1043,6 @@ function PhaseSection({ phase, tasks, canManage, onOpen, onEdit, onDelete, onAdd
                                                     <td style={{ fontSize: 12 }}>{sub.assigned_dept_name || sub.assigned_name || "—"}</td>
                                                     <td style={{ fontSize: 11, color: sOverdue ? "#dc2626" : "var(--text-muted)" }}>
                                                         {fmtDate(sub.due_date) || "—"}
-                                                    </td>
-                                                    <td>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                                            <div style={{ width: 60, height: 4, background: "var(--border-color)", borderRadius: 2, overflow: "hidden" }}>
-                                                                <div style={{ height: "100%", width: `${sub.progress || 0}%`, background: "var(--color-primary)" }} />
-                                                            </div>
-                                                            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub.progress || 0}%</span>
-                                                        </div>
                                                     </td>
                                                     <td><span style={{
                                                         fontSize: 10, color: ss.color, background: ss.color + "20",

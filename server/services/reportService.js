@@ -90,11 +90,68 @@ exports.getBudgetByEvent = async () => {
 };
 
 /**
+ * Thống kê ngân sách CHI TIẾT theo từng công việc/hạng mục (Giống danh sách trong Quản lý ngân sách)
+ */
+exports.getBudgetDetail = async () => {
+    const [rows] = await db.query(`
+        -- 1. Lấy tất cả các khoản chi đã có trong bảng event_budget (Phiếu chi)
+        SELECT 
+            e.name AS event_name,
+            eb.item AS item_name,
+            CAST(COALESCE(t.estimated_budget, eb.cost) AS DOUBLE) AS planned,
+            CAST(CASE WHEN eb.status = 'paid' THEN eb.cost ELSE 0 END AS DOUBLE) AS actual,
+            eb.status
+        FROM event_budget eb
+        JOIN events e ON eb.event_id = e.id
+        LEFT JOIN event_tasks t ON eb.task_id = t.id
+
+        UNION ALL
+
+        -- 2. Lấy các nhiệm vụ có ngân sách dự kiến nhưng CHƯA tạo phiếu chi
+        SELECT 
+            e.name AS event_name,
+            t.title AS item_name,
+            CAST(t.estimated_budget AS DOUBLE) AS planned,
+            0 AS actual,
+            'pending' AS status
+        FROM event_tasks t
+        JOIN events e ON t.event_id = e.id
+        WHERE t.estimated_budget > 0
+          AND NOT EXISTS (
+              SELECT 1 FROM event_budget eb WHERE eb.task_id = t.id
+          )
+
+        ORDER BY event_name, status DESC, item_name
+    `);
+    return rows;
+};
+
+/**
  * Thống kê tasks theo trạng thái.
  */
 exports.getTaskStats = async () => {
     const [rows] = await db.query(`
         SELECT status, COUNT(*) AS count FROM event_tasks GROUP BY status
+    `);
+    return rows;
+};
+
+/**
+ * Danh sách chi tiết tiến độ công việc (Cho báo cáo)
+ */
+exports.getTaskDetail = async () => {
+    const [rows] = await db.query(`
+        SELECT 
+            t.id,
+            e.name AS event_name,
+            t.title AS task_name,
+            COALESCE(u.name, d.name) AS assignee,
+            t.status
+        FROM event_tasks t
+        JOIN events e ON t.event_id = e.id
+        LEFT JOIN users u ON t.assigned_to = u.id
+        LEFT JOIN departments d ON t.assigned_department_id = d.id
+        ORDER BY e.name, t.status, t.title
     `);
     return rows;
 };
@@ -111,6 +168,23 @@ exports.getEventsByType = async () => {
 };
 
 /**
+ * Danh sách chi tiết khách mời & check-in (Cho báo cáo)
+ */
+exports.getAttendeeDetail = async () => {
+    const [rows] = await db.query(`
+        SELECT 
+            e.name AS event_name,
+            a.name AS attendee_name,
+            a.attendee_type,
+            a.checked_in
+        FROM attendees a
+        JOIN events e ON a.event_id = e.id
+        ORDER BY e.name, a.attendee_type, a.name
+    `);
+    return rows;
+};
+
+/**
  * Thống kê phản hồi theo sự kiện.
  */
 exports.getFeedbackStats = async () => {
@@ -122,6 +196,24 @@ exports.getFeedbackStats = async () => {
         JOIN feedback f ON e.id = f.event_id
         GROUP BY e.id
         ORDER BY avg_rating DESC
+    `);
+    return rows;
+};
+
+/**
+ * Danh sách chi tiết phản hồi (Cho báo cáo)
+ */
+exports.getFeedbackDetail = async () => {
+    const [rows] = await db.query(`
+        SELECT 
+            e.name AS event_name,
+            f.name AS reviewer_name,
+            f.rating,
+            f.message AS content,
+            f.created_at
+        FROM feedback f
+        JOIN events e ON f.event_id = e.id
+        ORDER BY e.name, f.created_at DESC
     `);
     return rows;
 };
